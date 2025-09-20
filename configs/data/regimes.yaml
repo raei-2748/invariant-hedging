@@ -1,4 +1,5 @@
 name: volatility_regimes
+dataset_type: synthetic
 train_environments: [low, medium, high]
 val_environment: high
 test_environment: crisis
@@ -51,3 +52,71 @@ tx_costs:
     linear: 0.002
     quadratic: 0.1
 shuffle: true
+real_data:
+  spy_options_path: data/spy_options_2016_2023.csv
+  es_futures_path: data/es_futures_2016_2023.csv
+  start_date: 2016-01-01
+  end_date: 2023-12-31
+  interpolation_method: time
+  target_dte: 60
+  realized_vol_window: 20
+  realized_skew_window: 60
+  options_columns:
+    date: quote_date
+    expiration: expiration
+    strike: strike
+    bid: bid
+    ask: ask
+    volume: volume
+    open_interest: open_interest
+    underlying: underlying_price
+    implied_vol: implied_volatility
+  futures_columns:
+    date: trade_date
+    close: settle
+  filters:
+    min_open_interest: 500
+    min_volume: 50
+    max_rel_spread: 0.05
+    max_abs_spread: 0.15
+  tx_costs:
+    default:
+      linear: 0.001
+      quadratic: 0.05
+    stress:
+      linear: 0.0015
+      quadratic: 0.08
+    crisis:
+      linear: 0.002
+      quadratic: 0.1
+  train_windows:
+    - name: calm_pre_volmageddon
+      start: 2016-01-04
+      end: 2017-12-29
+      cost_profile: default
+  val_windows:
+    - name: transition_2019
+      start: 2019-01-02
+      end: 2019-12-31
+      cost_profile: stress
+  test_windows:
+    - name: post_covid_recovery
+      start: 2020-06-01
+      end: 2021-12-31
+      cost_profile: default
+  crisis_windows:
+    - name: volmageddon_2018
+      start: 2018-01-02
+      end: 2018-06-29
+      cost_profile: crisis
+    - name: covid_crash
+      start: 2020-02-01
+      end: 2020-04-30
+      cost_profile: crisis
+    - name: inflation_shock_2022
+      start: 2022-03-01
+      end: 2022-10-31
+      cost_profile: crisis
+combined:
+  synthetic_batch_ratio: 0.5
+  real_batch_ratio: 0.5

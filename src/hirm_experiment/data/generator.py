@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Optional
+from typing import Any, Dict, Optional
 
 import numpy as np
 
@@ -33,6 +33,7 @@ class SimulationResult:
     implied_vol: np.ndarray
     option_price: np.ndarray
     tx_cost: TransactionCostSpec
+    metadata: Optional[Dict[str, Any]] = None
 
 
 class VolatilityRegimeSimulator:
@@ -66,6 +67,18 @@ class VolatilityRegimeSimulator:
         sigma_imp = np.full_like(tau, sigma + spec.vrp)
         prices, delta, gamma, theta = self._compute_option_terms(spot_paths[:, :-1], tau, sigma_imp)
         realized_vol = self._compute_realized_vol(spot_paths)
+        metadata: Dict[str, Any] = {
+            "source": "synthetic",
+            "regime": env,
+            "sigma": sigma,
+            "vrp": spec.vrp,
+            "skew": spec.skew,
+            "seed": seed,
+            "with_jump": with_jump,
+            "episode_length": self.episode_length,
+        }
+        if with_jump and self.jump_config:
+            metadata["jump_config"] = dict(self.jump_config)
         return SimulationResult(
             env=env,
             spot=spot_paths,
@@ -76,6 +89,7 @@ class VolatilityRegimeSimulator:
             implied_vol=sigma_imp,
             option_price=prices,
             tx_cost=cost,
+            metadata=metadata,
         )
 
     def _simulate_spot(self, rng: np.random.Generator, num_episodes: int, sigma: float, with_jump: bool) -> np.ndarray:

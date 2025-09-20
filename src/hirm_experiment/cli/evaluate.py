@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import hydra
 import torch
@@ -65,7 +65,7 @@ def _aggregate_results(per_seed: Dict[int, EvaluationResult]) -> Dict[str, Dict[
     return aggregated
 
 
-def _coverage_snapshot(per_seed: Dict[int, EvaluationResult]) -> Dict[str, Dict[str, float]]:
+def _coverage_snapshot(per_seed: Dict[int, EvaluationResult]) -> Dict[str, Dict[str, Any]]:
     if not per_seed:
         return {}
     first = next(iter(per_seed.values()))

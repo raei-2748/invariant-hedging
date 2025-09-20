@@ -4,12 +4,11 @@ from pathlib import Path
 from typing import Dict, Optional
 
 import torch
-from torch import nn
 from torch.nn.utils import clip_grad_norm_
 from torch.optim import Adam
 
 from hirm_experiment.algorithms import build_algorithm
-from hirm_experiment.data.dataset import VolatilityRegimeDataModule, create_data_module
+from hirm_experiment.data.dataset import create_data_module
 from hirm_experiment.evaluation.metrics import compute_metrics
 from hirm_experiment.models.policy import HedgingPolicy, HedgingPolicyConfig
 from hirm_experiment.training.features import FeatureBuilder
