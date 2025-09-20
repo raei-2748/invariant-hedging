@@ -116,14 +116,14 @@ class TrainingEngine:
                 for key, value in metrics.items():
                     eval_logs[f"val/{env}/{key}"] = value
             test_env = self.data_cfg.get("test_environment")
-            if test_env:
-                test_dataset = self.data_module.test_sets().get(test_env)
-                if test_dataset is not None:
-                    batch = test_dataset.full(self.device)
-                    outputs = rollout_policy(self.model, batch, self.feature_builder)
-                    metrics = compute_metrics(outputs)
-                    for key, value in metrics.items():
-                        eval_logs[f"test/{test_dataset.env}/{key}"] = value
+            for name, test_dataset in self.data_module.test_sets().items():
+                batch = test_dataset.full(self.device)
+                outputs = rollout_policy(self.model, batch, self.feature_builder)
+                metrics = compute_metrics(outputs)
+                env_name = test_dataset.env if test_dataset.env else name
+                for key, value in metrics.items():
+                    eval_logs[f"test/{env_name}/{key}"] = value
+                if test_env and env_name == test_env:
                     crisis_cvar = metrics.get("cvar_95")
                     if crisis_cvar is not None:
                         if self.best_val_metric is None or crisis_cvar < self.best_val_metric:

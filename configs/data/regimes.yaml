@@ -1,5 +1,5 @@
 name: volatility_regimes
-train_environments: [low, medium, high]
+train_environments: [low, medium]
 val_environment: high
 test_environment: crisis
 additional_stress: [jump, liquidity]

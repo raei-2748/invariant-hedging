@@ -18,10 +18,12 @@ class GroupDROAlgorithm(Algorithm):
         eta: float = 0.1,
     ) -> None:
         super().__init__("groupdro", feature_builder, device)
+        if not env_names:
+            raise ValueError("GroupDROAlgorithm requires at least one training environment.")
         self.eta = eta
-        self.env_order = env_names
-        weights = torch.ones(len(env_names), device=device) / len(env_names)
-        self.weights = weights
+        self.env_order = list(env_names)
+        weights = torch.ones(len(self.env_order), device=device, dtype=torch.float32)
+        self.weights = weights / weights.sum()
 
     def compute_loss(
         self,
