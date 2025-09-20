@@ -1,0 +1,5 @@
+name: vrex
+objective: mean_squared_pnl
+risk_measure: variance_penalized
+penalty_weight: 10.0
+penalty_anneal_iters: 5000

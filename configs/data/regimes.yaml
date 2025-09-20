@@ -1,0 +1,53 @@
+name: volatility_regimes
+train_environments: [low, medium, high]
+val_environment: high
+test_environment: crisis
+additional_stress: [jump, liquidity]
+episode_length: 60
+train_episodes: 20000
+val_episodes: 4000
+test_episodes: 1000
+batch_size: 128
+num_workers: 0
+feature_set:
+  invariants: [delta, gamma, time_to_maturity, inventory]
+  spurious: [realized_volatility]
+standardize_on: train
+volatility_bands:
+  low:
+    sigma: 0.10
+    vrp: 0.05
+    skew: -0.10
+  medium:
+    sigma: 0.18
+    vrp: 0.05
+    skew: -0.15
+  high:
+    sigma: 0.32
+    vrp: 0.15
+    skew: -0.30
+  crisis:
+    sigma: 0.55
+    vrp: 0.25
+    skew: -0.45
+jump_environments:
+  intensity: 0.4
+  mean_jump: -0.05
+  std_jump: 0.10
+liquidity_environments:
+  base_spread: 0.0005
+  crisis_spread: 0.002
+tx_costs:
+  low:
+    linear: 0.0005
+    quadratic: 0.0
+  medium:
+    linear: 0.0005
+    quadratic: 0.0
+  high:
+    linear: 0.002
+    quadratic: 0.1
+  crisis:
+    linear: 0.002
+    quadratic: 0.1
+shuffle: true
