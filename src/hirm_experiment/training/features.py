@@ -16,7 +16,6 @@ class FeatureBuilder:
 
     def step_features(self, batch: EpisodeBatch, t: int, inventory: torch.Tensor) -> torch.Tensor:
         components: List[torch.Tensor] = []
-        device = batch.delta.device
         for name in self.invariants + self.spurious:
             components.append(self._feature(name, batch, t, inventory).unsqueeze(-1))
         return torch.cat(components, dim=-1)

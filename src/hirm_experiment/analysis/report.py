@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import Dict
+from typing import Any, Dict
 
 import matplotlib.pyplot as plt
 import pandas as pd
 
 
-def coverage_table(coverage: Dict[str, Dict[str, float]]) -> pd.DataFrame:
+def coverage_table(coverage: Dict[str, Dict[str, Any]]) -> pd.DataFrame:
     if not coverage:
         return pd.DataFrame()
     df = pd.DataFrame.from_dict(coverage, orient="index")
