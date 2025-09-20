@@ -135,9 +135,17 @@ class VolatilityRegimeDataModule:
         self.device = device
         self.simulator = build_simulator_from_config(config, config["episode_length"])
         rng = np.random.default_rng(seed)
-        self.train_envs = list(config["train_environments"])
-        self.val_envs = [config["val_environment"]]
-        self.test_envs = [config["test_environment"]]
+
+        train_envs = list(config.get("train_environments", []))
+        if not train_envs:
+            raise ValueError("VolatilityRegimeDataModule requires at least one training environment.")
+        self.train_envs = train_envs
+
+        val_env = config.get("val_environment")
+        self.val_envs = [val_env] if val_env else []
+
+        test_env = config.get("test_environment")
+        self.test_envs = [test_env] if test_env else []
         self.additional_stress = list(config.get("additional_stress", []))
         self.datasets: Dict[str, RegimeDataset] = {}
         self.val_datasets: Dict[str, RegimeDataset] = {}
@@ -200,10 +208,18 @@ class VolatilityRegimeDataModule:
         return _compute_stats_from_datasets(datasets)
 
     def sample_train_batches(self, batch_size: int) -> Dict[str, EpisodeBatch]:
-        per_env = max(batch_size // len(self.train_envs), 1)
+        if not self.train_envs:
+            raise ValueError("No training environments are available for sampling.")
+        env_count = len(self.train_envs)
+        base = batch_size // env_count
+        remainder = batch_size % env_count
         batches: Dict[str, EpisodeBatch] = {}
-        for env in self.train_envs:
-            batches[env] = self.datasets[env].sample(per_env, self.device)
+        for idx, env in enumerate(self.train_envs):
+            extra = 1 if idx < remainder else 0
+            env_batch = base + extra
+            if env_batch <= 0:
+                env_batch = 1
+            batches[env] = self.datasets[env].sample(env_batch, self.device)
         return batches
 
     def sample_validation(self, env: Optional[str] = None) -> Dict[str, EpisodeBatch]:
