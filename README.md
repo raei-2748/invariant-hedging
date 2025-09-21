@@ -1,42 +1,75 @@
 # invariant-hedging
 
-Invariant Risk Minimization for Deep Hedging under regime shifts.
+Research-grade pipeline for testing invariant risk minimisation (IRM) against hedging baselines in single-asset options markets.
 
-## Hedging IRM Research Experiment
+## Quick start
 
-This repository contains a simulation and training framework for studying invariant risk minimization (IRM) and related baselines on volatility-regime hedging tasks. The implementation follows the research design laid out in `Research Setup.md`.
-
-## Getting Started
-
-1. Install dependencies:
+1. **Install dependencies**
    ```bash
    make setup
    ```
-2. Launch a default IRM training run:
+2. **Run a training job** (defaults to the ERM baseline)
    ```bash
    make train
    ```
-   Hydra logs outputs to `outputs/runs/<timestamp>`.
-3. Evaluate a saved checkpoint (replace the path with your checkpoint file):
+   Override the Hydra config by passing `CONFIG=train/irm` or other configs to the make target.
+3. **Evaluate a checkpoint** on the crisis out-of-distribution regime
    ```bash
-   make evaluate CHECKPOINT=outputs/checkpoints/checkpoint_150000.pt
+   make evaluate CHECKPOINT=/path/to/checkpoint.pt
    ```
+4. **Full reproduction** of the Phase 1 protocol (ERM, ERM-reg, IRM, GroupDRO, V-REx)
+   ```bash
+   scripts/make_reproduce.sh
+   ```
+   Each run mirrors metrics locally under `runs/<timestamp>/` and, if W&B is available, logs to the `invariant-hedging` project.
 
-## Project Structure
+## Repository layout
 
-- `configs/`: Hydra configuration hierarchy for data, models, algorithms, and evaluation.
-- `src/hirm_experiment/data/`: Synthetic volatility-regime simulator and dataset wrappers.
-- `src/hirm_experiment/models/`: Hedging policy networks.
-- `src/hirm_experiment/algorithms/`: Implementations of ERM, IRM, GroupDRO, and VREx training objectives.
-- `src/hirm_experiment/training/`: Training engine, logging, and learning-rate scheduling utilities.
-- `src/hirm_experiment/evaluation/`: Metric computation, evaluator logic, and analysis helpers.
-- `src/hirm_experiment/analysis/`: Reporting utilities for coverage tables and spread sensitivity curves.
+```
+configs/               Hydra configs for data, environments, models, training and evaluation
+src/
+  data/                Synthetic generators, real-data anchor, feature engineering
+  markets/             Black–Scholes pricing and execution cost models
+  envs/                Daily rebalancing single-asset environment
+  objectives/          CVaR estimator, entropic risk and regularisation penalties
+  models/              Policy networks and representation heads
+  utils/               Logging, checkpoints, determinism helpers, statistics
+  train.py             Three-phase training loop (ERM → IRM ramp → full horizon)
+  eval.py              Crisis evaluation with CVaR-95 table and QQ plots
+scripts/               Convenience wrappers (`run_train.sh`, `run_eval.sh`, `make_reproduce.sh`)
+tests/                 Unit tests for pricing, CVaR, costs and seeding
+notebooks/             Diagnostics (e.g. `phi_invariance.ipynb`)
+```
 
-## Key Outputs
+## Logging and outputs
 
-During evaluation the CLI reports:
-- Per-environment risk metrics including CVaR-95, mean P&L, turnover, drawdown, and Sharpe ratio.
-- Coverage statistics (episodes, horizon, average realized volatility, and transaction cost settings).
-- Spread-sensitivity data to support the required robustness plot.
+Every run (train or eval) writes to `runs/<timestamp>/` with the following structure:
 
-These artifacts can be consumed by downstream notebooks or plotting scripts under `src/hirm_experiment/analysis`.
+- `config.yaml`: resolved Hydra configuration
+- `metrics.jsonl`: stepwise metrics
+- `final_metrics.json`: summary metrics
+- `checkpoints/`: top-k checkpoints selected by validation CVaR-95
+- `artifacts/`: crisis tables, QQ plots and any additional evaluation artefacts
+- `metadata.json`: git commit hash and Python version
+
+If W&B credentials are available the same metrics are mirrored to the `invariant-hedging` project; offline mode is supported via `WANDB_MODE=offline`.
+
+## Testing
+
+Unit tests cover pricing Greeks, CVaR estimation, cost kernels and deterministic seeding. Run them with:
+
+```bash
+make tests
+```
+
+GitHub Actions executes the test suite together with a smoke train/eval pass on every push.
+
+## Data
+
+The synthetic generator supports GBM and Heston dynamics with environment-specific transaction costs. A tiny SPY options slice (`data/spy_sample.csv`) is bundled as a deterministic real-data anchor that exercises the full feature pipeline.
+
+Episode configuration, cost files and model settings live under `configs/`. Adjust these as needed for experiments or sweeps. The default training protocol performs 20k ERM pre-training steps, a 10k IRM ramp, and continues until 150k total updates with environment-balanced batching.
+
+## Reproducibility
+
+`scripts/make_reproduce.sh` re-runs the ERM, ERM-reg, IRM, GroupDRO and V-REx configurations for seed 0, evaluates the best checkpoint for each on the crisis environment, and regenerates the crisis CVaR-95 table plus QQ plots. All seeds are controlled via `configs/train/*.yaml` and `src/utils/seed.py` to guarantee deterministic `metrics.jsonl` for `seed=0`.

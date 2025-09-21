@@ -1,0 +1,15 @@
+wandb:
+  enabled: false
+  project: invariant-hedging
+  entity: null
+  offline_ok: true
+  dir: runs/wandb
+local_mirror:
+  enabled: true
+  base_dir: runs
+  metrics_file: metrics.jsonl
+  final_metrics_file: final_metrics.json
+  config_file: config.yaml
+  checkpoints_dir: checkpoints
+  artifacts_dir: artifacts
+  stats_csv: stats.csv

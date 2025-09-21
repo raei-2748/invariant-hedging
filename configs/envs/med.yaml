@@ -1,0 +1,19 @@
+episode:
+  length_days: 60
+  rebalancing: daily
+  notional: 1.0
+
+dynamics:
+  model: gbm
+  params:
+    mu: 0.03
+    sigma: 0.25
+    dt: 1.0
+
+costs:
+  file: low
+
+options:
+  strike_mode: atm
+  maturity_days: 60
+  rate: 0.01
