@@ -7,7 +7,7 @@ setup:
 	$(PYTHON) -m pip install -r requirements.txt
 
 train:
-        scripts/run_train.sh $(CONFIG)
+	 scripts/run_train.sh $(CONFIG)
 
 evaluate:
         @if [ -z "$(CHECKPOINT)" ]; then \
