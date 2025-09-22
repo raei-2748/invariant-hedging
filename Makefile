@@ -6,7 +6,6 @@ CONFIG ?= configs/experiment.yaml
 setup:
 	$(PYTHON) -m pip install -r requirements.txt
 
-
 train:
 	$(PYTHON) -m hirm_experiment.cli.train --config-path configs --config-name experiment
 
