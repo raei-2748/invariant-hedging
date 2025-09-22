@@ -14,7 +14,7 @@ evaluate:
 		echo "CHECKPOINT path required, e.g. make evaluate CHECKPOINT=outputs/checkpoints/checkpoint_150000.pt"; \
 		exit 1; \
 	fi
-	$(PYTHON) -m hirm_experiment.cli.evaluate --config-path configs --config-name experiment_eval evaluation.checkpoint_path=$(CHECKPOINT)
+	scripts/run_eval.sh $(CONFIG) eval.report.checkpoint_path=$(CHECKPOINT)
 
 reproduce:
 	SEED=0 $(PYTHON) -m hirm_experiment.cli.evaluate --config-path configs --config-name reproduce
