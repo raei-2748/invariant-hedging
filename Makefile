@@ -7,7 +7,7 @@ setup:
 	$(PYTHON) -m pip install -r requirements.txt
 
 train:
-	$(PYTHON) -m hirm_experiment.cli.train --config-path configs --config-name experiment
+	 scripts/run_train.sh $(CONFIG)
 
 evaluate:
 	@if [ -z "$(CHECKPOINT)" ]; then \
