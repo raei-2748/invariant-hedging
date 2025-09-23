@@ -1,5 +1,5 @@
 # HIRM
-**HIRM**: Hedging with IRM
+The research introduce **HIRM**(Hedging with IRM), a research framework for robust hedging, designed to test whether Invariant Risk Minimization improves tail-risk performance compared to standard deep hedging approaches.
 
 **Research question:** Does adding Invariant Risk Minimization (IRM) to a deep hedging framework improve robustness against regime shifts (such as crisis periods like Volmageddon), compared to a standard deep hedger without IRM or trained on alternative regularizations?
 
