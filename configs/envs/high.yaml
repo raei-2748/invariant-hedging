@@ -1,0 +1,22 @@
+episode:
+  length_days: 60
+  rebalancing: daily
+  notional: 1.0
+
+dynamics:
+  model: heston
+  params:
+    mu: 0.02
+    long_term_var: 0.2
+    mean_rev: 1.0
+    vol_of_vol: 0.35
+    rho: -0.3
+    v0: 0.25
+
+costs:
+  file: high
+
+options:
+  strike_mode: atm
+  maturity_days: 60
+  rate: 0.01
