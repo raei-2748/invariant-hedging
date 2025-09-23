@@ -1,23 +1,26 @@
 PYTHON ?= python3
 CONFIG ?= configs/experiment.yaml
 
-.PHONY: setup train evaluate reproduce lint
+.PHONY: setup train evaluate reproduce lint tests
 
 setup:
 	$(PYTHON) -m pip install -r requirements.txt
 
 train:
-	$(PYTHON) -m hirm_experiment.cli.train --config-path configs --config-name experiment
+        scripts/run_train.sh $(CONFIG)
 
 evaluate:
-	@if [ -z "$(CHECKPOINT)" ]; then \
-		echo "CHECKPOINT path required, e.g. make evaluate CHECKPOINT=outputs/checkpoints/checkpoint_150000.pt"; \
-		exit 1; \
-	fi
-	$(PYTHON) -m hirm_experiment.cli.evaluate --config-path configs --config-name experiment_eval evaluation.checkpoint_path=$(CHECKPOINT)
+        @if [ -z "$(CHECKPOINT)" ]; then \
+                echo "CHECKPOINT path required, e.g. make evaluate CHECKPOINT=outputs/checkpoints/checkpoint_150000.pt"; \
+                exit 1; \
+        fi
+        scripts/run_eval.sh $(CONFIG) eval.report.checkpoint_path=$(CHECKPOINT)
 
 reproduce:
-	SEED=0 $(PYTHON) -m hirm_experiment.cli.evaluate --config-path configs --config-name reproduce
+        scripts/make_reproduce.sh
 
 lint:
-	$(PYTHON) -m ruff check src
+        $(PYTHON) -m ruff check src
+
+tests:
+        $(PYTHON) -m pytest

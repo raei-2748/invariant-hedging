@@ -1,0 +1,7 @@
+name: real_spy
+file: data/spy_sample.csv
+slippage_bps: 10
+rate: 0.01
+min_volume: 1000
+start_date: 2019-01-01
+end_date: 2020-12-31
