@@ -1,27 +1,17 @@
+# Master Hydra experiment configuration
+# Provides defaults for training and evaluation workflows.
 defaults:
-  - model: hedger
-  - data: regimes
-  - algorithm: irm
-  - training: default
-  - evaluation: default
-  - logging: wandb
+  - /data: synthetic
+  - /envs: daily
+  - /costs: low
+  - /model: erm
+  - /train: erm
+  - /eval: daily
+  - /logging: default
   - _self_
 
-project:
-  name: hirm_experiment
-  seed: 123
-  output_dir: outputs
-
-checkpointing:
-  enabled: true
-  dir: ${project.output_dir}/checkpoints
-
-wandb:
-  mode: offline
-  entity: null
-  project: ${project.name}
-
-hydra:
-  run:
-    dir: ${project.output_dir}/runs/${now:%Y%m%d_%H%M%S}
-  output_subdir: null
+runtime:
+  seed: 0
+  device: auto
+  mixed_precision: true
+  output_dir: runs

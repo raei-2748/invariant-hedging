@@ -1,0 +1,3 @@
+linear_bps: 20
+quadratic: 0.1
+slippage_multiplier: 1.0

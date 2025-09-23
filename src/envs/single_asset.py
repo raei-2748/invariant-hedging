@@ -1,0 +1,108 @@
+"""Single-asset hedging environment with daily rebalancing."""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Optional
+
+import torch
+
+from ..data.features import FeatureEngineer
+from ..data.synthetic import EpisodeBatch
+from ..markets.costs import execution_cost
+
+
+@dataclass
+class SimulationOutput:
+    pnl: torch.Tensor
+    turnover: torch.Tensor
+    underlying_pnl: torch.Tensor
+    option_pnl: torch.Tensor
+    costs: torch.Tensor
+    positions: torch.Tensor
+    step_pnl: torch.Tensor
+
+
+class SingleAssetHedgingEnv:
+    def __init__(self, env_index: int, batch: EpisodeBatch, feature_engineer: FeatureEngineer):
+        self.env_index = env_index
+        self.batch = batch
+        self.feature_engineer = feature_engineer
+        self.cost_config = {
+            "linear_bps": batch.meta.get("linear_bps", 0.0),
+            "quadratic": batch.meta.get("quadratic", 0.0),
+            "slippage_multiplier": batch.meta.get("slippage_multiplier", 1.0),
+        }
+        self.notional = batch.meta.get("notional", 1.0)
+
+    def sample_indices(self, batch_size: int, generator: Optional[torch.Generator] = None) -> torch.Tensor:
+        num = self.batch.spot.shape[0]
+        if generator is None:
+            return torch.randint(0, num, (batch_size,))
+        return torch.randint(0, num, (batch_size,), generator=generator)
+
+    def simulate(
+        self,
+        policy,
+        indices: torch.Tensor,
+        device: torch.device,
+        representation_scale: Optional[torch.Tensor] = None,
+    ) -> SimulationOutput:
+        sub_batch = self.batch.subset(indices.tolist()).to(device)
+        steps = sub_batch.steps
+        batch_size = sub_batch.spot.shape[0]
+        spot = sub_batch.spot
+        option = sub_batch.option_price
+        base_features = self.feature_engineer.base_features(sub_batch).to(device)
+        scaler = self.feature_engineer.scaler
+        if scaler is None:
+            raise RuntimeError("Feature engineer must be fit before simulation.")
+        mean = scaler.mean.to(device)
+        std = torch.clamp(scaler.std.to(device), min=1e-6)
+
+        positions = torch.zeros(batch_size, steps + 1, device=device)
+        pnl = torch.zeros(batch_size, device=device)
+        underlying_pnl = torch.zeros_like(pnl)
+        option_pnl = torch.zeros_like(pnl)
+        costs = torch.zeros_like(pnl)
+        turnover = torch.zeros_like(pnl)
+        step_pnl = torch.zeros(batch_size, steps, device=device)
+
+        for t in range(steps):
+            inv = positions[:, t] / self.notional
+            feat_t = torch.cat([base_features[:, t, :], inv.unsqueeze(-1)], dim=-1)
+            feat_t = (feat_t - mean) / std
+            out = policy(feat_t, env_index=self.env_index, representation_scale=representation_scale)
+            action = out["action"].squeeze(-1)
+            positions[:, t + 1] = action
+            trade = positions[:, t + 1] - positions[:, t]
+            cost_t = execution_cost(trade, spot[:, t], self.cost_config)
+            costs += cost_t
+            turnover += torch.abs(trade)
+            underlying_step = positions[:, t] * (spot[:, t + 1] - spot[:, t])
+            option_step = -(option[:, t + 1] - option[:, t])
+            underlying_pnl += underlying_step
+            option_pnl += option_step
+            step_value = underlying_step + option_step - cost_t
+            step_pnl[:, t] = step_value
+            pnl += step_value
+
+        # Liquidate residual position at final spot price with same cost structure
+        final_trade = -positions[:, -1]
+        liquidation_cost = execution_cost(final_trade, spot[:, -1], self.cost_config)
+        final_underlying = positions[:, -1] * (spot[:, -1] - spot[:, -2])
+        underlying_pnl += final_underlying
+        costs += liquidation_cost
+        turnover += torch.abs(final_trade)
+        final_step = final_underlying - liquidation_cost
+        pnl += final_step
+        step_pnl = torch.cat([step_pnl, final_step.unsqueeze(-1)], dim=1)
+
+        return SimulationOutput(
+            pnl=pnl,
+            turnover=turnover,
+            underlying_pnl=underlying_pnl,
+            option_pnl=option_pnl,
+            costs=costs,
+            positions=positions,
+            step_pnl=step_pnl,
+        )
