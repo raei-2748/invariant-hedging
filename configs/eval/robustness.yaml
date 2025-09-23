@@ -1,0 +1,6 @@
+name: robustness
+hourly:
+  enabled: true
+  hours_per_day: 6
+  episode_hours: 360
+  batch_size: 32

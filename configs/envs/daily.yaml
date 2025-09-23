@@ -1,0 +1,13 @@
+# Defines the set of environments used during daily rebalancing experiments.
+# Training: low + med volatility; validation: high; testing: crisis regime.
+train:
+  - low
+  - med
+val:
+  - high
+test:
+  - crisis
+
+robustness:
+  rebalancing: hourly
+  hours_per_day: 6
