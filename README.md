@@ -1,5 +1,6 @@
 # HIRM
 **HIRM**: Hedging with IRM
+
 **Research question:** Does adding Invariant Risk Minimization (IRM) to a deep hedging framework improve robustness against regime shifts (such as crisis periods like Volmageddon), compared to a standard deep hedger without IRM or trained on alternative regularizations?
 
 ## Quick start
