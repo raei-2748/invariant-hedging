@@ -58,5 +58,6 @@ class PolicyMLP(nn.Module):
         scale = representation_scale if representation_scale is not None else 1.0
         scaled_rep = rep * scale
         adapter = self.env_adapters[env_index]
-        action = torch.tanh(adapter(scaled_rep)) * self.max_position
-        return {"action": action, "representation": rep}
+        raw_action = adapter(scaled_rep)
+        action = torch.tanh(raw_action) * self.max_position
+        return {"action": action, "raw_action": raw_action, "representation": rep}

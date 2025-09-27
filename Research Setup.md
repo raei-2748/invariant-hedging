@@ -284,3 +284,6 @@ This ensures comparisons are reproducible and fair, avoiding reviewer concerns a
 - **Section 5 (Training Protocol):** add “ERM-reg” config (weight decay 1e-3, dropout 0.3, label smoothing 0.05).
 - **Section 6 (Evaluation):** add the pre-commit thresholds for CVaR, turnover, mean P&L.
 - **Section 7 (Analysis):** add a **coverage table** and a **spread-sensitivity plot** (CVaR vs allowed spread cap).
+- **Turnover diagnostics:** set the environment variable `HIRM_DEBUG_PROBE=1` before launching training to print the first-episode probe (price, previous position, raw NN output, final position, trade, cost) for the first 20 steps only. Leave it unset for clean runs.
+- **Trade spike guard:** `train.max_trade_warning` (default 50.0) logs a warning if any single trade magnitude exceeds the threshold. This is meant to catch the “seed 1” churn bug early.
+- **Baseline automation:** run `scripts/run_baseline.py --steps 20000 --seeds 0-4` to retrain + evaluate the ERM baseline. The script writes `baseline_summary.csv` and (optionally) keeps per-seed evaluation artifacts under `runs_eval/` when `--keep-eval` is supplied.
