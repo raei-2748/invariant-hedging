@@ -157,15 +157,20 @@ def generate_episode_batch(
     time_grid = np.broadcast_to(time_to_maturity, (num_episodes, steps + 1))
 
     # Use instantaneous variance from log returns for GBM, or from Heston generator if available.
-    params = dynamics_cfg["params"]
+    params = dynamics_cfg.get("params", {})
     implied_vol = np.zeros_like(spot_paths)
-    for t in range(steps + 1):
-        if t == 0:
-            implied_vol[:, t] = math.sqrt(max(dynamics_cfg["params"].get("sigma", 0.2), 1e-6))
-        else:
-            ret = np.log(spot_paths[:, t] / spot_paths[:, t - 1])
-            implied_vol[:, t] = np.clip(np.std(ret), 1e-6, None)
-    implied_vol = np.where(np.isfinite(implied_vol), implied_vol, 0.2)
+    init_vol = _initial_implied_vol(params)
+    implied_vol[:, 0] = init_vol
+
+    dt = getattr(generator, "dt", 1.0 / 252.0)
+    inv_sqrt_dt = 1.0 / math.sqrt(max(dt, 1e-12))
+    for t in range(1, steps + 1):
+        # Cross-sectional realised volatility scaled to annualised units.
+        ret = np.log(spot_paths[:, t] / spot_paths[:, t - 1])
+        realised = np.std(ret, ddof=0) * inv_sqrt_dt
+        implied_vol[:, t] = np.clip(realised, 1e-6, None)
+
+    implied_vol = np.where(np.isfinite(implied_vol), implied_vol, init_vol)
 
     strike_mode = env_cfg.get("options", {}).get("strike_mode", "atm")
     if strike_mode == "atm":
@@ -214,7 +219,7 @@ class SyntheticDataModule:
         }
         num = episodes_per_env.get(split, episodes_per_env["train"])
         batches: Dict[str, EpisodeBatch] = {}
-        base_seed = int(self.config.get("seed", 0)) + hash(split) % (2**32)
+        base_seed = int(self.config.get("seed", 0)) + _stable_seed_offset(split)
         for idx, name in enumerate(env_names):
             env_cfg = self.env_cfgs[name]
             cost_cfg = self.cost_cfgs[env_cfg["costs"]["file"]]
@@ -225,7 +230,7 @@ class SyntheticDataModule:
                 num_episodes=num,
                 spot0=float(self.config.get("spot_init", 100.0)),
                 rate=float(self.config.get("rate", 0.01)),
-                seed=base_seed + idx,
+                seed=base_seed + _stable_seed_offset(name),
             )
             batches[name] = batch
         return batches
