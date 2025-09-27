@@ -1,0 +1,10 @@
+name: erm
+objective: erm
+hidden_width: 192
+hidden_depth: 3
+dropout: 0.0
+layer_norm: false
+max_position: 5.0
+use_prev_position: true
+representation_dim: 64
+adapter_hidden: 16

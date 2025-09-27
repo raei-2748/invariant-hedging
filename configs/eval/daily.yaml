@@ -1,0 +1,9 @@
+name: daily
+seeds: [0, 1, 2]
+report:
+  alpha: 0.95
+  bootstrap_samples: 1000
+  table_path: crisis_results.csv
+  plot_dir: plots
+  include_hourly: true
+  checkpoint_path: null

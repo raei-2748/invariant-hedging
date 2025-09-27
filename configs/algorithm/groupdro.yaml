@@ -1,0 +1,5 @@
+name: groupdro
+objective: mean_squared_pnl
+risk_measure: worst_case
+eta: 0.1
+momentum: 0.9

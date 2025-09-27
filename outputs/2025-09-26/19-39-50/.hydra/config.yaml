@@ -1,0 +1,84 @@
+data:
+  name: synthetic
+  seed: 0
+  spot_init: 100.0
+  rate: 0.01
+  train_episodes: 2048
+  val_episodes: 512
+  test_episodes: 512
+  hourly_episodes: 256
+  real_data_anchor:
+    enabled: true
+    file: data/spy_sample.csv
+    slippage_bps: 5
+envs:
+  train:
+  - low
+  - med
+  val:
+  - high
+  test:
+  - crisis
+  robustness:
+    rebalancing: hourly
+    hours_per_day: 6
+model:
+  name: erm
+  objective: erm
+  hidden_width: 192
+  hidden_depth: 3
+  dropout: 0.0
+  layer_norm: false
+  max_position: 5.0
+  use_prev_position: true
+  representation_dim: 64
+  adapter_hidden: 16
+eval:
+  name: daily
+  seeds:
+  - 0
+  - 1
+  - 2
+  report:
+    alpha: 0.95
+    bootstrap_samples: 1000
+    table_path: crisis_results.csv
+    plot_dir: plots
+    include_hourly: true
+    checkpoint_path: null
+logging:
+  wandb:
+    enabled: false
+    project: invariant-hedging
+    entity: null
+    offline_ok: true
+    dir: runs/wandb
+  local_mirror:
+    enabled: true
+    base_dir: runs
+    metrics_file: metrics.jsonl
+    final_metrics_file: final_metrics.json
+    config_file: config.yaml
+    checkpoints_dir: checkpoints
+    artifacts_dir: artifacts
+    stats_csv: stats.csv
+  log_interval: 50
+  eval_interval: 100
+train:
+  steps: 200
+  batch_size: 32
+  grad_clip: 1.0
+  seed: 0
+  pretrain_steps: 20
+  irm_ramp_steps: 20
+  eval_interval: 100
+  checkpoint_topk: 1
+loss:
+  name: cvar
+  cvar_alpha: 0.95
+optimizer:
+  name: adam
+  lr: 0.0005
+  weight_decay: 1.0e-06
+scheduler:
+  name: none
