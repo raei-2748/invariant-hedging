@@ -1,6 +1,7 @@
 """Single-asset hedging environment with daily rebalancing."""
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Optional
 
@@ -20,6 +21,7 @@ class SimulationOutput:
     costs: torch.Tensor
     positions: torch.Tensor
     step_pnl: torch.Tensor
+    max_trade: torch.Tensor
 
 
 class SingleAssetHedgingEnv:
@@ -33,6 +35,11 @@ class SingleAssetHedgingEnv:
             "slippage_multiplier": batch.meta.get("slippage_multiplier", 1.0),
         }
         self.notional = batch.meta.get("notional", 1.0)
+        debug_flag = batch.meta.get("debug_probe")
+        if debug_flag is None:
+            debug_flag = os.getenv("HIRM_DEBUG_PROBE", "0") not in {"", "0", "false", "False"}
+        self._debug_probe_enabled = bool(debug_flag)
+        self._debug_episode_logged = False
 
     def sample_indices(self, batch_size: int, generator: Optional[torch.Generator] = None) -> torch.Tensor:
         num = self.batch.spot.shape[0]
@@ -66,6 +73,7 @@ class SingleAssetHedgingEnv:
         costs = torch.zeros_like(pnl)
         turnover = torch.zeros_like(pnl)
         step_pnl = torch.zeros(batch_size, steps, device=device)
+        max_trade = torch.zeros(batch_size, device=device)
 
         for t in range(steps):
             inv = positions[:, t] / self.notional
@@ -73,11 +81,15 @@ class SingleAssetHedgingEnv:
             feat_t = (feat_t - mean) / std
             out = policy(feat_t, env_index=self.env_index, representation_scale=representation_scale)
             action = out["action"].squeeze(-1)
+            raw_action = out.get("raw_action")
+            if raw_action is not None:
+                raw_action = raw_action.squeeze(-1)
             positions[:, t + 1] = action
             trade = positions[:, t + 1] - positions[:, t]
             cost_t = execution_cost(trade, spot[:, t], self.cost_config)
             costs += cost_t
             turnover += torch.abs(trade)
+            max_trade = torch.maximum(max_trade, torch.abs(trade))
             underlying_step = positions[:, t] * (spot[:, t + 1] - spot[:, t])
             option_step = -(option[:, t + 1] - option[:, t])
             underlying_pnl += underlying_step
@@ -86,6 +98,33 @@ class SingleAssetHedgingEnv:
             step_pnl[:, t] = step_value
             pnl += step_value
 
+            if (
+                self._debug_probe_enabled
+                and not self._debug_episode_logged
+                and positions.shape[0] > 0
+                and t < 20
+            ):
+                episode_idx = 0
+                price = spot[episode_idx, t]
+                prev_position = positions[episode_idx, t]
+                target_position = positions[episode_idx, t + 1]
+                trade_val = trade[episode_idx]
+                cost_val = cost_t[episode_idx]
+                raw_val = raw_action[episode_idx] if raw_action is not None else target_position
+                print(
+                    {
+                        "t": int(t),
+                        "price": float(price.item()),
+                        "prev_position": float(prev_position.item()),
+                        "action_output": float(raw_val.item()),
+                        "target_position": float(target_position.item()),
+                        "trade": float(trade_val.item()),
+                        "cost": float(cost_val.item()),
+                    }
+                )
+                if t == 19:
+                    self._debug_episode_logged = True
+
         # Liquidate residual position at final spot price with same cost structure
         final_trade = -positions[:, -1]
         liquidation_cost = execution_cost(final_trade, spot[:, -1], self.cost_config)
@@ -93,9 +132,13 @@ class SingleAssetHedgingEnv:
         underlying_pnl += final_underlying
         costs += liquidation_cost
         turnover += torch.abs(final_trade)
+        max_trade = torch.maximum(max_trade, torch.abs(final_trade))
         final_step = final_underlying - liquidation_cost
         pnl += final_step
         step_pnl = torch.cat([step_pnl, final_step.unsqueeze(-1)], dim=1)
+
+        if self._debug_probe_enabled and not self._debug_episode_logged:
+            self._debug_episode_logged = True
 
         return SimulationOutput(
             pnl=pnl,
@@ -105,4 +148,5 @@ class SingleAssetHedgingEnv:
             costs=costs,
             positions=positions,
             step_pnl=step_pnl,
+            max_trade=max_trade,
         )
