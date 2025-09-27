@@ -219,7 +219,7 @@ class SyntheticDataModule:
         }
         num = episodes_per_env.get(split, episodes_per_env["train"])
         batches: Dict[str, EpisodeBatch] = {}
-        base_seed = int(self.config.get("seed", 0)) + _stable_seed_offset(split)
+        base_seed = (int(self.config.get("seed", 0)) + _stable_seed_offset(split)) & 0xFFFFFFFF
         for idx, name in enumerate(env_names):
             env_cfg = self.env_cfgs[name]
             cost_cfg = self.cost_cfgs[env_cfg["costs"]["file"]]
@@ -230,7 +230,7 @@ class SyntheticDataModule:
                 num_episodes=num,
                 spot0=float(self.config.get("spot_init", 100.0)),
                 rate=float(self.config.get("rate", 0.01)),
-                seed=base_seed + _stable_seed_offset(name),
+                seed=(base_seed + _stable_seed_offset(name)) & 0xFFFFFFFF,
             )
             batches[name] = batch
         return batches
