@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+import zlib
 from dataclasses import dataclass
 from typing import Dict, Iterable, Optional
 
@@ -109,6 +110,21 @@ class HestonGenerator:
         return spot
 
 
+def _initial_implied_vol(params: Dict[str, float]) -> float:
+    if "sigma" in params:
+        return max(float(params["sigma"]), 1e-6)
+    variance = params.get("v0", params.get("long_term_var"))
+    if variance is not None:
+        return max(math.sqrt(float(variance)), 1e-6)
+    return 0.2
+
+
+def _stable_seed_offset(label: str) -> int:
+    # zlib.adler32 returns an unsigned 32-bit integer but may appear negative on
+    # some platforms, so mask it into the expected range.
+    return zlib.adler32(label.encode("utf-8")) & 0xFFFFFFFF
+
+
 def _make_generator(model: str, params: Dict[str, float]):
     if model.lower() == "gbm":
         return GBMGenerator(params)
@@ -141,14 +157,14 @@ def generate_episode_batch(
     time_grid = np.broadcast_to(time_to_maturity, (num_episodes, steps + 1))
 
     # Use instantaneous variance from log returns for GBM, or from Heston generator if available.
+    params = dynamics_cfg["params"]
     implied_vol = np.zeros_like(spot_paths)
-    for t in range(steps + 1):
-        if t == 0:
-            implied_vol[:, t] = math.sqrt(max(dynamics_cfg["params"].get("sigma", 0.2), 1e-6))
-        else:
-            ret = np.log(spot_paths[:, t] / spot_paths[:, t - 1])
-            implied_vol[:, t] = np.clip(np.std(ret), 1e-6, None)
-    implied_vol = np.where(np.isfinite(implied_vol), implied_vol, 0.2)
+    base_sigma = _initial_implied_vol(params)
+    implied_vol[:, 0] = base_sigma
+    for t in range(1, steps + 1):
+        ret = np.log(spot_paths[:, t] / spot_paths[:, t - 1])
+        implied_vol[:, t] = np.clip(np.std(ret), 1e-6, None)
+    implied_vol = np.where(np.isfinite(implied_vol), implied_vol, base_sigma)
 
     strike_mode = env_cfg.get("options", {}).get("strike_mode", "atm")
     if strike_mode == "atm":
@@ -174,7 +190,7 @@ def generate_episode_batch(
         meta={
             "linear_bps": float(costs_cfg.get("linear_bps", 0.0)),
             "quadratic": float(costs_cfg.get("quadratic", 0.0)),
-            "slippage_multiplier": float(costs_cfg.get("slippage_multiplier", 0.0)),
+            "slippage_multiplier": float(costs_cfg.get("slippage_multiplier", 1.0)),
             "notional": float(env_cfg.get("episode", {}).get("notional", 1.0)),
         },
     )
@@ -197,7 +213,7 @@ class SyntheticDataModule:
         }
         num = episodes_per_env.get(split, episodes_per_env["train"])
         batches: Dict[str, EpisodeBatch] = {}
-        base_seed = int(self.config.get("seed", 0)) + hash(split) % (2**32)
+        base_seed = int(self.config.get("seed", 0)) + _stable_seed_offset(split)
         for idx, name in enumerate(env_names):
             env_cfg = self.env_cfgs[name]
             cost_cfg = self.cost_cfgs[env_cfg["costs"]["file"]]
