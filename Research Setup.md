@@ -284,6 +284,6 @@ This ensures comparisons are reproducible and fair, avoiding reviewer concerns a
 - **Section 5 (Training Protocol):** add “ERM-reg” config (weight decay 1e-3, dropout 0.3, label smoothing 0.05).
 - **Section 6 (Evaluation):** add the pre-commit thresholds for CVaR, turnover, mean P&L.
 - **Section 7 (Analysis):** add a **coverage table** and a **spread-sensitivity plot** (CVaR vs allowed spread cap).
-- **Turnover diagnostics:** set the environment variable `HIRM_DEBUG_PROBE=1` before launching training to print the first-episode probe (price, previous position, raw NN output, final position, trade, cost) for the first 20 steps only. Leave it unset for clean runs.
-- **Trade spike guard:** `train.max_trade_warning` (default 50.0) logs a warning if any single trade magnitude exceeds the threshold. This is meant to catch the “seed 1” churn bug early.
-- **Baseline automation:** run `scripts/run_baseline.py --steps 20000 --seeds 0-4` to retrain + evaluate the ERM baseline. The script writes `baseline_summary.csv` and (optionally) keeps per-seed evaluation artifacts under `runs_eval/` when `--keep-eval` is supplied.
+- **Turnover diagnostics:** enable `HIRM_DEBUG_PROBE=1` to capture a structured probe of the first 20 steps (price, inventory, raw NN output, final position, trade, cost). These values are also logged under `train/<env>_probe/step_*` for plotting.
+- **Trade spike guard:** `train.max_trade_warning_factor` (default 1.2) multiplies `model.max_position` to derive the warning threshold and logs both `train/<env>_max_trade` and `train/<env>_mean_abs_trade` every step.
+- **Baselines & packaging:** run `scripts/run_baseline.py --steps 20000 --seeds 0-4` to refresh the ERM baseline. Outputs land in `outputs/_baseline_erm_v1/summary.csv`. Delta/no-hedge references are produced automatically during `src.eval`, and you can add confidence intervals via `scripts/bootstrap_metrics.py --metric test/crisis_cvar runs/2025-*/`.

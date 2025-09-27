@@ -181,8 +181,10 @@ def main(cfg: DictConfig) -> None:
     log_interval = cfg.logging.log_interval
     eval_interval = cfg.logging.eval_interval
 
-    max_trade_warn = float(cfg.train.get("max_trade_warning", 0.0))
-    spike_alerted = False
+    warning_factor = float(cfg.train.get("max_trade_warning_factor", 0.0))
+    max_position = float(cfg.model.max_position)
+    max_trade_warn = warning_factor * max_position if warning_factor > 0 else 0.0
+    spike_alerted_envs: set[str] = set()
 
     for step in range(1, cfg.train.steps + 1):
         optimizer.zero_grad()
@@ -195,6 +197,8 @@ def main(cfg: DictConfig) -> None:
             indices = env.sample_indices(per_env_batch, generator)
             rep_scale = dummy if cfg.model.objective == "irm" else None
             sim = env.simulate(policy, indices, device, representation_scale=rep_scale)
+            if sim.probe:
+                run_logger.log_probe(env_name, step, sim.probe)
             pnl = sim.pnl
             if cfg.model.name == "erm_reg":
                 smoothing = cfg.model.regularization.get("label_smoothing", 0.0)
@@ -204,16 +208,19 @@ def main(cfg: DictConfig) -> None:
             metrics_to_log[f"train/{env_name}_mean_pnl"] = float(pnl.mean().item())
             metrics_to_log[f"train/{env_name}_cvar"] = float(cvar_obj.cvar_from_pnl(pnl, alpha).item())
             metrics_to_log[f"train/{env_name}_turnover"] = float(sim.turnover.mean().item())
-            if max_trade_warn > 0:
-                max_trade_val = float(sim.max_trade.max().item())
-                if max_trade_val > max_trade_warn:
-                    metrics_to_log[f"train/{env_name}_max_trade"] = max_trade_val
-                    if not spike_alerted:
-                        print(
-                            f"[warn] large trade magnitude detected: {max_trade_val:.2f} "
-                            f"(threshold {max_trade_warn:.2f}) in env '{env_name}' at step {step}"
-                        )
-                        spike_alerted = True
+            trades = sim.positions[:, 1:] - sim.positions[:, :-1]
+            final_trade = -sim.positions[:, -1:]
+            all_trades = torch.cat([trades, final_trade], dim=1)
+            mean_abs_trade = float(torch.abs(all_trades).mean().item())
+            metrics_to_log[f"train/{env_name}_mean_abs_trade"] = mean_abs_trade
+            max_trade_val = float(sim.max_trade.max().item())
+            metrics_to_log[f"train/{env_name}_max_trade"] = max_trade_val
+            if max_trade_warn > 0 and max_trade_val > max_trade_warn and env_name not in spike_alerted_envs:
+                print(
+                    f"[warn] large trade magnitude detected: {max_trade_val:.2f} "
+                    f"(threshold {max_trade_warn:.2f}) in env '{env_name}' at step {step}"
+                )
+                spike_alerted_envs.add(env_name)
 
         loss_tensor = torch.stack(env_losses)
         if cfg.model.objective == "groupdro":

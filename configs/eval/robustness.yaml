@@ -4,3 +4,7 @@ hourly:
   hours_per_day: 6
   episode_hours: 360
   batch_size: 32
+
+baselines:
+  include: [no_hedge, delta]
+  table_path: baseline_metrics.csv

@@ -142,13 +142,26 @@ def generate_episode_batch(
 
     # Use instantaneous variance from log returns for GBM, or from Heston generator if available.
     implied_vol = np.zeros_like(spot_paths)
-    for t in range(steps + 1):
-        if t == 0:
-            implied_vol[:, t] = math.sqrt(max(dynamics_cfg["params"].get("sigma", 0.2), 1e-6))
-        else:
-            ret = np.log(spot_paths[:, t] / spot_paths[:, t - 1])
-            implied_vol[:, t] = np.clip(np.std(ret), 1e-6, None)
-    implied_vol = np.where(np.isfinite(implied_vol), implied_vol, 0.2)
+    model_name = dynamics_cfg["model"].lower()
+    params = dynamics_cfg.get("params", {})
+    if model_name == "gbm":
+        init_vol = float(params.get("sigma", 0.2))
+    elif model_name == "heston":
+        init_var = float(params.get("v0", params.get("long_term_var", 0.2)))
+        init_vol = math.sqrt(max(init_var, 1e-8))
+    else:
+        init_vol = 0.2
+    implied_vol[:, 0] = max(init_vol, 1e-6)
+
+    dt = getattr(generator, "dt", 1.0 / 252.0)
+    inv_sqrt_dt = 1.0 / math.sqrt(max(dt, 1e-12))
+    for t in range(1, steps + 1):
+        # Cross-sectional realized volatility scaled to annualized units.
+        ret = np.log(spot_paths[:, t] / spot_paths[:, t - 1])
+        realized = np.std(ret, ddof=0) * inv_sqrt_dt
+        implied_vol[:, t] = np.clip(realized, 1e-6, None)
+
+    implied_vol = np.where(np.isfinite(implied_vol), implied_vol, init_vol)
 
     strike_mode = env_cfg.get("options", {}).get("strike_mode", "atm")
     if strike_mode == "atm":
@@ -197,7 +210,8 @@ class SyntheticDataModule:
         }
         num = episodes_per_env.get(split, episodes_per_env["train"])
         batches: Dict[str, EpisodeBatch] = {}
-        base_seed = int(self.config.get("seed", 0)) + hash(split) % (2**32)
+        split_offsets = {"train": 0, "val": 1, "test": 2, "hourly": 3}
+        base_seed = int(self.config.get("seed", 0)) + split_offsets.get(split, 0) * 10_000
         for idx, name in enumerate(env_names):
             env_cfg = self.env_cfgs[name]
             cost_cfg = self.cost_cfgs[env_cfg["costs"]["file"]]
