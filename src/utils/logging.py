@@ -3,11 +3,19 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import time
+import warnings
 from pathlib import Path
 from typing import Dict, Optional
 
 import yaml
+
+warnings.filterwarnings(
+    "ignore",
+    message="pkg_resources is deprecated as an API",
+    category=UserWarning,
+)
 
 try:
     import wandb
@@ -83,18 +91,27 @@ class RunLogger:
     def info(self) -> Dict[str, str]:
         return {"base_dir": str(self.base_dir)}
 
-    def _system_info(self) -> Dict[str, str]:
-        info = {}
-        try:
-            import subprocess
-
-            info["git_commit"] = (
-                subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
-            )
-            info["git_status_clean"] = (
-                subprocess.check_output(["git", "status", "--short"], text=True).strip() == ""
-            )
-        except Exception:  # pragma: no cover
-            info["git_commit"] = "unknown"
-        info["python"] = f"{os.sys.version_info.major}.{os.sys.version_info.minor}.{os.sys.version_info.micro}"
+    def _system_info(self) -> Dict[str, object]:
+        info: Dict[str, object] = {
+            "git_commit": _get_git_commit(),
+            "python": f"{os.sys.version_info.major}.{os.sys.version_info.minor}.{os.sys.version_info.micro}",
+        }
+        git_status = _get_git_status_clean()
+        if git_status is not None:
+            info["git_status_clean"] = git_status
         return info
+
+
+def _get_git_commit() -> str:
+    try:
+        return subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+    except Exception:  # pragma: no cover
+        return "unknown"
+
+
+def _get_git_status_clean() -> Optional[bool]:
+    try:
+        output = subprocess.check_output(["git", "status", "--short"], text=True).strip()
+        return output == ""
+    except Exception:  # pragma: no cover
+        return None

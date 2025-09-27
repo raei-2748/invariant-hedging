@@ -168,7 +168,7 @@ def generate_episode_batch(
         spot=torch.from_numpy(spot_paths).float(),
         option_price=torch.from_numpy(option_prices).float(),
         implied_vol=torch.from_numpy(implied_vol).float(),
-        time_to_maturity=torch.from_numpy(time_grid).float(),
+        time_to_maturity=torch.from_numpy(np.ascontiguousarray(time_grid)).float(),
         rate=rate_env,
         env_name=env_name,
         meta={
