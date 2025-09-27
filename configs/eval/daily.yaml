@@ -7,3 +7,7 @@ report:
   plot_dir: plots
   include_hourly: true
   checkpoint_path: null
+
+baselines:
+  include: [no_hedge, delta]
+  table_path: baseline_metrics.csv

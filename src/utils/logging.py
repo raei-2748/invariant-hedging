@@ -7,7 +7,7 @@ import subprocess
 import time
 import warnings
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 import yaml
 
@@ -61,6 +61,16 @@ class RunLogger:
         self.metrics_file.flush()
         if self.wandb_run is not None:
             self.wandb_run.log(metrics, step=step)
+
+    def log_probe(self, env_name: str, step: int, records: List[Dict[str, float]]) -> None:
+        if not records:
+            return
+        probe_dir = self.artifacts_dir / "train" / f"{env_name}_probe"
+        probe_dir.mkdir(parents=True, exist_ok=True)
+        path = probe_dir / f"step_{step:06d}.json"
+        payload = {"step": step, "env": env_name, "records": records}
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2)
 
     def log_final(self, metrics: Dict) -> None:
         with open(self.final_metrics_path, "w", encoding="utf-8") as f:

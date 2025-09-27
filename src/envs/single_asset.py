@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Optional
+from typing import List, Optional
 
 import torch
 
@@ -22,6 +22,7 @@ class SimulationOutput:
     positions: torch.Tensor
     step_pnl: torch.Tensor
     max_trade: torch.Tensor
+    probe: Optional[List[dict[str, float]]] = None
 
 
 class SingleAssetHedgingEnv:
@@ -75,6 +76,8 @@ class SingleAssetHedgingEnv:
         step_pnl = torch.zeros(batch_size, steps, device=device)
         max_trade = torch.zeros(batch_size, device=device)
 
+        probe_records: List[dict[str, float]] = []
+
         for t in range(steps):
             inv = positions[:, t] / self.notional
             feat_t = torch.cat([base_features[:, t, :], inv.unsqueeze(-1)], dim=-1)
@@ -110,14 +113,17 @@ class SingleAssetHedgingEnv:
                 target_position = positions[episode_idx, t + 1]
                 trade_val = trade[episode_idx]
                 cost_val = cost_t[episode_idx]
-                raw_val = raw_action[episode_idx] if raw_action is not None else target_position
-                print(
+                if raw_action is not None:
+                    raw_val = raw_action[episode_idx]
+                else:
+                    raw_val = target_position
+                probe_records.append(
                     {
                         "t": int(t),
                         "price": float(price.item()),
-                        "prev_position": float(prev_position.item()),
-                        "action_output": float(raw_val.item()),
-                        "target_position": float(target_position.item()),
+                        "inventory": float((prev_position / max(self.notional, 1e-6)).item()),
+                        "raw_output": float(raw_val.item()),
+                        "position": float(target_position.item()),
                         "trade": float(trade_val.item()),
                         "cost": float(cost_val.item()),
                     }
@@ -128,16 +134,16 @@ class SingleAssetHedgingEnv:
         # Liquidate residual position at final spot price with same cost structure
         final_trade = -positions[:, -1]
         liquidation_cost = execution_cost(final_trade, spot[:, -1], self.cost_config)
-        final_underlying = positions[:, -1] * (spot[:, -1] - spot[:, -2])
-        underlying_pnl += final_underlying
         costs += liquidation_cost
         turnover += torch.abs(final_trade)
         max_trade = torch.maximum(max_trade, torch.abs(final_trade))
-        final_step = final_underlying - liquidation_cost
-        pnl += final_step
-        step_pnl = torch.cat([step_pnl, final_step.unsqueeze(-1)], dim=1)
+        pnl -= liquidation_cost
+        step_pnl = torch.cat([step_pnl, (-liquidation_cost).unsqueeze(-1)], dim=1)
 
         if self._debug_probe_enabled and not self._debug_episode_logged:
+            self._debug_episode_logged = True
+
+        if self._debug_probe_enabled and probe_records:
             self._debug_episode_logged = True
 
         return SimulationOutput(
@@ -149,4 +155,5 @@ class SingleAssetHedgingEnv:
             positions=positions,
             step_pnl=step_pnl,
             max_trade=max_trade,
+            probe=probe_records if probe_records else None,
         )

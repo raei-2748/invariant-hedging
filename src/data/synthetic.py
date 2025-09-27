@@ -159,12 +159,13 @@ def generate_episode_batch(
     # Use instantaneous variance from log returns for GBM, or from Heston generator if available.
     params = dynamics_cfg["params"]
     implied_vol = np.zeros_like(spot_paths)
-    base_sigma = _initial_implied_vol(params)
-    implied_vol[:, 0] = base_sigma
-    for t in range(1, steps + 1):
-        ret = np.log(spot_paths[:, t] / spot_paths[:, t - 1])
-        implied_vol[:, t] = np.clip(np.std(ret), 1e-6, None)
-    implied_vol = np.where(np.isfinite(implied_vol), implied_vol, base_sigma)
+    for t in range(steps + 1):
+        if t == 0:
+            implied_vol[:, t] = math.sqrt(max(dynamics_cfg["params"].get("sigma", 0.2), 1e-6))
+        else:
+            ret = np.log(spot_paths[:, t] / spot_paths[:, t - 1])
+            implied_vol[:, t] = np.clip(np.std(ret), 1e-6, None)
+    implied_vol = np.where(np.isfinite(implied_vol), implied_vol, 0.2)
 
     strike_mode = env_cfg.get("options", {}).get("strike_mode", "atm")
     if strike_mode == "atm":
@@ -213,7 +214,7 @@ class SyntheticDataModule:
         }
         num = episodes_per_env.get(split, episodes_per_env["train"])
         batches: Dict[str, EpisodeBatch] = {}
-        base_seed = int(self.config.get("seed", 0)) + _stable_seed_offset(split)
+        base_seed = int(self.config.get("seed", 0)) + hash(split) % (2**32)
         for idx, name in enumerate(env_names):
             env_cfg = self.env_cfgs[name]
             cost_cfg = self.cost_cfgs[env_cfg["costs"]["file"]]

@@ -17,7 +17,7 @@ train:
   irm_ramp_steps: 20
   eval_interval: 100
   checkpoint_topk: 1
-  max_trade_warning: 0.0
+  max_trade_warning_factor: 0.0
 
 loss:
   name: cvar

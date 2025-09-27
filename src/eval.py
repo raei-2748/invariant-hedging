@@ -97,6 +97,73 @@ def _plot_qq(record: Dict, output_path: Path) -> None:
     plt.close()
 
 
+class _ZeroPolicy:
+    def __init__(self) -> None:
+        self._device: torch.device | None = None
+
+    def to(self, device: torch.device) -> "_ZeroPolicy":
+        self._device = device
+        return self
+
+    def eval(self) -> "_ZeroPolicy":  # pragma: no cover - trivial
+        return self
+
+    def __call__(self, features: torch.Tensor, env_index: int, representation_scale=None) -> Dict[str, torch.Tensor]:
+        device = features.device if self._device is None else self._device
+        zeros = torch.zeros(features.shape[0], 1, device=device)
+        return {"action": zeros, "raw_action": zeros}
+
+
+class _DeltaBaselinePolicy:
+    def __init__(self, scaler: FeatureScaler, max_position: float) -> None:
+        self.mean = scaler.mean.clone().detach()
+        self.std = torch.clamp(scaler.std.clone().detach(), min=1e-6)
+        self.max_position = max_position
+
+    def to(self, device: torch.device) -> "_DeltaBaselinePolicy":
+        self.mean = self.mean.to(device)
+        self.std = self.std.to(device)
+        return self
+
+    def eval(self) -> "_DeltaBaselinePolicy":  # pragma: no cover - trivial
+        return self
+
+    def __call__(self, features: torch.Tensor, env_index: int, representation_scale=None) -> Dict[str, torch.Tensor]:
+        delta = features[:, 0] * self.std[0] + self.mean[0]
+        action = delta.unsqueeze(-1).clamp(-self.max_position, self.max_position)
+        return {"action": action, "raw_action": action}
+
+
+def _baseline_policy(name: str, scaler: FeatureScaler, max_position: float):
+    key = name.lower()
+    if key == "no_hedge":
+        return _ZeroPolicy()
+    if key == "delta":
+        return _DeltaBaselinePolicy(scaler, max_position)
+    raise ValueError(f"Unsupported baseline '{name}'")
+
+
+def _evaluate_baselines(
+    names: List[str],
+    envs: Dict[str, SingleAssetHedgingEnv],
+    device: torch.device,
+    alpha: float,
+    scaler: FeatureScaler,
+    max_position: float,
+) -> List[Dict[str, float]]:
+    records: List[Dict[str, float]] = []
+    for name in names:
+        policy = _baseline_policy(name, scaler, max_position).to(device)
+        for env_name, env in envs.items():
+            with torch.no_grad():
+                result = _evaluate_env(policy, env, device, alpha)
+            summary = {k: v for k, v in result.items() if k not in {"pnl", "step_pnl"}}
+            summary["baseline"] = name
+            summary["env"] = env_name
+            records.append(summary)
+    return records
+
+
 @hydra.main(config_path="../configs", config_name="experiment", version_base=None)
 def main(cfg: DictConfig) -> None:
     if "train" in cfg and "data" not in cfg:
@@ -155,6 +222,33 @@ def main(cfg: DictConfig) -> None:
     df = pd.DataFrame(summary)
     table_path = Path(run_logger.artifacts_dir) / cfg.eval.report.table_path
     df.to_csv(table_path, index=False)
+
+    baseline_cfg = cfg.get("baselines")
+    if baseline_cfg is None and "eval" in cfg:
+        baseline_cfg = cfg.eval.get("baselines")
+    if baseline_cfg is not None and feature_engineer.scaler is not None:
+        baseline_names = list(baseline_cfg.get("include", []))
+        if baseline_names:
+            baseline_records = _evaluate_baselines(
+                baseline_names,
+                envs,
+                device,
+                alpha,
+                feature_engineer.scaler,
+                float(cfg.model.max_position),
+            )
+            baseline_df = pd.DataFrame(baseline_records)
+            baseline_path = Path(run_logger.artifacts_dir) / baseline_cfg.get(
+                "table_path", "baseline_metrics.csv"
+            )
+            baseline_df.to_csv(baseline_path, index=False)
+            for row in baseline_records:
+                run_logger.log_metrics(
+                    {
+                        f"baseline/{row['baseline']}_{row['env']}_cvar": row["cvar"],
+                        f"baseline/{row['baseline']}_{row['env']}_turnover": row["turnover"],
+                    }
+                )
 
     plot_dir = Path(run_logger.artifacts_dir) / cfg.eval.report.plot_dir
     plot_dir.mkdir(parents=True, exist_ok=True)

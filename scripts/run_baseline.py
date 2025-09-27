@@ -15,7 +15,7 @@ from typing import Iterable, List, Sequence, Tuple
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_RUN_DIR = REPO_ROOT / "runs"
 DEFAULT_EVAL_DIR = REPO_ROOT / "runs_eval"
-DEFAULT_SUMMARY = REPO_ROOT / "baseline_summary.csv"
+DEFAULT_SUMMARY = REPO_ROOT / "outputs" / "_baseline_erm_v1" / "summary.csv"
 
 
 def parse_seeds(raw: str) -> List[int]:
@@ -85,6 +85,7 @@ def write_summary(rows: Sequence[dict[str, object]], summary_path: Path) -> None
         for key in row.keys():
             if key not in fieldnames:
                 fieldnames.append(key)
+    summary_path.parent.mkdir(parents=True, exist_ok=True)
     with summary_path.open("w", encoding="utf-8", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=fieldnames)
         writer.writeheader()
@@ -117,7 +118,12 @@ def main() -> None:
     parser.add_argument("--summary", default=str(DEFAULT_SUMMARY), help="Where to write the CSV summary")
     parser.add_argument("--run-dir", default=str(DEFAULT_RUN_DIR), help="Directory where Hydra writes train runs")
     parser.add_argument("--eval-dir", default=str(DEFAULT_EVAL_DIR), help="Directory where Hydra writes eval runs")
-    parser.add_argument("--max-trade-warning", type=float, default=50.0, help="Override for max trade warning threshold")
+    parser.add_argument(
+        "--max-trade-warning-factor",
+        type=float,
+        default=1.2,
+        help="Multiplier applied to model.max_position for trade spike warnings",
+    )
     parser.add_argument("--keep-eval", action="store_true", help="Keep eval directories (default removes them after summarising)")
     args, extra = parser.parse_known_args()
 
@@ -150,7 +156,7 @@ def main() -> None:
             f"logging.eval_interval={max(1, args.steps // 10)}",
             "train.checkpoint_topk=1",
             f"train.seed={seed}",
-            f"train.max_trade_warning={args.max_trade_warning}",
+            f"train.max_trade_warning_factor={args.max_trade_warning_factor}",
         ]
         train_cmd.extend(extra)
         run_subprocess(train_cmd, env)

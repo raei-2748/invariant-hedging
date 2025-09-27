@@ -22,3 +22,6 @@ eval:
     plot_dir: smoke_plots
     include_hourly: false
     checkpoint_path: null
+  baselines:
+    include: [no_hedge, delta]
+    table_path: smoke_baselines.csv
