@@ -15,7 +15,7 @@ from typing import Iterable, List, Sequence, Tuple
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_RUN_DIR = REPO_ROOT / "runs"
 DEFAULT_EVAL_DIR = REPO_ROOT / "runs_eval"
-DEFAULT_SUMMARY = REPO_ROOT / "outputs" / "_baseline_erm_v1" / "summary.csv"
+DEFAULT_SUMMARY = REPO_ROOT / "outputs" / "_baseline_erm_base" / "ERM_base_crisis.csv"
 
 
 def parse_seeds(raw: str) -> List[int]:

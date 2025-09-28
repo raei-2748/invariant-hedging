@@ -225,4 +225,4 @@ Because IRM is sensitive to the regularization parameter λ, *we will experiment
 * Section 7 (Analysis): add coverage table and spread-sensitivity plot.
 * Turnover diagnostics: enable `HIRM_DEBUG_PROBE=1` to log structured probes.
 * Trade spike guard: `train.max_trade_warning_factor` logs max-trade metrics.
-* Baselines packaging: run `scripts/run_baseline.py` to refresh ERM baseline; outputs land in `outputs/_baseline_erm_v1/summary.csv`.
+* Baselines packaging: run `scripts/run_baseline.py` to refresh ERM baseline; outputs land in `outputs/_baseline_erm_base/ERM_base_crisis.csv`.

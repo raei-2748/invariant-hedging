@@ -1,4 +1,4 @@
-# ERM-v1 control
+# ERM_base control
 
 Seeds: 0, 1, 2, 3, 4 (n=5)
 
