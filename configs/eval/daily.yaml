@@ -1,5 +1,8 @@
 name: daily
 seeds: [0, 1, 2]
+compute_per_env_metrics: true
+compute_msi: false
+msi_batch_size: 512
 report:
   alpha: 0.95
   bootstrap_samples: 1000
