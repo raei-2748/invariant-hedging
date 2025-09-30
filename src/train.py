@@ -10,13 +10,11 @@ import torch
 from omegaconf import DictConfig, OmegaConf
 
 from .data.features import FeatureEngineer
-from .data.synthetic import EpisodeBatch, SyntheticDataModule
-from .envs.single_asset import SingleAssetHedgingEnv
 from .models.policy_mlp import PolicyMLP
 from .objectives import cvar as cvar_obj
 from .objectives import penalties
 from .utils import checkpoints, logging as log_utils, seed as seed_utils, stats
-from .utils.configs import resolve_env_configs
+from .utils.configs import build_envs, prepare_data_module, unwrap_experiment_config
 
 
 
@@ -56,20 +54,9 @@ def _init_policy(cfg: DictConfig, feature_dim: int, num_envs: int) -> PolicyMLP:
     )
 
 
-def _build_envs(
-    batches: Dict[str, EpisodeBatch],
-    feature_engineer: FeatureEngineer,
-    name_to_index: Dict[str, int],
-) -> Dict[str, SingleAssetHedgingEnv]:
-    envs: Dict[str, SingleAssetHedgingEnv] = {}
-    for name, batch in batches.items():
-        envs[name] = SingleAssetHedgingEnv(name_to_index[name], batch, feature_engineer)
-    return envs
-
-
 def _evaluate(
     policy: PolicyMLP,
-    envs: Dict[str, SingleAssetHedgingEnv],
+    envs: Dict[str, "SingleAssetHedgingEnv"],
     device: torch.device,
     alpha: float,
 ) -> Dict[str, Dict[str, float]]:
@@ -141,29 +128,26 @@ def _setup_scheduler(optimizer: torch.optim.Optimizer, cfg: DictConfig):
 
 @hydra.main(config_path="../configs", config_name="experiment", version_base=None)
 def main(cfg: DictConfig) -> None:
-    if "train" in cfg and "data" not in cfg:
-        cfg = cfg.train
+    cfg = unwrap_experiment_config(cfg)
     resolved_cfg = OmegaConf.to_container(cfg, resolve=True)
     device = _device(cfg.get("runtime", {}))
     generator = seed_utils.seed_everything(cfg.train.seed)
-    env_cfgs, cost_cfgs, env_order = resolve_env_configs(cfg.envs)
-    data_module = SyntheticDataModule(
-        config=OmegaConf.to_container(cfg.data, resolve=True),
-        env_cfgs=env_cfgs,
-        cost_cfgs=cost_cfgs,
-    )
-    train_batches = data_module.prepare("train", cfg.envs.train)
-    val_batches = data_module.prepare("val", cfg.envs.val)
-    test_batches = data_module.prepare("test", cfg.envs.test)
+    data_ctx = prepare_data_module(cfg)
+    train_batches = data_ctx.data_module.prepare("train", cfg.envs.train)
+    val_batches = data_ctx.data_module.prepare("val", cfg.envs.val)
+    test_batches = data_ctx.data_module.prepare("test", cfg.envs.test)
     feature_engineer = FeatureEngineer()
     feature_engineer.fit(train_batches.values())
 
-    name_to_index = {name: idx for idx, name in enumerate(env_order)}
-    train_envs = _build_envs(train_batches, feature_engineer, name_to_index)
-    val_envs = _build_envs(val_batches, feature_engineer, name_to_index)
-    test_envs = _build_envs(test_batches, feature_engineer, name_to_index)
+    train_envs = build_envs(train_batches, feature_engineer, data_ctx.name_to_index)
+    val_envs = build_envs(val_batches, feature_engineer, data_ctx.name_to_index)
+    test_envs = build_envs(test_batches, feature_engineer, data_ctx.name_to_index)
 
-    policy = _init_policy(cfg, feature_dim=len(feature_engineer.feature_names), num_envs=len(env_order))
+    policy = _init_policy(
+        cfg,
+        feature_dim=len(feature_engineer.feature_names),
+        num_envs=len(data_ctx.env_order),
+    )
     policy.to(device)
 
     optimizer = _setup_optimizer(policy, cfg)
