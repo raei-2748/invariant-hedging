@@ -5,7 +5,7 @@ import json
 import math
 import os
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, TYPE_CHECKING
 
 import hydra
 import matplotlib.pyplot as plt
@@ -14,12 +14,14 @@ import torch
 from omegaconf import DictConfig, OmegaConf
 
 from .data.features import FeatureEngineer, FeatureScaler
-from .data.synthetic import EpisodeBatch, SyntheticDataModule
-from .envs.single_asset import SingleAssetHedgingEnv
+from .data.synthetic import EpisodeBatch
 from .models.policy_mlp import PolicyMLP
 from .objectives import cvar as cvar_obj
 from .utils import logging as log_utils, stats
-from .utils.configs import resolve_env_configs
+from .utils.configs import build_envs, prepare_data_module, unwrap_experiment_config
+
+if TYPE_CHECKING:  # pragma: no cover - typing helper
+    from .envs.single_asset import SingleAssetHedgingEnv
 
 
 _TORCH_THREAD_ENV = os.environ.get("HIRM_TORCH_NUM_THREADS") or os.environ.get("OMP_NUM_THREADS")
@@ -249,20 +251,35 @@ def _compute_wg(
     return wg
 
 
-def _build_envs(
-    batches: Dict[str, EpisodeBatch],
-    feature_engineer: FeatureEngineer,
-    name_to_index: Dict[str, int],
-) -> Dict[str, SingleAssetHedgingEnv]:
-    envs: Dict[str, SingleAssetHedgingEnv] = {}
-    for name, batch in batches.items():
-        envs[name] = SingleAssetHedgingEnv(name_to_index[name], batch, feature_engineer)
-    return envs
-
-
-def _feature_groups(feature_names: List[str]) -> tuple[List[int], List[int]]:
+def _feature_groups(
+    feature_names: List[str],
+    grouping_cfg: Optional[Dict[str, Iterable[str]]] = None,
+) -> tuple[List[int], List[int]]:
     invariants: List[int] = []
     spurious: List[int] = []
+
+    if grouping_cfg:
+        explicit_invariants = {name.lower() for name in grouping_cfg.get("invariants", [])}
+        explicit_spurious = {name.lower() for name in grouping_cfg.get("spurious", [])}
+        invariant_patterns = [pat.lower() for pat in grouping_cfg.get("invariant_patterns", [])]
+        spurious_patterns = [pat.lower() for pat in grouping_cfg.get("spurious_patterns", [])]
+        default_group = str(grouping_cfg.get("default", "invariant")).lower()
+
+        def _matches(key: str, patterns: Iterable[str]) -> bool:
+            return any(pat in key for pat in patterns)
+
+        for idx, name in enumerate(feature_names):
+            key = name.lower()
+            if key in explicit_invariants or _matches(key, invariant_patterns):
+                invariants.append(idx)
+            elif key in explicit_spurious or _matches(key, spurious_patterns):
+                spurious.append(idx)
+            elif default_group == "spurious":
+                spurious.append(idx)
+            else:
+                invariants.append(idx)
+        return invariants, spurious
+
     for idx, name in enumerate(feature_names):
         key = name.lower()
         if key in {"delta", "gamma", "vega", "theta", "tau", "time_to_maturity", "inventory"}:
@@ -270,7 +287,6 @@ def _feature_groups(feature_names: List[str]) -> tuple[List[int], List[int]]:
         elif key in {"realized_vol", "realised_vol"} or "regime" in key or "vol" in key:
             spurious.append(idx)
         else:
-            # Default to invariant if we cannot categorise – conservative choice.
             invariants.append(idx)
     return invariants, spurious
 
@@ -298,14 +314,15 @@ def _collect_policy_inputs(
 
 def _compute_msi(
     policy: PolicyMLP,
-    envs: Dict[str, SingleAssetHedgingEnv],
+    envs: Dict[str, "SingleAssetHedgingEnv"],
     feature_names: List[str],
     device: torch.device,
     batch_size: int,
+    grouping_cfg: Optional[Dict[str, Iterable[str]]] = None,
 ) -> Optional[Dict[str, float]]:
     if not envs:
         return None
-    invariants, spurious = _feature_groups(feature_names)
+    invariants, spurious = _feature_groups(feature_names, grouping_cfg)
     if not invariants:
         return None
     per_env_features: Dict[str, torch.Tensor] = {}
@@ -434,19 +451,17 @@ def _aggregate_records(records: List[Dict]) -> Dict[str, Dict[str, object]]:
 
 @hydra.main(config_path="../configs", config_name="experiment", version_base=None)
 def main(cfg: DictConfig) -> None:
-    if "train" in cfg and "data" not in cfg:
-        cfg = cfg.train
+    cfg = unwrap_experiment_config(cfg)
     resolved_cfg = OmegaConf.to_container(cfg, resolve=True)
     device = _device(cfg.get("runtime", {}))
-    env_cfgs, cost_cfgs, env_order = resolve_env_configs(cfg.envs)
-    data_module = SyntheticDataModule(
-        config=OmegaConf.to_container(cfg.data, resolve=True),
-        env_cfgs=env_cfgs,
-        cost_cfgs=cost_cfgs,
-    )
+    data_ctx = prepare_data_module(cfg)
     feature_engineer = FeatureEngineer()
 
-    policy = _policy_from_cfg(cfg, feature_dim=len(feature_engineer.feature_names), num_envs=len(env_order))
+    policy = _policy_from_cfg(
+        cfg,
+        feature_dim=len(feature_engineer.feature_names),
+        num_envs=len(data_ctx.env_order),
+    )
     policy.to(device)
 
     checkpoint_path = cfg.eval.report.get("checkpoint_path")
@@ -464,18 +479,17 @@ def main(cfg: DictConfig) -> None:
 
     policy.eval()
     run_logger = log_utils.RunLogger(OmegaConf.to_container(cfg.logging, resolve=True), resolved_cfg)
-    name_to_index = {name: idx for idx, name in enumerate(env_order)}
 
     compute_per_env = bool(cfg.eval.get("compute_per_env_metrics", True))
     env_batches: Dict[str, Dict[str, EpisodeBatch]] = {}
-    env_batches["test"] = data_module.prepare("test", cfg.envs.test)
+    env_batches["test"] = data_ctx.data_module.prepare("test", cfg.envs.test)
     if compute_per_env and cfg.envs.train:
-        env_batches["train"] = data_module.prepare("train", cfg.envs.train)
+        env_batches["train"] = data_ctx.data_module.prepare("train", cfg.envs.train)
     if compute_per_env and cfg.envs.get("val"):
-        env_batches["val"] = data_module.prepare("val", cfg.envs.val)
+        env_batches["val"] = data_ctx.data_module.prepare("val", cfg.envs.val)
 
     env_splits = {
-        split: _build_envs(batches, feature_engineer, name_to_index)
+        split: build_envs(batches, feature_engineer, data_ctx.name_to_index)
         for split, batches in env_batches.items()
     }
 
@@ -552,9 +566,19 @@ def main(cfg: DictConfig) -> None:
 
     compute_msi_flag = bool(cfg.eval.get("compute_msi", False))
     msi_batch_size = int(cfg.eval.get("msi_batch_size", 512))
+    msi_groups_cfg = cfg.eval.get("msi_feature_groups")
+    if msi_groups_cfg is not None:
+        msi_groups_cfg = OmegaConf.to_container(msi_groups_cfg, resolve=True)
     msi_envs = env_splits.get("train") or env_splits.get("test")
     msi = (
-        _compute_msi(policy, msi_envs, feature_engineer.feature_names, device, msi_batch_size)
+        _compute_msi(
+            policy,
+            msi_envs,
+            feature_engineer.feature_names,
+            device,
+            msi_batch_size,
+            grouping_cfg=msi_groups_cfg,
+        )
         if compute_msi_flag
         else None
     )

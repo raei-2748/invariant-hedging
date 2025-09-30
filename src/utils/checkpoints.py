@@ -22,6 +22,7 @@ class CheckpointManager:
         self.directory.mkdir(parents=True, exist_ok=True)
         self.top_k = top_k
         self.heap: List[CheckpointEntry] = []
+        self._load_manifest()
 
     def save(self, step: int, score: float, state: Dict) -> Path:
         path = self.directory / f"checkpoint_{step}.pt"
@@ -42,6 +43,41 @@ class CheckpointManager:
         ]
         with open(self.directory / "manifest.json", "w", encoding="utf-8") as f:
             json.dump(manifest, f, indent=2)
+
+    def _load_manifest(self) -> None:
+        manifest_path = self.directory / "manifest.json"
+        if not manifest_path.exists():
+            return
+
+        try:
+            with manifest_path.open("r", encoding="utf-8") as handle:
+                entries = json.load(handle)
+        except (json.JSONDecodeError, OSError):
+            # Corrupted manifest – start from a clean slate.
+            self.heap.clear()
+            return
+
+        changed = False
+        for record in entries:
+            path_name = record.get("path")
+            score = record.get("score")
+            if path_name is None or score is None:
+                changed = True
+                continue
+            path = self.directory / path_name
+            if not path.exists():
+                changed = True
+                continue
+            heapq.heappush(self.heap, CheckpointEntry(score=float(score), path=path))
+
+        while len(self.heap) > self.top_k:
+            removed = heapq.heappop(self.heap)
+            if removed.path.exists():
+                removed.path.unlink()
+            changed = True
+
+        if changed:
+            self._write_manifest()
 
 
 def load_checkpoint(path: Path, map_location: str | torch.device | None = None):
