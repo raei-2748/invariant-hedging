@@ -23,6 +23,7 @@ class SimulationOutput:
     step_pnl: torch.Tensor
     max_trade: torch.Tensor
     probe: Optional[List[dict[str, float]]] = None
+    representations: Optional[torch.Tensor] = None
 
 
 class SingleAssetHedgingEnv:
@@ -54,6 +55,7 @@ class SingleAssetHedgingEnv:
         indices: torch.Tensor,
         device: torch.device,
         representation_scale: Optional[torch.Tensor] = None,
+        collect_representation: bool = False,
     ) -> SimulationOutput:
         sub_batch = self.batch.subset(indices.tolist()).to(device)
         steps = sub_batch.steps
@@ -77,6 +79,7 @@ class SingleAssetHedgingEnv:
         max_trade = torch.zeros(batch_size, device=device)
 
         probe_records: List[dict[str, float]] = []
+        representations: Optional[List[torch.Tensor]] = [] if collect_representation else None
 
         for t in range(steps):
             inv = positions[:, t] / self.notional
@@ -87,6 +90,8 @@ class SingleAssetHedgingEnv:
             raw_action = out.get("raw_action")
             if raw_action is not None:
                 raw_action = raw_action.squeeze(-1)
+            if collect_representation and representations is not None and "representation" in out:
+                representations.append(out["representation"])
             positions[:, t + 1] = action
             trade = positions[:, t + 1] - positions[:, t]
             cost_t = execution_cost(trade, spot[:, t], self.cost_config)
@@ -146,6 +151,10 @@ class SingleAssetHedgingEnv:
         if self._debug_probe_enabled and probe_records:
             self._debug_episode_logged = True
 
+        rep_tensor: Optional[torch.Tensor] = None
+        if collect_representation and representations:
+            rep_tensor = torch.stack(representations, dim=1)
+
         return SimulationOutput(
             pnl=pnl,
             turnover=turnover,
@@ -156,4 +165,5 @@ class SingleAssetHedgingEnv:
             step_pnl=step_pnl,
             max_trade=max_trade,
             probe=probe_records if probe_records else None,
+            representations=rep_tensor,
         )
