@@ -1,0 +1,11 @@
+name: hirm_head
+objective: hirm_head
+hidden_width: 192
+hidden_depth: 3
+dropout: 0.0
+layer_norm: true
+max_position: 5.0
+representation_dim: 64
+adapter_hidden: 16
+risk_hidden: 32
+risk_loss_weight: 1.0

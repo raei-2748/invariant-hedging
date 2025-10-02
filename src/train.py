@@ -1,18 +1,21 @@
 """Training loop for invariant hedging experiments."""
 from __future__ import annotations
 
+import math
 import os
 from pathlib import Path
 from typing import Dict, List
 
 import hydra
 import torch
+import torch.nn.functional as F
 from omegaconf import DictConfig, OmegaConf
 
 from .data.features import FeatureEngineer
-from .models.policy_mlp import PolicyMLP
+from .diagnostics import metrics as diag_metrics
+from .models import PolicyMLP, TwoHeadPolicy
 from .objectives import cvar as cvar_obj
-from .objectives import penalties
+from .objectives import invariance, penalties
 from .utils import checkpoints, logging as log_utils, seed as seed_utils, stats
 from .utils.configs import build_envs, prepare_data_module, unwrap_experiment_config
 
@@ -40,7 +43,22 @@ def _device(runtime_cfg: DictConfig) -> torch.device:
     return torch.device(device_str)
 
 
-def _init_policy(cfg: DictConfig, feature_dim: int, num_envs: int) -> PolicyMLP:
+def _init_policy(cfg: DictConfig, feature_dim: int, num_envs: int):
+    if cfg.model.get("name", "erm") == "hirm_hybrid":
+        return TwoHeadPolicy(
+            feature_dim=feature_dim,
+            num_envs=num_envs,
+            hidden_width=cfg.model.hidden_width,
+            hidden_depth=cfg.model.hidden_depth,
+            dropout=cfg.model.dropout,
+            layer_norm=cfg.model.layer_norm,
+            representation_dim=cfg.model.representation_dim,
+            adapter_hidden=cfg.model.adapter_hidden,
+            max_position=cfg.model.max_position,
+            risk_hidden=cfg.model.get("risk_hidden", cfg.model.adapter_hidden),
+            alpha_init=cfg.model.get("alpha_init", 0.0),
+            freeze_alpha=cfg.model.get("freeze_alpha", False),
+        )
     return PolicyMLP(
         feature_dim=feature_dim,
         num_envs=num_envs,
@@ -54,8 +72,15 @@ def _init_policy(cfg: DictConfig, feature_dim: int, num_envs: int) -> PolicyMLP:
     )
 
 
+def _init_risk_head(cfg: DictConfig, representation_dim: int):
+    from .models.heads import RiskHead
+
+    hidden = cfg.model.get("risk_hidden", cfg.model.adapter_hidden)
+    return RiskHead(representation_dim, hidden)
+
+
 def _evaluate(
-    policy: PolicyMLP,
+    policy,
     envs: Dict[str, "SingleAssetHedgingEnv"],
     device: torch.device,
     alpha: float,
@@ -94,6 +119,25 @@ def _lambda_schedule(step: int, cfg: DictConfig) -> float:
     return cfg.irm.get("lambda_target", cfg.model.irm.penalty_weight)
 
 
+def _lambda_from_schedule(step: int, schedule_cfg: DictConfig, total_steps: int) -> float:
+    if not schedule_cfg:
+        return 0.0
+    schedule_type = schedule_cfg.get("type", "constant")
+    max_lambda = float(schedule_cfg.get("max_lambda", 0.0))
+    warmup_steps = int(schedule_cfg.get("warmup_steps", 0))
+    if schedule_type == "constant":
+        return max_lambda
+    if schedule_type == "warmup_cosine":
+        if warmup_steps > 0 and step < warmup_steps:
+            return max_lambda * float(step) / max(1, warmup_steps)
+        if total_steps <= warmup_steps:
+            return max_lambda
+        progress = min(1.0, (step - warmup_steps) / max(1, total_steps - warmup_steps))
+        cosine = 0.5 * (1.0 + math.cos(math.pi * progress))
+        return max_lambda * cosine
+    return max_lambda
+
+
 def _label_smoothing(pnl: torch.Tensor, smoothing: float) -> torch.Tensor:
     if smoothing <= 0:
         return pnl
@@ -101,9 +145,12 @@ def _label_smoothing(pnl: torch.Tensor, smoothing: float) -> torch.Tensor:
     return (1 - smoothing) * pnl + smoothing * mean
 
 
-def _setup_optimizer(policy: PolicyMLP, cfg: DictConfig) -> torch.optim.Optimizer:
+def _setup_optimizer(policy: torch.nn.Module, cfg: DictConfig, extra_params=None) -> torch.optim.Optimizer:
     name = cfg.optimizer.name.lower()
-    params = policy.parameters()
+    params = list(policy.parameters())
+    if extra_params is not None:
+        for param in extra_params:
+            params.append(param)
     lr = cfg.optimizer.lr
     weight_decay = cfg.optimizer.weight_decay
     if cfg.model.name == "erm_reg":
@@ -143,6 +190,7 @@ def main(cfg: DictConfig) -> None:
     val_envs = build_envs(val_batches, feature_engineer, data_ctx.name_to_index)
     test_envs = build_envs(test_batches, feature_engineer, data_ctx.name_to_index)
 
+    objective = cfg.model.get("objective", cfg.model.get("name", "erm"))
     policy = _init_policy(
         cfg,
         feature_dim=len(feature_engineer.feature_names),
@@ -150,7 +198,18 @@ def main(cfg: DictConfig) -> None:
     )
     policy.to(device)
 
-    optimizer = _setup_optimizer(policy, cfg)
+    is_hirm_head = objective == "hirm_head"
+    is_hirm_hybrid = objective == "hirm_hybrid"
+    risk_head = None
+    if is_hirm_head:
+        risk_head = _init_risk_head(cfg, cfg.model.representation_dim)
+        risk_head.to(device)
+
+    extra_params = None
+    if risk_head is not None:
+        extra_params = list(risk_head.parameters())
+
+    optimizer = _setup_optimizer(policy, cfg, extra_params=extra_params)
     scheduler = _setup_scheduler(optimizer, cfg)
     scaler = torch.cuda.amp.GradScaler(enabled=(device.type == "cuda" and cfg.runtime.get("mixed_precision", True)))
 
@@ -170,17 +229,29 @@ def main(cfg: DictConfig) -> None:
     max_trade_warn = warning_factor * max_position if warning_factor > 0 else 0.0
     spike_alerted_envs: set[str] = set()
 
+    invariance_cfg = cfg.get("invariance", {})
+
     for step in range(1, cfg.train.steps + 1):
         optimizer.zero_grad()
         env_losses: List[torch.Tensor] = []
         metrics_to_log = {}
-        dummy = torch.tensor(1.0, requires_grad=(cfg.model.objective == "irm"), device=device)
+        dummy = torch.tensor(1.0, requires_grad=(objective == "irm"), device=device)
+        head_features: List[torch.Tensor] = []
+        risk_reg_losses: List[torch.Tensor] = []
+        msi_values: List[float] = []
 
         for env_idx, env_name in enumerate(cfg.envs.train):
             env = train_envs[env_name]
             indices = env.sample_indices(per_env_batch, generator)
-            rep_scale = dummy if cfg.model.objective == "irm" else None
-            sim = env.simulate(policy, indices, device, representation_scale=rep_scale)
+            collect_rep = is_hirm_head or is_hirm_hybrid
+            rep_scale = dummy if objective == "irm" else None
+            sim = env.simulate(
+                policy,
+                indices,
+                device,
+                representation_scale=rep_scale,
+                collect_representation=collect_rep,
+            )
             if sim.probe:
                 run_logger.log_probe(env_name, step, sim.probe)
             pnl = sim.pnl
@@ -206,23 +277,82 @@ def main(cfg: DictConfig) -> None:
                 )
                 spike_alerted_envs.add(env_name)
 
+            if collect_rep:
+                if sim.representations is None:
+                    raise RuntimeError("Representations were not collected for HIRM objective.")
+                rep_summary = sim.representations.mean(dim=1)
+                rep_detached = rep_summary.detach()
+                head_features.append(rep_detached)
+                rep_for_msi = rep_detached.clone().requires_grad_(True)
+
+                if is_hirm_head and risk_head is not None:
+                    risk_pred = risk_head(rep_detached)
+                    mse_loss = F.mse_loss(risk_pred.squeeze(-1), (-pnl).detach())
+                    risk_reg_losses.append(mse_loss)
+                    diag_pred = risk_head(rep_for_msi)
+                elif is_hirm_hybrid:
+                    risk_pred = policy.mixed_risk(rep_detached)
+                    mse_loss = F.mse_loss(risk_pred.squeeze(-1), (-pnl).detach())
+                    risk_reg_losses.append(mse_loss)
+                    diag_pred = policy.mixed_risk(rep_for_msi)
+                else:
+                    diag_pred = None
+
+                if diag_pred is not None:
+                    grad = torch.autograd.grad(diag_pred.mean(), rep_for_msi, retain_graph=False, allow_unused=True)[0]
+                    if grad is not None:
+                        msi_values.append(float(grad.abs().mean().item()))
+                metrics_to_log[f"train/{env_name}_risk_mse"] = float(mse_loss.item())
+
         loss_tensor = torch.stack(env_losses)
-        if cfg.model.objective == "groupdro":
+        if objective == "groupdro":
             total_loss = penalties.groupdro_objective(group_weights, env_losses)
         else:
             total_loss = loss_tensor.mean()
 
         penalty_value = 0.0
-        if cfg.model.objective == "irm":
+        lambda_logged = 0.0
+        if objective == "irm":
             lambda_weight = _lambda_schedule(step, cfg)
             irm_pen = penalties.irm_penalty(env_losses, dummy)
             total_loss = total_loss + lambda_weight * irm_pen
             penalty_value = float(irm_pen.item())
-        elif cfg.model.objective == "vrex":
+            lambda_logged = lambda_weight
+        elif objective == "vrex":
             vrex_pen = penalties.vrex_penalty(env_losses)
             weight = cfg.model.vrex.penalty_weight
             total_loss = total_loss + weight * vrex_pen
             penalty_value = float(vrex_pen.item())
+        elif objective in {"hirm_head", "hirm_hybrid"}:
+            lambda_weight = _lambda_from_schedule(step, invariance_cfg.get("lambda_schedule"), cfg.train.steps)
+            scope = invariance_cfg.get("scope", "head")
+            if head_features:
+                if objective == "hirm_head" and risk_head is not None:
+                    head_penalty = invariance.irm_penalty(
+                        risk_head,
+                        head_features,
+                        None,
+                        lambda module, feat, target, dummy: (module(feat) * dummy).mean(),
+                        scope=scope,
+                    )
+                else:
+                    head_penalty = invariance.irm_penalty(
+                        policy.inv_head,
+                        head_features,
+                        None,
+                        lambda module, feat, target, dummy: (module(feat) * dummy).mean(),
+                        scope=scope,
+                    )
+                total_loss = total_loss + lambda_weight * head_penalty
+                penalty_value = float(head_penalty.item())
+            lambda_logged = lambda_weight
+
+        if (is_hirm_head or is_hirm_hybrid) and risk_reg_losses:
+            risk_weight = cfg.model.get("risk_loss_weight", 1.0)
+            risk_loss = torch.stack(risk_reg_losses).mean()
+            total_loss = total_loss + risk_weight * risk_loss
+        else:
+            risk_loss = None
 
         scaler.scale(total_loss).backward()
         torch.nn.utils.clip_grad_norm_(policy.parameters(), cfg.train.grad_clip)
@@ -236,6 +366,18 @@ def main(cfg: DictConfig) -> None:
                 group_weights, env_losses, cfg.model.groupdro.step_size
             )
 
+        if objective in {"hirm_head", "hirm_hybrid", "irm"}:
+            metrics_to_log["train/lambda"] = lambda_logged
+        if (is_hirm_head or is_hirm_hybrid) and env_losses:
+            env_risk_vals = [float(loss.detach().item()) for loss in env_losses]
+            metrics_to_log["train/ig"] = diag_metrics.invariant_gap(env_risk_vals)
+            metrics_to_log["train/wg"] = diag_metrics.worst_group(env_risk_vals)
+            metrics_to_log["train/msi"] = diag_metrics.mechanistic_sensitivity(msi_values)
+            if risk_loss is not None:
+                metrics_to_log["train/risk_loss"] = float(risk_loss.item())
+            if is_hirm_hybrid:
+                metrics_to_log["train/gate"] = float(policy.gate_value().item())
+
         if step % log_interval == 0 or step == 1:
             metrics_to_log["train/loss"] = float(total_loss.item())
             metrics_to_log["train/penalty"] = penalty_value
@@ -243,28 +385,39 @@ def main(cfg: DictConfig) -> None:
             run_logger.log_metrics(metrics_to_log, step=step)
 
         if step % eval_interval == 0 or step == cfg.train.steps:
+            if risk_head is not None:
+                risk_head.eval()
             val_metrics = _evaluate(policy, val_envs, device, alpha)
             log_payload = {f"val/{k}_{m}": v for k, metrics in val_metrics.items() for m, v in metrics.items()}
             run_logger.log_metrics(log_payload, step=step)
             primary_env = cfg.envs.val[0]
             score = -val_metrics[primary_env]["cvar"]
+            ckpt_payload = {
+                "model": policy.state_dict(),
+                "optimizer": optimizer.state_dict(),
+                "step": step,
+                "score": score,
+                "scaler": {
+                    "mean": feature_engineer.scaler.mean.cpu(),
+                    "std": feature_engineer.scaler.std.cpu(),
+                },
+            }
+            if risk_head is not None:
+                ckpt_payload["risk_head"] = risk_head.state_dict()
             ckpt_manager.save(
                 step,
                 score,
-                {
-                    "model": policy.state_dict(),
-                    "optimizer": optimizer.state_dict(),
-                    "step": step,
-                    "score": score,
-                    "scaler": {
-                        "mean": feature_engineer.scaler.mean.cpu(),
-                        "std": feature_engineer.scaler.std.cpu(),
-                    }
-                },
+                ckpt_payload,
             )
+            if risk_head is not None:
+                risk_head.train()
 
+    if risk_head is not None:
+        risk_head.eval()
     test_metrics = _evaluate(policy, test_envs, device, alpha)
     run_logger.log_final({f"test/{k}_{m}": v for k, metrics in test_metrics.items() for m, v in metrics.items()})
+    if risk_head is not None:
+        risk_head.train()
     run_logger.close()
 
 
