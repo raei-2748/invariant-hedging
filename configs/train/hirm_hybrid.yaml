@@ -34,9 +34,7 @@ logging:
   log_interval: 100
   eval_interval: 1000
 
-invariance:
-  scope: head
-  lambda_schedule:
-    type: warmup_cosine
-    warmup_steps: 20000
-    max_lambda: 0.5
+irm:
+  lambda_target: 0.5
+  schedule: linear
+  warmup_steps: 20000
