@@ -19,3 +19,13 @@ def test_bootstrap_ci_has_width():
     pnl = torch.linspace(-1, 1, 200)
     result = cvar_obj.bootstrap_cvar_ci(pnl, 0.9, num_samples=200, seed=123)
     assert result.upper > result.lower
+
+
+
+def test_cvar_scales_down_with_losses():
+    losses = torch.linspace(-2.0, 2.0, 500)
+    scaled = losses * 0.5
+    alpha = 0.9
+    base = cvar_obj.cvar_loss(losses, alpha)
+    scaled_val = cvar_obj.cvar_loss(scaled, alpha)
+    assert scaled_val < base
