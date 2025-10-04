@@ -4,6 +4,10 @@ This research introduce **HIRM** (Hedging with IRM), a research framework for ro
 
 **Research question:** Does adding Invariant Risk Minimization (IRM) to a deep hedging framework improve robustness against regime shifts (such as crisis periods like Volmageddon), compared to a standard deep hedger without IRM or trained on alternative regularizations?
 
+## Contents
+
+- [Quick start](#quick-start)
+- [Experiments](#phase-1-results) → [Phase 1](#phase-1-results) | [Phase 2 — Head-Only IRM + Diagnostics (Current)](#-phase-2--head-only-irm--diagnostics-current)
 ## Table of Contents
 - [Quick start](#quick-start)
 - [Roadmap](#roadmap)
@@ -15,6 +19,7 @@ This research introduce **HIRM** (Hedging with IRM), a research framework for ro
 - [Smoke test](#smoke-test)
 - [Data](#data)
 - [Reproducibility](#reproducibility)
+- [Reproducibility checklist](#reproducibility-checklist)
 
 ## Quick start
 
@@ -31,6 +36,23 @@ make reproduce PHASE=phase1
 | ERM-v1   | –12.4%         | 0.021    | 1.00×    |
 | IRM-head | –10.7%         | 0.020    | 1.12×    |
 | V-REx    | –11.0%         | 0.019    | 1.05×    |
+
+
+### 📈 Phase 2 — Head-Only IRM + Diagnostics (Current)
+
+Phase 2 expands the baseline to test **head-only IRM**, **V-REx**, and early diagnostics (**IG**, **WG**, **MSI**) under jump + liquidity stresses.  See the full plan in [`experiments/phase2_plan.md`](experiments/phase2_plan.md).
+
+**Quick Start**
+
+```bash
+# IRM-head sweep (λ in {1e-2, 1e-1, 1})
+python scripts/train.py config=train/phase2 irm.enabled=true irm.mode=head_only irm.lambda=0.1
+
+# V-REx sweep (β in {1, 5, 10})
+python scripts/train.py config=train/phase2 vrex.enabled=true vrex.beta=10.0
+```
+
+Results are saved in `outputs/_phase2_snapshot/`.
 
 
 1. **Install dependencies**
