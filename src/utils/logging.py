@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import platform
 import subprocess
 import time
 import warnings
@@ -10,6 +11,11 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 import yaml
+
+try:
+    import torch
+except ImportError:  # pragma: no cover
+    torch = None  # type: ignore
 
 warnings.filterwarnings(
     "ignore",
@@ -105,10 +111,14 @@ class RunLogger:
         info: Dict[str, object] = {
             "git_commit": _get_git_commit(),
             "python": f"{os.sys.version_info.major}.{os.sys.version_info.minor}.{os.sys.version_info.micro}",
+            "platform": platform.platform(),
         }
         git_status = _get_git_status_clean()
         if git_status is not None:
             info["git_status_clean"] = git_status
+        if torch is not None:
+            info["torch_version"] = torch.__version__
+            info["cuda_available"] = bool(torch.cuda.is_available())
         return info
 
 
