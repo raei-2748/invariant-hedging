@@ -8,6 +8,11 @@ This research introduce **HIRM** (Hedging with IRM), a research framework for ro
 
 - [Quick start](#quick-start)
 - [Experiments](#phase-1-results) → [Phase 1](#phase-1-results) | [Phase 2 — Head-Only IRM + Diagnostics (Current)](#-phase-2--head-only-irm--diagnostics-current)
+## Table of Contents
+- [Quick start](#quick-start)
+- [Roadmap](#roadmap)
+  - [✅ Phase 1 — ERM Baseline (Complete)](#phase-1-erm)
+  - [📈 Phase 2 — Head-Only IRM + Diagnostics (Current)](#phase-2-headirm)
 - [Repository layout](#repository-layout)
 - [Logging and outputs](#logging-and-outputs)
 - [Testing](#testing)
@@ -68,6 +73,16 @@ Results are saved in `outputs/_phase2_snapshot/`.
    scripts/make_reproduce.sh
    ```
    Each run mirrors metrics locally under `runs/<timestamp>/` and, if W&B is available, logs to the `invariant-hedging` project.
+
+## Roadmap
+
+<a id="phase-1-erm"></a>
+### ✅ Phase 1 — ERM Baseline (Complete)
+See [`experiments/phase1_summary.md`](experiments/phase1_summary.md) for the ERM-v1 baseline protocol and artifacts.
+
+<a id="phase-2-headirm"></a>
+### 📈 Phase 2 — Head-Only IRM + Diagnostics (Current)
+See [`experiments/phase2_plan.md`](experiments/phase2_plan.md) for objectives, sweeps, and metrics.
 
 ## Repository layout
 

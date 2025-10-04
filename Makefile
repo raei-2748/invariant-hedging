@@ -3,7 +3,7 @@ SHELL := /bin/bash
 PYTHON ?= python3
 CONFIG ?= configs/experiment.yaml
 
-.PHONY: setup train evaluate reproduce lint tests smoke
+.PHONY: setup train evaluate reproduce lint tests smoke phase2
 
 setup:
 	$(PYTHON) -m pip install -r requirements.txt
@@ -34,3 +34,6 @@ smoke:
 	if [ -z "$$LAST_RUN" ]; then echo "No run directories found" >&2; exit 1; fi; \
 	CHECKPOINT=$$(python3 scripts/find_latest_checkpoint.py "$$LAST_RUN"); \
 	python3 -m src.eval --config-name=eval/smoke eval.report.checkpoint_path=$$CHECKPOINT
+
+phase2:
+	@echo "See experiments/phase2_plan.md for details."
