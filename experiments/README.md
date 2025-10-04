@@ -1,0 +1,2 @@
+- **Phase 1:** Baseline ERM v1 reproduction
+- **Phase 2:** Head-Only IRM + Diagnostics → [phase2_plan.md](phase2_plan.md)

@@ -9,8 +9,8 @@ defaults:
   - _self_
 
 train:
-  steps: 200
-  batch_size: 32
+  steps: 100
+  batch_size: 16
   grad_clip: 1.0
   seed: 0
   pretrain_steps: 20

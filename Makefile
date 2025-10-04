@@ -1,3 +1,5 @@
+SHELL := /bin/bash
+.SHELLFLAGS := -eu -o pipefail -c
 PYTHON ?= python3
 CONFIG ?= configs/experiment.yaml
 
