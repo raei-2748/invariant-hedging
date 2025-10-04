@@ -77,11 +77,11 @@ Results are saved in `outputs/_phase2_snapshot/`.
 ## Roadmap
 
 <a id="phase-1-erm"></a>
-### ✅ Phase 1 — ERM Baseline (Complete)
+### Phase 1 — ERM Baseline (Complete)
 See [`experiments/phase1_summary.md`](experiments/phase1_summary.md) for the ERM-v1 baseline protocol and artifacts.
 
 <a id="phase-2-headirm"></a>
-### 📈 Phase 2 — Head-Only IRM + Diagnostics (Current)
+### Phase 2 — Head-Only IRM + Diagnostics (Current)
 See [`experiments/phase2_plan.md`](experiments/phase2_plan.md) for objectives, sweeps, and metrics.
 
 ## Repository layout
