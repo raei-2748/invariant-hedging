@@ -6,7 +6,7 @@ import argparse
 import logging
 import math
 from pathlib import Path
-from typing import List, Sequence
+from typing import List, Optional, Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -60,7 +60,7 @@ def _ensure_outdir(path: Path) -> None:
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--scorecard", required=True, help="Path to aggregated scorecard.csv")
+    parser.add_argument("--scorecard", default=None, help="Optional path to aggregated scorecard.csv for ordering")
     parser.add_argument("--diagnostics", required=True, help="Path to diagnostics_all.csv")
     parser.add_argument("--out", required=True, help="Output image path")
     parser.add_argument("--dpi", type=int, default=200, help="Output figure DPI")
@@ -68,9 +68,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _method_order(scorecard: pd.DataFrame, diagnostics: pd.DataFrame) -> List[str]:
+def _method_order(scorecard: Optional[pd.DataFrame], diagnostics: pd.DataFrame) -> List[str]:
     ordered = []
-    if "method" in scorecard:
+    if scorecard is not None and "method" in scorecard:
         ordered.extend(list(dict.fromkeys(scorecard["method"].tolist())))
     diag_methods = list(dict.fromkeys(diagnostics.get("method", pd.Series(dtype=str)).tolist()))
     for method in diag_methods:
@@ -82,7 +82,7 @@ def _method_order(scorecard: pd.DataFrame, diagnostics: pd.DataFrame) -> List[st
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     _setup_logging(args.verbose)
-    scorecard_df = _load_csv(Path(args.scorecard))
+    scorecard_df = _load_csv(Path(args.scorecard)) if args.scorecard else None
     diagnostics_df = _load_csv(Path(args.diagnostics))
     if "es95_crisis" not in diagnostics_df.columns:
         raise KeyError("diagnostics CSV must contain 'es95_crisis' column")

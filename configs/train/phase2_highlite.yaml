@@ -1,0 +1,47 @@
+# @package _global_
+
+defaults:
+  - /data: synthetic
+  - /envs: daily
+  - /model: hirm_head
+  - /eval: daily
+  - /logging: default
+  - _self_
+
+train:
+  steps: 150000
+  batch_size: 128
+  grad_clip: 1.0
+  seed: 0
+  eval_interval: 1000
+  checkpoint_topk: 3
+  max_trade_warning_factor: 1.0
+  envs: [low, med, high_slim]
+  env_weights: [0.45, 0.45, 0.10]
+  lambda_grid: [0.1, 1.0, 10.0, 100.0]
+
+loss:
+  name: cvar
+  cvar_alpha: 0.95
+
+optimizer:
+  name: adamw
+  lr: 1.0e-4
+  weight_decay: 1.0e-6
+
+scheduler:
+  name: cosine
+
+logging:
+  log_interval: 200
+  eval_interval: 1000
+
+irm:
+  lambda_target: 0.01
+  schedule: linear
+  warmup_steps: 20000
+
+hydra:
+  sweeper:
+    params:
+      irm.lambda_target: 0.01,0.1

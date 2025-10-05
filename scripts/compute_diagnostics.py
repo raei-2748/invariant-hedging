@@ -190,6 +190,12 @@ def _normalize_key(key: str) -> str:
 
 
 _METRIC_ALIASES: Mapping[str, Tuple[str, ...]] = {
+    "es90": (
+        "es90",
+        "cvar90",
+        "cvar_90",
+        "crisis_es90",
+    ),
     "es95": (
         "es95",
         "cvar",
@@ -197,6 +203,12 @@ _METRIC_ALIASES: Mapping[str, Tuple[str, ...]] = {
         "cvar_95",
         "crisis_cvar",
         "crisis_es95",
+    ),
+    "es99": (
+        "es99",
+        "cvar99",
+        "cvar_99",
+        "crisis_es99",
     ),
     "meanpnl": (
         "mean_pnl",
@@ -263,6 +275,7 @@ def _collect_env_values(
     env_metrics: Mapping[str, Mapping[str, object]] | None,
     target_names: Iterable[str],
     expected_split: Optional[str],
+    risk_key: str,
 ) -> List[float]:
     if not env_metrics:
         return []
@@ -273,21 +286,23 @@ def _collect_env_values(
         if not isinstance(metrics, Mapping):
             continue
         split = str(metrics.get("split", "")).lower()
-        es95 = metrics.get("ES95") or metrics.get("es95")
-        if es95 is None:
+        value = metrics.get(risk_key)
+        if value is None:
+            value = metrics.get(risk_key.lower())
+        if value is None:
             continue
         try:
-            es95_val = float(es95)
+            es_val = float(value)
         except (TypeError, ValueError):
             continue
         name_key = env_name.lower()
         if names and name_key not in names:
             if expected_split and split == expected_split:
-                fallback.append(es95_val)
+                fallback.append(es_val)
             continue
         if expected_split and split and split != expected_split:
             continue
-        values.append(es95_val)
+        values.append(es_val)
     if not values and expected_split:
         return fallback
     return values
@@ -297,8 +312,9 @@ def _extract_single_env_metric(
     env_metrics: Mapping[str, Mapping[str, object]] | None,
     target_names: Iterable[str],
     expected_split: Optional[str],
+    risk_key: str,
 ) -> Optional[float]:
-    candidates = _collect_env_values(env_metrics, target_names, expected_split)
+    candidates = _collect_env_values(env_metrics, target_names, expected_split, risk_key)
     if candidates:
         return candidates[0]
     return None
@@ -337,6 +353,7 @@ def _empty_row(method: str, seed: int) -> Dict[str, object]:
         "wg": math.nan,
         "msi": math.nan,
         "es95_crisis": math.nan,
+        "es99_crisis": math.nan,
         "meanpnl_crisis": math.nan,
         "turnover_crisis": math.nan,
         "es95_train_max": math.nan,
@@ -402,8 +419,8 @@ def _collect_diagnostics(
         metrics_mtime = (meta.path / "final_metrics.json").stat().st_mtime if (meta.path / "final_metrics.json").exists() else meta.path.stat().st_mtime
         combined_mtime = max(metrics_mtime, diag_mtime)
         env_metrics = diag_record.get("env_metrics") if isinstance(diag_record, Mapping) else None
-        train_vals = _collect_env_values(env_metrics, train_envs, "train")
-        test_vals = _collect_env_values(env_metrics, test_envs, "test")
+        train_vals = _collect_env_values(env_metrics, train_envs, "train", "ES95")
+        test_vals = _collect_env_values(env_metrics, test_envs, "test", "ES95")
         ig = None
         if isinstance(diag_record, Mapping):
             ig = diag_record.get("IG", {}).get("ES95") if isinstance(diag_record.get("IG"), Mapping) else None
@@ -421,10 +438,13 @@ def _collect_diagnostics(
                 msi = msi_obj.get("value")
         train_max = _max_or_nan(train_vals)
         train_min = _min_or_nan(train_vals)
-        val_high = _extract_single_env_metric(env_metrics, val_envs, "val")
-        crisis_es = _extract_single_env_metric(env_metrics, test_envs, "test")
+        val_high = _extract_single_env_metric(env_metrics, val_envs, "val", "ES95")
+        crisis_es = _extract_single_env_metric(env_metrics, test_envs, "test", "ES95")
+        crisis_es99 = _extract_single_env_metric(env_metrics, test_envs, "test", "ES99")
         if crisis_es is None:
             crisis_es = _find_metric(final_metrics, split, "es95")
+        if crisis_es99 is None:
+            crisis_es99 = _find_metric(final_metrics, split, "es99")
         mean_pnl = _find_metric(final_metrics, split, "meanpnl")
         turnover = _find_metric(final_metrics, split, "turnover")
         row = {
@@ -434,6 +454,7 @@ def _collect_diagnostics(
             "wg": float(wg) if wg is not None else math.nan,
             "msi": float(msi) if msi is not None else math.nan,
             "es95_crisis": float(crisis_es) if crisis_es is not None else math.nan,
+            "es99_crisis": float(crisis_es99) if crisis_es99 is not None else math.nan,
             "meanpnl_crisis": float(mean_pnl) if mean_pnl is not None else math.nan,
             "turnover_crisis": float(turnover) if turnover is not None else math.nan,
             "es95_train_max": train_max,
@@ -459,6 +480,7 @@ def _write_csv(path: Path, rows: Sequence[Mapping[str, object]]) -> None:
         "wg",
         "msi",
         "es95_crisis",
+        "es99_crisis",
         "meanpnl_crisis",
         "turnover_crisis",
         "es95_train_max",

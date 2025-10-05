@@ -8,6 +8,7 @@ import json
 import logging
 import math
 import os
+import subprocess
 import statistics
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -35,6 +36,13 @@ _METHOD_CANONICAL = {
 }
 
 _METRIC_ALIASES: Mapping[str, Tuple[str, ...]] = {
+    "es90": (
+        "es90",
+        "cvar90",
+        "cvar_90",
+        "cv_90",
+        "crisis_es90",
+    ),
     "es95": (
         "es95",
         "cvar",
@@ -46,6 +54,13 @@ _METRIC_ALIASES: Mapping[str, Tuple[str, ...]] = {
         "crisis_cvar",
         "crisis_es95",
         "risk/cvar",
+    ),
+    "es99": (
+        "es99",
+        "cvar99",
+        "cvar_99",
+        "cv_99",
+        "crisis_es99",
     ),
     "meanpnl": (
         "mean",
@@ -66,9 +81,15 @@ _SCORECARD_COLUMNS: Tuple[str, ...] = (
     "method",
     "split",
     "n_seeds",
+    "es90_mean",
+    "es90_ci_low",
+    "es90_ci_high",
     "es95_mean",
     "es95_ci_low",
     "es95_ci_high",
+    "es99_mean",
+    "es99_ci_low",
+    "es99_ci_high",
     "meanpnl_mean",
     "meanpnl_ci_low",
     "meanpnl_ci_high",
@@ -90,7 +111,9 @@ class MetricRecord:
     method: str
     seed: int
     split: str
+    es90: float
     es95: float
+    es99: float
     meanpnl: float
     turnover: float
     source_dir: Path
@@ -251,6 +274,13 @@ def _candidate_run_roots(default: Path) -> List[Path]:
     return roots
 
 
+def _current_branch() -> str:
+    try:
+        return subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"], text=True).strip()
+    except Exception:  # pragma: no cover - git may not be available
+        return "unknown"
+
+
 def _canonical_method(name: str | None) -> Optional[str]:
     if not name:
         return None
@@ -346,10 +376,12 @@ def _collect_metrics(roots: Sequence[Path], methods: Sequence[str], seeds: Seque
             continue
         metrics_path = meta.path / "final_metrics.json"
         metrics = _load_json(metrics_path)
+        es90 = _find_metric(metrics, split, "es90")
         es95 = _find_metric(metrics, split, "es95")
+        es99 = _find_metric(metrics, split, "es99")
         meanpnl = _find_metric(metrics, split, "meanpnl")
         turnover = _find_metric(metrics, split, "turnover")
-        if es95 is None or meanpnl is None or turnover is None:
+        if es90 is None or es95 is None or es99 is None or meanpnl is None or turnover is None:
             LOGGER.debug("Missing metrics for %s seed=%s at %s", canonical_method, meta.seed, meta.path)
             continue
         modified = metrics_path.stat().st_mtime if metrics_path.exists() else meta.path.stat().st_mtime
@@ -357,7 +389,9 @@ def _collect_metrics(roots: Sequence[Path], methods: Sequence[str], seeds: Seque
             method=target_method,
             seed=int(meta.seed),
             split=split,
+            es90=float(es90),
             es95=float(es95),
+            es99=float(es99),
             meanpnl=float(meanpnl),
             turnover=float(turnover),
             source_dir=meta.path,
@@ -449,7 +483,9 @@ def _write_markdown(path: Path, rows: Sequence[Mapping[str, object]]) -> None:
     headers = [
         "Method",
         "Seeds",
+        "ES90",
         "ES95",
+        "ES99",
         "Mean PnL",
         "Turnover",
         "ΔES95 vs ERM (%)",
@@ -460,7 +496,9 @@ def _write_markdown(path: Path, rows: Sequence[Mapping[str, object]]) -> None:
         return [
             str(row.get("method", "")),
             str(row.get("n_seeds", "0")),
+            _format_ci(row.get("es90_mean", math.nan), row.get("es90_ci_low", math.nan), row.get("es90_ci_high", math.nan)),
             _format_ci(row.get("es95_mean", math.nan), row.get("es95_ci_low", math.nan), row.get("es95_ci_high", math.nan)),
+            _format_ci(row.get("es99_mean", math.nan), row.get("es99_ci_low", math.nan), row.get("es99_ci_high", math.nan)),
             _format_ci(row.get("meanpnl_mean", math.nan), row.get("meanpnl_ci_low", math.nan), row.get("meanpnl_ci_high", math.nan)),
             _format_ci(row.get("turnover_mean", math.nan), row.get("turnover_ci_low", math.nan), row.get("turnover_ci_high", math.nan)),
             _format_percent(row.get("d_es95_vs_ERM_pct")),
@@ -474,6 +512,52 @@ def _write_markdown(path: Path, rows: Sequence[Mapping[str, object]]) -> None:
     with path.open("w", encoding="utf-8") as handle:
         for row in table_rows:
             handle.write("| " + " | ".join(row) + " |\n")
+
+
+def _write_latex(path: Path, rows: Sequence[Mapping[str, object]]) -> None:
+    if not rows:
+        return
+
+    def _format_ci_tex(mean: float, lo: float, hi: float) -> str:
+        formatted = _format_ci(mean, lo, hi)
+        return formatted.replace("±", "\\pm")
+
+    def _format_percent_tex(value: object) -> str:
+        formatted = _format_percent(value)
+        if formatted == "NA":
+            return formatted
+        return formatted.replace("%", "\\%")
+
+    with path.open("w", encoding="utf-8") as handle:
+        handle.write("\\begin{tabular}{lccccccccc}\\n")
+        header = [
+            "Method",
+            "Seeds",
+            "ES90 (95\\% CI)",
+            "ES95 (95\\% CI)",
+            "ES99 (95\\% CI)",
+            "Mean PnL (95\\% CI)",
+            "Turnover (95\\% CI)",
+            "$\\Delta$ES95 vs ERM (\\%)",
+            "$\\Delta$MeanPnL vs ERM (\\%)",
+            "$\\Delta$Turnover vs ERM (\\%)",
+        ]
+        handle.write(" & ".join(header) + " \\\\ \\hline\\n")
+        for row in rows:
+            cells = [
+                str(row.get("method", "")),
+                str(row.get("n_seeds", "0")),
+                _format_ci_tex(row.get("es90_mean", math.nan), row.get("es90_ci_low", math.nan), row.get("es90_ci_high", math.nan)),
+                _format_ci_tex(row.get("es95_mean", math.nan), row.get("es95_ci_low", math.nan), row.get("es95_ci_high", math.nan)),
+                _format_ci_tex(row.get("es99_mean", math.nan), row.get("es99_ci_low", math.nan), row.get("es99_ci_high", math.nan)),
+                _format_ci_tex(row.get("meanpnl_mean", math.nan), row.get("meanpnl_ci_low", math.nan), row.get("meanpnl_ci_high", math.nan)),
+                _format_ci_tex(row.get("turnover_mean", math.nan), row.get("turnover_ci_low", math.nan), row.get("turnover_ci_high", math.nan)),
+                _format_percent_tex(row.get("d_es95_vs_ERM_pct")),
+                _format_percent_tex(row.get("d_meanpnl_vs_ERM_pct")),
+                _format_percent_tex(row.get("d_turnover_vs_ERM_pct")),
+            ]
+            handle.write(" & ".join(cells) + " \\\\ \n")
+        handle.write("\\end{tabular}\\n")
 
 
 def _format_percent(value: object) -> str:
@@ -515,18 +599,28 @@ def _aggregate(records: Sequence[MetricRecord]) -> Tuple[List[Mapping[str, objec
     stats_by_method: Dict[str, Dict[str, object]] = {}
     method_rows: List[Mapping[str, object]] = []
     for method, entries in sorted(grouped.items()):
+        es90_values = [entry.es90 for entry in entries]
         es95_values = [entry.es95 for entry in entries]
-        meanpnl_values = [entry.meanypnl for entry in entries]
+        es99_values = [entry.es99 for entry in entries]
+        meanpnl_values = [entry.meanpnl for entry in entries]
         turnover_values = [entry.turnover for entry in entries]
+        es90_mean, es90_low, es90_high = _confidence_interval(es90_values)
         es95_mean, es95_low, es95_high = _confidence_interval(es95_values)
+        es99_mean, es99_low, es99_high = _confidence_interval(es99_values)
         meanpnl_mean, meanpnl_low, meanpnl_high = _confidence_interval(meanpnl_values)
         turnover_mean, turnover_low, turnover_high = _confidence_interval(turnover_values)
         stats = {
             "method": method,
             "n_seeds": len(entries),
+            "es90_mean": es90_mean,
+            "es90_ci_low": es90_low,
+            "es90_ci_high": es90_high,
             "es95_mean": es95_mean,
             "es95_ci_low": es95_low,
             "es95_ci_high": es95_high,
+            "es99_mean": es99_mean,
+            "es99_ci_low": es99_low,
+            "es99_ci_high": es99_high,
             "meanpnl_mean": meanpnl_mean,
             "meanpnl_ci_low": meanpnl_low,
             "meanpnl_ci_high": meanpnl_high,
@@ -543,9 +637,15 @@ def _empty_stats_row(method: str) -> Dict[str, object]:
     return {
         "method": method,
         "n_seeds": 0,
+        "es90_mean": math.nan,
+        "es90_ci_low": math.nan,
+        "es90_ci_high": math.nan,
         "es95_mean": math.nan,
         "es95_ci_low": math.nan,
         "es95_ci_high": math.nan,
+        "es99_mean": math.nan,
+        "es99_ci_low": math.nan,
+        "es99_ci_high": math.nan,
         "meanpnl_mean": math.nan,
         "meanpnl_ci_low": math.nan,
         "meanpnl_ci_high": math.nan,
@@ -563,24 +663,89 @@ def _empty_stats_row(method: str) -> Dict[str, object]:
     }
 
 
+def _extract_lambda_value(config: Mapping[str, object]) -> Optional[float]:
+    candidates: List[Tuple[str, float]] = []
+
+    def _walk(node: Mapping[str, object] | Sequence[object], path: str = "") -> None:
+        if isinstance(node, Mapping):
+            for key, value in node.items():
+                key_str = str(key)
+                next_path = f"{path}.{key_str}" if path else key_str
+                if isinstance(value, Mapping):
+                    _walk(value, next_path)
+                elif isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+                    # Skip lists of lambdas or other collections.
+                    continue
+                else:
+                    if isinstance(value, (int, float)) and "lambda" in key_str.lower():
+                        candidates.append((next_path.lower(), float(value)))
+        elif isinstance(node, Sequence) and not isinstance(node, (str, bytes)):
+            for idx, item in enumerate(node):
+                if isinstance(item, Mapping):
+                    _walk(item, f"{path}[{idx}]")
+
+    if isinstance(config, Mapping):
+        _walk(config)
+
+    if not candidates:
+        return None
+
+    priority_terms = ("selected", "choice", "chosen", "best", "final")
+    for term in priority_terms:
+        for key, value in candidates:
+            if term in key:
+                return value
+    for key, value in candidates:
+        if key.endswith(".lambda") or key.endswith("lambda"):
+            return value
+    return candidates[0][1] if candidates else None
+
+
 def _build_params_json(args: argparse.Namespace, config_tags: Mapping[str, str], records: Sequence[MetricRecord]) -> Dict[str, object]:
     seeds_by_method: Dict[str, List[int]] = {}
+    lambda_by_method: Dict[str, Optional[float]] = {}
     for record in records:
         seeds_by_method.setdefault(record.method, []).append(record.seed)
+        config_path = record.source_dir / "config.yaml"
+        config = _load_yaml(config_path)
+        lam = _extract_lambda_value(config)
+        if lam is None:
+            continue
+        existing = lambda_by_method.get(record.method)
+        if existing is not None and not math.isclose(existing, lam, rel_tol=1e-4, abs_tol=1e-4):
+            LOGGER.warning(
+                "Inconsistent lambda for %s across runs (%.4f vs %.4f); keeping first value",
+                record.method,
+                existing,
+                lam,
+            )
+            continue
+        lambda_by_method.setdefault(record.method, lam)
     for method, seeds in seeds_by_method.items():
         seeds_by_method[method] = sorted(set(seeds))
     for method in args.methods:
         seeds_by_method.setdefault(method, [])
+        lambda_by_method.setdefault(method, None)
+
     params = {
         "commit": args.commit_hash,
+        "branch": _current_branch(),
         "phase": args.phase,
-        "split": args.split,
-        "seeds_requested": args.seeds,
         "methods": args.methods,
+        "seeds": getattr(args, "seeds_spec", "") or ",".join(str(s) for s in args.seeds),
+        "methods_spec": getattr(args, "methods_spec", ",".join(args.methods)),
+        "splits": {"train": ["low", "med"], "val": ["high"], "test": [args.split]},
+        "eval": {
+            "es_alpha_list": [0.9, 0.95, 0.99],
+            "horizons": [20, 60, 120],
+            "cost_multipliers": [1.0, 1.5, 2.0],
+        },
+        "lambda_selection": "min ES95 on High",
+        "chosen_lambda_by_method": lambda_by_method,
         "seed_coverage": seeds_by_method,
         "config_tags": config_tags,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
         "config_tag_override": args.config_tag,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
     return params
 
@@ -616,8 +781,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--run_roots", default=None, help="Optional additional run directories (os.pathsep separated)")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
     args = parser.parse_args(argv)
-    args.methods = _parse_methods(args.methods)
-    args.seeds = _parse_seeds(args.seeds)
+    raw_methods = args.methods
+    raw_seeds = args.seeds
+    args.methods = _parse_methods(raw_methods)
+    args.seeds = _parse_seeds(raw_seeds)
+    args.methods_spec = raw_methods
+    args.seeds_spec = raw_seeds
     args.read_only = _str_to_bool(str(args.read_only))
     return args
 
@@ -667,6 +836,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     _write_scorecard(scorecard_path, rows)
     markdown_path = outdir / "table_crisis.md"
     _write_markdown(markdown_path, rows)
+    latex_path = outdir / "table_crisis.tex"
+    _write_latex(latex_path, rows)
     params_path = outdir / "params.json"
     with params_path.open("w", encoding="utf-8") as handle:
         json.dump(params, handle, indent=2)
