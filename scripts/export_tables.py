@@ -14,9 +14,15 @@ LOGGER = logging.getLogger("export_tables")
 REQUIRED_COLUMNS = [
     "method",
     "n_seeds",
+    "es90_mean",
+    "es90_ci_low",
+    "es90_ci_high",
     "es95_mean",
     "es95_ci_low",
     "es95_ci_high",
+    "es99_mean",
+    "es99_ci_low",
+    "es99_ci_high",
     "meanpnl_mean",
     "meanpnl_ci_low",
     "meanpnl_ci_high",
@@ -31,7 +37,9 @@ REQUIRED_COLUMNS = [
 MARKDOWN_HEADERS = [
     "Method",
     "Seeds",
+    "ES90 (95% CI)",
     "ES95 (95% CI)",
+    "ES99 (95% CI)",
     "Mean PnL (95% CI)",
     "Turnover (95% CI)",
     "ΔES95 vs ERM (%)",
@@ -92,7 +100,9 @@ def _markdown_table(rows: Sequence[Mapping[str, object]]) -> str:
             [
                 str(row.get("method", "")),
                 str(row.get("n_seeds", "")),
+                _format_ci(row.get("es90_mean"), row.get("es90_ci_low"), row.get("es90_ci_high")),
                 _format_ci(row.get("es95_mean"), row.get("es95_ci_low"), row.get("es95_ci_high")),
+                _format_ci(row.get("es99_mean"), row.get("es99_ci_low"), row.get("es99_ci_high")),
                 _format_ci(row.get("meanpnl_mean"), row.get("meanpnl_ci_low"), row.get("meanpnl_ci_high")),
                 _format_ci(row.get("turnover_mean"), row.get("turnover_ci_low"), row.get("turnover_ci_high")),
                 _format_pct(row.get("d_es95_vs_ERM_pct")),
@@ -104,10 +114,10 @@ def _markdown_table(rows: Sequence[Mapping[str, object]]) -> str:
 
 
 def _latex_table(rows: Sequence[Mapping[str, object]]) -> str:
-    header = r"\begin{tabular}{lrrrrrrr}\toprule"
+    header = r"\begin{tabular}{lrrrrrrrrr}\toprule"
     lines = [header]
     lines.append(
-        r"Method & Seeds & ES95 (95\% CI) & Mean PnL (95\% CI) & Turnover (95\% CI) & "
+        r"Method & Seeds & ES90 (95\% CI) & ES95 (95\% CI) & ES99 (95\% CI) & Mean PnL (95\% CI) & Turnover (95\% CI) & "
         r"\(\Delta\)ES95 vs ERM (\%) & \(\Delta\)MeanPnL vs ERM (\%) & \(\Delta\)Turnover vs ERM (\%) \\"
     )
     lines.append(r"\midrule")
@@ -115,7 +125,9 @@ def _latex_table(rows: Sequence[Mapping[str, object]]) -> str:
         fields = [
             str(row.get("method", "")),
             str(row.get("n_seeds", "")),
+            _format_ci(row.get("es90_mean"), row.get("es90_ci_low"), row.get("es90_ci_high")),
             _format_ci(row.get("es95_mean"), row.get("es95_ci_low"), row.get("es95_ci_high")),
+            _format_ci(row.get("es99_mean"), row.get("es99_ci_low"), row.get("es99_ci_high")),
             _format_ci(row.get("meanpnl_mean"), row.get("meanpnl_ci_low"), row.get("meanpnl_ci_high")),
             _format_ci(row.get("turnover_mean"), row.get("turnover_ci_low"), row.get("turnover_ci_high")),
             _format_pct(row.get("d_es95_vs_ERM_pct")),

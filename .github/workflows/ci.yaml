@@ -25,3 +25,28 @@ jobs:
           RUN_DIR=$(ls -td runs/20* | head -n1)
           CKPT=$(ls -t "$RUN_DIR"/checkpoints/*.pt | head -n1)
           scripts/run_eval.sh train/smoke logging.wandb.enabled=false eval.report.checkpoint_path=$CKPT
+      - name: Phase-2 scorecard smoke
+        run: |
+          rm -rf runs/scorecard_export_small
+          python scripts/make_scorecard.py --methods ERM,HIRM_Head --seeds 0..2 --split crisis --outdir runs/scorecard_export_small --read_only true --phase phase2 --commit_hash TEST
+          python scripts/compute_diagnostics.py --methods ERM,HIRM_Head --seeds 0..2 --train_envs low,medium --val_envs high --test_envs crisis --out runs/scorecard_export_small/diagnostics_all.csv --phase phase2 --commit_hash TEST
+          python scripts/plot_cvar_violin.py --diagnostics runs/scorecard_export_small/diagnostics_all.csv --out runs/scorecard_export_small/figs/fig_cvar_violin.png
+          python scripts/plot_ig_vs_cvar.py --diagnostics runs/scorecard_export_small/diagnostics_all.csv --out runs/scorecard_export_small/figs/fig_ig_vs_cvar.png
+          python scripts/plot_capital_frontier.py --scorecard runs/scorecard_export_small/scorecard.csv --out runs/scorecard_export_small/figs/fig_capital_frontier.png --notional 1.0
+          python scripts/export_tables.py --scorecard runs/scorecard_export_small/scorecard.csv --out_md runs/scorecard_export_small/table_crisis.md --out_tex runs/scorecard_export_small/table_crisis.tex
+          python - <<'PY'
+          import pathlib, sys
+          required = [
+              "runs/scorecard_export_small/scorecard.csv",
+              "runs/scorecard_export_small/diagnostics_all.csv",
+              "runs/scorecard_export_small/figs/fig_cvar_violin.png",
+              "runs/scorecard_export_small/figs/fig_ig_vs_cvar.png",
+              "runs/scorecard_export_small/figs/fig_capital_frontier.png",
+              "runs/scorecard_export_small/table_crisis.md",
+              "runs/scorecard_export_small/params.json",
+          ]
+          missing = [path for path in required if not pathlib.Path(path).exists()]
+          if missing:
+              print("Missing artifacts:", ", ".join(missing))
+              sys.exit(1)
+          PY
