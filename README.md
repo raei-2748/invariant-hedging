@@ -74,6 +74,14 @@ Results are saved in `outputs/_phase2_snapshot/`.
    ```
    Each run mirrors metrics locally under `runs/<timestamp>/` and, if W&B is available, logs to the `invariant-hedging` project.
 
+## Reproduce Phase-2 in one command
+
+```bash
+make phase2
+```
+
+Outputs go to `tables/diag.csv` and `figures/` and will be used in the paper.
+
 ## Roadmap
 
 <a id="phase-1-erm"></a>

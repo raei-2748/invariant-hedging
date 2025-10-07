@@ -2,7 +2,7 @@ SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 PYTHON ?= python3
 CONFIG ?= configs/experiment.yaml
-.PHONY: setup train evaluate reproduce lint tests smoke phase2 phase2_scorecard
+.PHONY: setup train evaluate reproduce lint tests smoke smoke-train smoke-eval phase2 phase2_scorecard
 setup:
 	$(PYTHON) -m pip install -r requirements.txt
 train:
@@ -18,16 +18,14 @@ reproduce:
 lint:
 	$(PYTHON) -m ruff check src
 tests:
-	$(PYTHON) -m pytest
-smoke:
-	@set -euo pipefail; \
-	python3 -m src.train --config-name=train/smoke; \
-	LAST_RUN=$$(ls -td runs/*/ 2>/dev/null | head -1); \
-	if [ -z "$$LAST_RUN" ]; then echo "No run directories found" >&2; exit 1; fi; \
-	CHECKPOINT=$$(python3 scripts/find_latest_checkpoint.py "$$LAST_RUN"); \
-	python3 -m src.eval --config-name=eval/smoke eval.report.checkpoint_path=$$CHECKPOINT
+        $(PYTHON) -m pytest
+smoke-train:
+        $(PYTHON) -m src.train method=erm_reg seed=0 +phase=smoke
+smoke-eval:
+        $(PYTHON) -m src.eval +phase=smoke
+smoke: smoke-train smoke-eval
 phase2:
-	@echo "See experiments/phase2_plan.md for details."
+        bash scripts/reproduce_phase2.sh
 .PHONY: phase2_scorecard
 phase2_scorecard:
 	python scripts/make_scorecard.py --methods ERM,ERM_reg,IRM,HIRM_Head,HIRM_Head_HighLite,GroupDRO,V_REx --seeds 0..29 --split crisis --outdir runs/scorecard_export --read_only true --phase phase2 --commit_hash $$(git rev-parse --short HEAD)
