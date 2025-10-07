@@ -9,7 +9,6 @@ def test_hybrid_gate_is_scalar_and_shared():
     risk_inv = RiskHead(4, 4)
     risk_adapt = RiskHead(4, 4)
     hybrid = HIRMHybrid(nn.Identity(), risk_inv, risk_adapt, alpha_init=0.3)
-
     assert hybrid.alpha.shape == torch.Size([]), "Alpha parameter should be a scalar"
 
     gate_before = hybrid.gate_value().item()
@@ -19,4 +18,6 @@ def test_hybrid_gate_is_scalar_and_shared():
     out1 = hybrid(features_env1)
 
     assert torch.isclose(out0[-1], out1[-1]), "Gate outputs should match across calls"
-    assert gate_before == hybrid.gate_value().item(), "Gate parameter should not change during forward"
+    assert gate_before == hybrid.gate_value().item(), (
+        "Gate parameter should not change during forward"
+    )
