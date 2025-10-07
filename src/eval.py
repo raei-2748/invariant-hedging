@@ -1,6 +1,8 @@
 """Evaluation pipeline for crisis regime robustness."""
+
 from __future__ import annotations
 
+import contextlib
 import csv
 import json
 import logging
@@ -8,7 +10,7 @@ import math
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Iterable, Mapping, Sequence
 
 import hydra
 import matplotlib.pyplot as plt
@@ -20,7 +22,8 @@ from .data.features import FeatureEngineer, FeatureScaler
 from .data.synthetic import EpisodeBatch
 from .models.policy_mlp import PolicyMLP
 from .objectives import cvar as cvar_obj
-from .utils import logging as log_utils, stats
+from .utils import logging as log_utils
+from .utils import stats
 from .utils.configs import build_envs, prepare_data_module, unwrap_experiment_config
 
 if TYPE_CHECKING:  # pragma: no cover - typing helper
@@ -30,15 +33,11 @@ if TYPE_CHECKING:  # pragma: no cover - typing helper
 _TORCH_THREAD_ENV = os.environ.get("HIRM_TORCH_NUM_THREADS") or os.environ.get("OMP_NUM_THREADS")
 
 if _TORCH_THREAD_ENV:
-    try:
+    with contextlib.suppress(TypeError, ValueError):
         torch.set_num_threads(max(1, int(_TORCH_THREAD_ENV)))
-    except (TypeError, ValueError):
-        pass
 
-try:
+with contextlib.suppress(TypeError, RuntimeError, AttributeError):
     torch.set_num_interop_threads(1)
-except (TypeError, RuntimeError, AttributeError):
-    pass
 
 
 def _device(runtime_cfg: DictConfig) -> torch.device:
@@ -50,7 +49,7 @@ def _device(runtime_cfg: DictConfig) -> torch.device:
 
 LOGGER = logging.getLogger(__name__)
 
-_RISK_KEYS: Tuple[str, ...] = ("ES95", "Mean", "SharpeRisk", "Turnover")
+_RISK_KEYS: tuple[str, ...] = ("ES95", "Mean", "SharpeRisk", "Turnover")
 _MSI_EPS = 1e-8
 
 
@@ -74,7 +73,7 @@ def _es_key(alpha: float) -> str:
     return f"ES{pct:02d}"
 
 
-def _resolve_es_keys(alphas: Sequence[float]) -> Tuple[str, ...]:
+def _resolve_es_keys(alphas: Sequence[float]) -> tuple[str, ...]:
     unique_keys = []
     seen = set()
     for alpha in alphas:
@@ -85,16 +84,16 @@ def _resolve_es_keys(alphas: Sequence[float]) -> Tuple[str, ...]:
     return tuple(unique_keys)
 
 
-def _canonical_method_name(name: Optional[str]) -> Optional[str]:
+def _canonical_method_name(name: str | None) -> str | None:
     if not name:
         return None
     lowered = str(name).strip().lower()
     return _METHOD_CANONICAL.get(lowered, name if isinstance(name, str) else None)
 
 
-def _method_from_cfg(cfg: DictConfig) -> Optional[str]:
+def _method_from_cfg(cfg: DictConfig) -> str | None:
     model_cfg = cfg.get("model") if cfg is not None else None
-    candidates: List[Optional[str]] = []
+    candidates: list[str | None] = []
     if model_cfg is not None:
         candidates.extend([getattr(model_cfg, "name", None), getattr(model_cfg, "objective", None)])
     algo_cfg = cfg.get("algorithm") if cfg is not None else None
@@ -112,13 +111,13 @@ def _method_from_cfg(cfg: DictConfig) -> Optional[str]:
     return None
 
 
-def _config_tag_from_cfg(cfg: DictConfig) -> Optional[str]:
+def _config_tag_from_cfg(cfg: DictConfig) -> str | None:
     tags = None
     experiment_cfg = cfg.get("experiment") if cfg is not None else None
     if experiment_cfg is not None and hasattr(experiment_cfg, "tags"):
-        tags = getattr(experiment_cfg, "tags")
+        tags = experiment_cfg.tags
     if tags is None and cfg is not None and hasattr(cfg, "tags"):
-        tags = getattr(cfg, "tags")
+        tags = cfg.tags
     if tags is None:
         return None
     if isinstance(tags, str):
@@ -144,7 +143,7 @@ def _policy_from_cfg(cfg: DictConfig, feature_dim: int, num_envs: int) -> Policy
     return policy
 
 
-def _slice_horizon(tensor: torch.Tensor, horizon: Optional[int]) -> torch.Tensor:
+def _slice_horizon(tensor: torch.Tensor, horizon: int | None) -> torch.Tensor:
     if horizon is None:
         return tensor.clone()
     steps = tensor.shape[1] - 1
@@ -154,7 +153,7 @@ def _slice_horizon(tensor: torch.Tensor, horizon: Optional[int]) -> torch.Tensor
     return tensor[:, :end].clone()
 
 
-def _scaled_meta(meta: Mapping[str, float], multiplier: Optional[float]) -> Dict[str, float]:
+def _scaled_meta(meta: Mapping[str, float], multiplier: float | None) -> dict[str, float]:
     updated = dict(meta)
     if multiplier is None:
         return updated
@@ -169,10 +168,10 @@ def _scaled_meta(meta: Mapping[str, float], multiplier: Optional[float]) -> Dict
 
 
 def _env_with_overrides(
-    env: "SingleAssetHedgingEnv",
-    horizon: Optional[int],
-    cost_multiplier: Optional[float],
-) -> "SingleAssetHedgingEnv":
+    env: SingleAssetHedgingEnv,
+    horizon: int | None,
+    cost_multiplier: float | None,
+) -> SingleAssetHedgingEnv:
     batch = env.batch
     new_batch = EpisodeBatch(
         spot=_slice_horizon(batch.spot, horizon),
@@ -193,7 +192,7 @@ def _evaluate_env(
     alphas: Sequence[float],
     primary_alpha: float,
     es_keys: Sequence[str],
-) -> Dict:
+) -> dict:
     indices = torch.arange(env.batch.spot.shape[0])
     with torch.no_grad():
         sim = env.simulate(policy, indices, device)
@@ -201,7 +200,7 @@ def _evaluate_env(
     step_pnl = sim.step_pnl
     turnover = sim.turnover
     losses = -pnl
-    es_values: Dict[str, float] = {}
+    es_values: dict[str, float] = {}
     for alpha in alphas:
         key = _es_key(alpha)
         if key in es_values:
@@ -233,9 +232,9 @@ def _evaluate_env(
     return record
 
 
-def _plot_qq(record: Dict, output_path: Path) -> None:
+def _plot_qq(record: dict, output_path: Path) -> None:
     pnl = record["pnl"].numpy()
-    ref = torch.from_numpy(pnl).mean().item()
+    torch.from_numpy(pnl).mean().item()
     quantiles = torch.linspace(0, 1, len(pnl))
     sorted_pnl = torch.sort(torch.from_numpy(pnl))[0]
     normal = torch.distributions.Normal(sorted_pnl.mean(), sorted_pnl.std(unbiased=False))
@@ -256,14 +255,16 @@ class _ZeroPolicy:
     def __init__(self) -> None:
         self._device: torch.device | None = None
 
-    def to(self, device: torch.device) -> "_ZeroPolicy":
+    def to(self, device: torch.device) -> _ZeroPolicy:
         self._device = device
         return self
 
-    def eval(self) -> "_ZeroPolicy":  # pragma: no cover - trivial
+    def eval(self) -> _ZeroPolicy:  # pragma: no cover - trivial
         return self
 
-    def __call__(self, features: torch.Tensor, env_index: int, representation_scale=None) -> Dict[str, torch.Tensor]:
+    def __call__(
+        self, features: torch.Tensor, env_index: int, representation_scale=None
+    ) -> dict[str, torch.Tensor]:
         device = features.device if self._device is None else self._device
         zeros = torch.zeros(features.shape[0], 1, device=device)
         return {"action": zeros, "raw_action": zeros}
@@ -275,15 +276,17 @@ class _DeltaBaselinePolicy:
         self.std = torch.clamp(scaler.std.clone().detach(), min=1e-6)
         self.max_position = max_position
 
-    def to(self, device: torch.device) -> "_DeltaBaselinePolicy":
+    def to(self, device: torch.device) -> _DeltaBaselinePolicy:
         self.mean = self.mean.to(device)
         self.std = self.std.to(device)
         return self
 
-    def eval(self) -> "_DeltaBaselinePolicy":  # pragma: no cover - trivial
+    def eval(self) -> _DeltaBaselinePolicy:  # pragma: no cover - trivial
         return self
 
-    def __call__(self, features: torch.Tensor, env_index: int, representation_scale=None) -> Dict[str, torch.Tensor]:
+    def __call__(
+        self, features: torch.Tensor, env_index: int, representation_scale=None
+    ) -> dict[str, torch.Tensor]:
         delta = features[:, 0] * self.std[0] + self.mean[0]
         action = delta.unsqueeze(-1).clamp(-self.max_position, self.max_position)
         return {"action": action, "raw_action": action}
@@ -299,16 +302,16 @@ def _baseline_policy(name: str, scaler: FeatureScaler, max_position: float):
 
 
 def _evaluate_baselines(
-    names: List[str],
-    envs: Dict[str, SingleAssetHedgingEnv],
+    names: list[str],
+    envs: dict[str, SingleAssetHedgingEnv],
     device: torch.device,
     alphas: Sequence[float],
     primary_alpha: float,
     es_keys: Sequence[str],
     scaler: FeatureScaler,
     max_position: float,
-) -> List[Dict[str, float]]:
-    records: List[Dict[str, float]] = []
+) -> list[dict[str, float]]:
+    records: list[dict[str, float]] = []
     for name in names:
         policy = _baseline_policy(name, scaler, max_position).to(device)
         for env_name, env in envs.items():
@@ -330,8 +333,8 @@ def _evaluate_baselines(
     return records
 
 
-def _flatten_env_records(records: List[Dict]) -> pd.DataFrame:
-    rows: List[Dict[str, object]] = []
+def _flatten_env_records(records: list[dict]) -> pd.DataFrame:
+    rows: list[dict[str, object]] = []
     for record in records:
         env_name = record["env"]
         split = record["split"]
@@ -355,8 +358,10 @@ def _flatten_env_records(records: List[Dict]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def _aggregate_split_metrics(records: Sequence[Dict[str, object]], es_keys: Sequence[str]) -> Dict[str, Optional[float]]:
-    acc: Dict[str, List[float]] = {key: [] for key in es_keys}
+def _aggregate_split_metrics(
+    records: Sequence[dict[str, object]], es_keys: Sequence[str]
+) -> dict[str, float | None]:
+    acc: dict[str, list[float]] = {key: [] for key in es_keys}
     acc["mean_pnl"] = []
     acc["turnover"] = []
     for record in records:
@@ -374,7 +379,7 @@ def _aggregate_split_metrics(records: Sequence[Dict[str, object]], es_keys: Sequ
         if turnover is not None and not math.isnan(turnover):
             acc["turnover"].append(float(turnover))
 
-    summary: Dict[str, Optional[float]] = {}
+    summary: dict[str, float | None] = {}
     for key, values in acc.items():
         if values:
             summary[key] = sum(values) / len(values)
@@ -383,14 +388,16 @@ def _aggregate_split_metrics(records: Sequence[Dict[str, object]], es_keys: Sequ
     return summary
 
 
-def _gap(values: Iterable[float]) -> Optional[float]:
+def _gap(values: Iterable[float]) -> float | None:
     vals = [float(v) for v in values if v is not None and not math.isnan(v)]
     if not vals:
         return None
     return max(vals) - min(vals)
 
 
-def _append_eval_matrix_rows(path: Path, fieldnames: Sequence[str], rows: Sequence[Mapping[str, object]]) -> None:
+def _append_eval_matrix_rows(
+    path: Path, fieldnames: Sequence[str], rows: Sequence[Mapping[str, object]]
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     exists = path.exists()
     with path.open("a", encoding="utf-8", newline="") as handle:
@@ -401,18 +408,18 @@ def _append_eval_matrix_rows(path: Path, fieldnames: Sequence[str], rows: Sequen
             writer.writerow(row)
 
 
-def _compute_ig(train_metrics: Dict[str, Dict[str, float]]) -> Dict[str, Optional[float]]:
-    ig: Dict[str, Optional[float]] = {}
+def _compute_ig(train_metrics: dict[str, dict[str, float]]) -> dict[str, float | None]:
+    ig: dict[str, float | None] = {}
     for risk_key in _RISK_KEYS:
         ig[risk_key] = _gap(m[risk_key] for m in train_metrics.values())
     return ig
 
 
 def _compute_wg(
-    train_metrics: Dict[str, Dict[str, float]],
-    test_metrics: Dict[str, Dict[str, float]],
-) -> Dict[str, Optional[float]]:
-    wg: Dict[str, Optional[float]] = {}
+    train_metrics: dict[str, dict[str, float]],
+    test_metrics: dict[str, dict[str, float]],
+) -> dict[str, float | None]:
+    wg: dict[str, float | None] = {}
     for risk_key in _RISK_KEYS:
         train_vals = [m[risk_key] for m in train_metrics.values() if m.get(risk_key) is not None]
         test_vals = [m[risk_key] for m in test_metrics.values() if m.get(risk_key) is not None]
@@ -424,11 +431,11 @@ def _compute_wg(
 
 
 def _feature_groups(
-    feature_names: List[str],
-    grouping_cfg: Optional[Dict[str, Iterable[str]]] = None,
-) -> tuple[List[int], List[int]]:
-    invariants: List[int] = []
-    spurious: List[int] = []
+    feature_names: list[str],
+    grouping_cfg: dict[str, Iterable[str]] | None = None,
+) -> tuple[list[int], list[int]]:
+    invariants: list[int] = []
+    spurious: list[int] = []
 
     if grouping_cfg:
         explicit_invariants = {name.lower() for name in grouping_cfg.get("invariants", [])}
@@ -444,9 +451,11 @@ def _feature_groups(
             key = name.lower()
             if key in explicit_invariants or _matches(key, invariant_patterns):
                 invariants.append(idx)
-            elif key in explicit_spurious or _matches(key, spurious_patterns):
-                spurious.append(idx)
-            elif default_group == "spurious":
+            elif (
+                key in explicit_spurious
+                or _matches(key, spurious_patterns)
+                or default_group == "spurious"
+            ):
                 spurious.append(idx)
             else:
                 invariants.append(idx)
@@ -486,24 +495,24 @@ def _collect_policy_inputs(
 
 def _compute_msi(
     policy: PolicyMLP,
-    envs: Dict[str, "SingleAssetHedgingEnv"],
-    feature_names: List[str],
+    envs: dict[str, SingleAssetHedgingEnv],
+    feature_names: list[str],
     device: torch.device,
     batch_size: int,
-    grouping_cfg: Optional[Dict[str, Iterable[str]]] = None,
-) -> Optional[Dict[str, float]]:
+    grouping_cfg: dict[str, Iterable[str]] | None = None,
+) -> dict[str, float] | None:
     if not envs:
         return None
     invariants, spurious = _feature_groups(feature_names, grouping_cfg)
     if not invariants:
         return None
-    per_env_features: Dict[str, torch.Tensor] = {}
+    per_env_features: dict[str, torch.Tensor] = {}
     for name, env in envs.items():
         per_env_features[name] = _collect_policy_inputs(policy, env, device)
 
     policy.eval()
 
-    def _compute_autograd() -> Optional[Dict[str, float]]:
+    def _compute_autograd() -> dict[str, float] | None:
         total_phi = 0.0
         total_r = 0.0
         total_count = 0
@@ -545,9 +554,14 @@ def _compute_msi(
         s_phi = total_phi / total_count
         s_r = total_r / max(total_count, 1)
         msi_val = s_phi / (s_r + _MSI_EPS)
-        return {"value": float(msi_val), "S_phi": float(s_phi), "S_r": float(s_r), "method": "autograd"}
+        return {
+            "value": float(msi_val),
+            "S_phi": float(s_phi),
+            "S_r": float(s_r),
+            "method": "autograd",
+        }
 
-    def _compute_finite_difference() -> Optional[Dict[str, float]]:
+    def _compute_finite_difference() -> dict[str, float] | None:
         eps = 1e-3
         total_phi = 0.0
         total_r = 0.0
@@ -566,8 +580,9 @@ def _compute_msi(
                 sampled = feats[perm].to(device)
                 if sampled.numel() == 0:
                     continue
-                def _eval(inputs: torch.Tensor) -> torch.Tensor:
-                    out = policy(inputs, env.env_index)
+
+                def _eval(inputs: torch.Tensor, *, current_env=env) -> torch.Tensor:
+                    out = policy(inputs, current_env.env_index)
                     raw = out.get("raw_action")
                     if raw is None:
                         raw = out["action"]
@@ -615,7 +630,7 @@ def _compute_msi(
     return fd_res
 
 
-def _mean_std(values: List[float]) -> Dict[str, float]:
+def _mean_std(values: list[float]) -> dict[str, float]:
     if not values:
         return {"mean": None, "std": None}
     n = len(values)
@@ -626,11 +641,11 @@ def _mean_std(values: List[float]) -> Dict[str, float]:
     return {"mean": mean, "std": math.sqrt(var)}
 
 
-def _aggregate_records(records: List[Dict]) -> Dict[str, Dict[str, object]]:
+def _aggregate_records(records: list[dict]) -> dict[str, dict[str, object]]:
     if not records:
         return {}
-    env_acc: Dict[str, Dict[str, List[float]]] = {}
-    env_meta: Dict[str, Dict[str, object]] = {}
+    env_acc: dict[str, dict[str, list[float]]] = {}
+    env_meta: dict[str, dict[str, object]] = {}
     for record in records:
         env_metrics = record.get("env_metrics", {})
         for env_name, metrics in env_metrics.items():
@@ -645,13 +660,13 @@ def _aggregate_records(records: List[Dict]) -> Dict[str, Dict[str, object]]:
                 if value is not None and not math.isnan(value):
                     env_entry[risk].append(float(value))
 
-    aggregated: Dict[str, Dict[str, object]] = {}
+    aggregated: dict[str, dict[str, object]] = {}
     for env_name, risk_values in env_acc.items():
         agg_metrics = {risk: _mean_std(vals) for risk, vals in risk_values.items()}
         aggregated[env_name] = {**env_meta.get(env_name, {}), **agg_metrics}
 
-    def _aggregate_gap(key: str) -> Dict[str, Dict[str, float]]:
-        gap_acc: Dict[str, List[float]] = {risk: [] for risk in _RISK_KEYS}
+    def _aggregate_gap(key: str) -> dict[str, dict[str, float]]:
+        gap_acc: dict[str, list[float]] = {risk: [] for risk in _RISK_KEYS}
         for record in records:
             metrics = record.get(key, {})
             for risk in _RISK_KEYS:
@@ -663,9 +678,9 @@ def _aggregate_records(records: List[Dict]) -> Dict[str, Dict[str, object]]:
     ig_summary = _aggregate_gap("IG")
     wg_summary = _aggregate_gap("WG")
 
-    msi_values: List[float] = []
-    s_phi_values: List[float] = []
-    s_r_values: List[float] = []
+    msi_values: list[float] = []
+    s_phi_values: list[float] = []
+    s_r_values: list[float] = []
     for record in records:
         msi = record.get("MSI") or {}
         value = msi.get("value")
@@ -719,10 +734,12 @@ def main(cfg: DictConfig) -> None:
     )
 
     policy.eval()
-    run_logger = log_utils.RunLogger(OmegaConf.to_container(cfg.logging, resolve=True), resolved_cfg)
+    run_logger = log_utils.RunLogger(
+        OmegaConf.to_container(cfg.logging, resolve=True), resolved_cfg
+    )
 
     compute_per_env = bool(cfg.eval.get("compute_per_env_metrics", True))
-    env_batches: Dict[str, Dict[str, EpisodeBatch]] = {}
+    env_batches: dict[str, dict[str, EpisodeBatch]] = {}
     env_batches["test"] = data_ctx.data_module.prepare("test", cfg.envs.test)
     if compute_per_env and cfg.envs.train:
         env_batches["train"] = data_ctx.data_module.prepare("train", cfg.envs.train)
@@ -740,7 +757,7 @@ def main(cfg: DictConfig) -> None:
     if cfg_alphas is not None:
         alpha_candidates.extend(float(a) for a in cfg_alphas)
     alpha_candidates.append(primary_alpha)
-    sanitized_alphas: List[float] = []
+    sanitized_alphas: list[float] = []
     seen_alphas: set[float] = set()
     for alpha_val in alpha_candidates:
         if not (0.0 < float(alpha_val) < 1.0):
@@ -750,7 +767,7 @@ def main(cfg: DictConfig) -> None:
             continue
         sanitized_alphas.append(rounded)
         seen_alphas.add(rounded)
-    es_alpha_list: List[float] = sanitized_alphas or [primary_alpha]
+    es_alpha_list: list[float] = sanitized_alphas or [primary_alpha]
     es_keys = _resolve_es_keys(es_alpha_list)
     global _RISK_KEYS
     _RISK_KEYS = tuple([*es_keys, "Mean", "SharpeRisk", "Turnover"])
@@ -761,10 +778,10 @@ def main(cfg: DictConfig) -> None:
     commit_full = log_utils._get_git_commit()
     commit_hash = commit_full[:8] if commit_full not in {"unknown", ""} else commit_full
 
-    evaluation_records: List[Dict] = []
-    env_metric_payload: Dict[str, Dict[str, object]] = {}
-    train_metrics: Dict[str, Dict[str, float]] = {}
-    test_metrics: Dict[str, Dict[str, float]] = {}
+    evaluation_records: list[dict] = []
+    env_metric_payload: dict[str, dict[str, object]] = {}
+    train_metrics: dict[str, dict[str, float]] = {}
+    test_metrics: dict[str, dict[str, float]] = {}
 
     for split, split_envs in env_splits.items():
         for env_name, env in split_envs.items():
@@ -794,13 +811,13 @@ def main(cfg: DictConfig) -> None:
     cost_multipliers = [float(c) for c in cost_cfg] if cost_cfg else []
     if save_eval_matrix and horizons and cost_multipliers:
         timestamp = datetime.now(timezone.utc).isoformat()
-        eval_rows: List[Dict[str, object]] = []
+        eval_rows: list[dict[str, object]] = []
         for split, split_envs in env_splits.items():
             if not split_envs:
                 continue
             for horizon in horizons:
                 for cost_mult in cost_multipliers:
-                    split_records: List[Dict[str, object]] = []
+                    split_records: list[dict[str, object]] = []
                     for env in split_envs.values():
                         sweep_env = _env_with_overrides(env, horizon, cost_mult)
                         sweep_res = _evaluate_env(
@@ -815,7 +832,7 @@ def main(cfg: DictConfig) -> None:
                     if not split_records:
                         continue
                     agg = _aggregate_split_metrics(split_records, es_keys)
-                    row: Dict[str, object] = {
+                    row: dict[str, object] = {
                         "method": method_name,
                         "seed": seed_value,
                         "split": split,
@@ -925,7 +942,7 @@ def main(cfg: DictConfig) -> None:
     }
 
     diagnostics_path = Path(run_logger.artifacts_dir) / "diagnostics.jsonl"
-    existing_records: List[Dict] = []
+    existing_records: list[dict] = []
     if diagnostics_path.exists():
         with diagnostics_path.open("r", encoding="utf-8") as handle:
             for line in handle:
@@ -944,7 +961,7 @@ def main(cfg: DictConfig) -> None:
     with summary_path.open("w", encoding="utf-8") as handle:
         json.dump(aggregated, handle, indent=2)
 
-    final_metrics: Dict[str, float] = {}
+    final_metrics: dict[str, float] = {}
     for env_name, metrics in test_metrics.items():
         for key, value in metrics.items():
             if value is not None:
@@ -956,7 +973,11 @@ def main(cfg: DictConfig) -> None:
         if value is not None:
             final_metrics[f"diagnostics/WG/{key}"] = value
     for comp_key, comp_value in diagnostics_record["MSI"].items():
-        if isinstance(comp_value, (int, float)) and comp_value is not None and not math.isnan(comp_value):
+        if (
+            isinstance(comp_value, (int, float))
+            and comp_value is not None
+            and not math.isnan(comp_value)
+        ):
             final_metrics[f"diagnostics/MSI/{comp_key}"] = float(comp_value)
 
     run_logger.log_final(final_metrics)

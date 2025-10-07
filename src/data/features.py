@@ -1,8 +1,9 @@
 """Feature engineering for hedging policies."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, List
+from typing import Iterable
 
 import torch
 
@@ -15,7 +16,7 @@ class FeatureScaler:
     mean: torch.Tensor
     std: torch.Tensor
 
-    def to(self, device: torch.device) -> "FeatureScaler":
+    def to(self, device: torch.device) -> FeatureScaler:
         return FeatureScaler(mean=self.mean.to(device), std=self.std.to(device))
 
     def transform(self, features: torch.Tensor) -> torch.Tensor:
@@ -28,7 +29,7 @@ class FeatureEngineer:
     def __init__(self, realized_vol_window: int = 20):
         self.realized_vol_window = realized_vol_window
         self.scaler: FeatureScaler | None = None
-        self.feature_names: List[str] = [
+        self.feature_names: list[str] = [
             "delta",
             "gamma",
             "time_to_maturity",

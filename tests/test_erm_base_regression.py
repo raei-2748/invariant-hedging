@@ -59,10 +59,9 @@ def test_erm_base_crisis_metrics_stable():
         mean, margin = _stat(values)
         expected_mean = EXPECTED_MEAN[metric]
         expected_margin = EXPECTED_MARGIN[metric]
-        assert math.isclose(mean, expected_mean, rel_tol=0, abs_tol=1e-4), (
-            f"Mean for {metric} changed: {mean:.4f} vs {expected_mean:.4f}"
-        )
-        assert margin <= expected_margin + 1e-4, (
-            f"Spread for {metric} widened: {margin:.4f} vs {expected_margin:.4f}"
-        )
-
+        assert math.isclose(
+            mean, expected_mean, rel_tol=0, abs_tol=1e-4
+        ), f"Mean for {metric} changed: {mean:.4f} vs {expected_mean:.4f}"
+        assert (
+            margin <= expected_margin + 1e-4
+        ), f"Spread for {metric} widened: {margin:.4f} vs {expected_margin:.4f}"

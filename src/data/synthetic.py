@@ -1,10 +1,11 @@
 """Synthetic path generation utilities for single-asset hedging experiments."""
+
 from __future__ import annotations
 
 import math
 import zlib
 from dataclasses import dataclass
-from typing import Dict, Iterable, Optional
+from typing import Iterable
 
 import numpy as np
 import torch
@@ -24,9 +25,9 @@ class EpisodeBatch:
     time_to_maturity: torch.Tensor  # shape: [batch, steps + 1]
     rate: float
     env_name: str
-    meta: Dict[str, float]
+    meta: dict[str, float]
 
-    def to(self, device: torch.device) -> "EpisodeBatch":
+    def to(self, device: torch.device) -> EpisodeBatch:
         return EpisodeBatch(
             spot=self.spot.to(device),
             option_price=self.option_price.to(device),
@@ -41,7 +42,7 @@ class EpisodeBatch:
     def steps(self) -> int:
         return self.spot.shape[1] - 1
 
-    def subset(self, indices) -> "EpisodeBatch":
+    def subset(self, indices) -> EpisodeBatch:
         return EpisodeBatch(
             spot=self.spot[indices],
             option_price=self.option_price[indices],
@@ -56,15 +57,17 @@ class EpisodeBatch:
 class GBMGenerator:
     """Generate geometric Brownian motion price paths."""
 
-    def __init__(self, params: Dict[str, float]):
+    def __init__(self, params: dict[str, float]):
         self.mu = params.get("mu", 0.0)
         self.sigma = params.get("sigma", 0.2)
         self.dt = params.get("dt", 1.0) / 252.0
 
-    def sample_paths(self, n_paths: int, steps: int, spot0: float, seed: Optional[int] = None) -> ArrayLike:
+    def sample_paths(
+        self, n_paths: int, steps: int, spot0: float, seed: int | None = None
+    ) -> ArrayLike:
         rng = np.random.default_rng(seed)
         normals = rng.standard_normal(size=(n_paths, steps))
-        drift = (self.mu - 0.5 * self.sigma ** 2) * self.dt
+        drift = (self.mu - 0.5 * self.sigma**2) * self.dt
         diffusion = self.sigma * math.sqrt(self.dt) * normals
         log_returns = drift + diffusion
         log_paths = np.log(spot0) + np.concatenate(
@@ -76,7 +79,7 @@ class GBMGenerator:
 class HestonGenerator:
     """Rough Euler-Maruyama scheme for the Heston stochastic volatility model."""
 
-    def __init__(self, params: Dict[str, float]):
+    def __init__(self, params: dict[str, float]):
         self.mu = params.get("mu", 0.0)
         self.long_term_var = params.get("long_term_var", 0.2)
         self.mean_rev = params.get("mean_rev", 1.0)
@@ -85,7 +88,9 @@ class HestonGenerator:
         self.v0 = max(params.get("v0", self.long_term_var), 1e-6)
         self.dt = params.get("dt", 1.0) / 252.0
 
-    def sample_paths(self, n_paths: int, steps: int, spot0: float, seed: Optional[int] = None) -> ArrayLike:
+    def sample_paths(
+        self, n_paths: int, steps: int, spot0: float, seed: int | None = None
+    ) -> ArrayLike:
         rng = np.random.default_rng(seed)
         spot = np.zeros((n_paths, steps + 1), dtype=np.float64)
         var = np.zeros((n_paths, steps + 1), dtype=np.float64)
@@ -95,7 +100,7 @@ class HestonGenerator:
         for t in range(steps):
             z1 = rng.standard_normal(n_paths)
             z2 = rng.standard_normal(n_paths)
-            z2 = self.rho * z1 + math.sqrt(1.0 - self.rho ** 2) * z2
+            z2 = self.rho * z1 + math.sqrt(1.0 - self.rho**2) * z2
             vt = np.clip(var[:, t], 1e-8, None)
             var[:, t + 1] = np.clip(
                 vt
@@ -110,7 +115,7 @@ class HestonGenerator:
         return spot
 
 
-def _initial_implied_vol(params: Dict[str, float]) -> float:
+def _initial_implied_vol(params: dict[str, float]) -> float:
     if "sigma" in params:
         return max(float(params["sigma"]), 1e-6)
     variance = params.get("v0", params.get("long_term_var"))
@@ -125,7 +130,7 @@ def _stable_seed_offset(label: str) -> int:
     return zlib.adler32(label.encode("utf-8")) & 0xFFFFFFFF
 
 
-def _make_generator(model: str, params: Dict[str, float]):
+def _make_generator(model: str, params: dict[str, float]):
     if model.lower() == "gbm":
         return GBMGenerator(params)
     if model.lower() == "heston":
@@ -135,8 +140,8 @@ def _make_generator(model: str, params: Dict[str, float]):
 
 def generate_episode_batch(
     env_name: str,
-    env_cfg: Dict[str, Dict],
-    costs_cfg: Dict[str, float],
+    env_cfg: dict[str, dict],
+    costs_cfg: dict[str, float],
     num_episodes: int,
     spot0: float,
     rate: float,
@@ -151,9 +156,7 @@ def generate_episode_batch(
     maturity_days = env_cfg.get("options", {}).get("maturity_days", steps)
     rate_env = env_cfg.get("options", {}).get("rate", rate)
 
-    time_to_maturity = np.maximum(
-        maturity_days - np.arange(steps + 1), 1
-    ) / 252.0
+    time_to_maturity = np.maximum(maturity_days - np.arange(steps + 1), 1) / 252.0
     time_grid = np.broadcast_to(time_to_maturity, (num_episodes, steps + 1))
 
     # Use instantaneous variance from log returns for GBM, or from Heston generator if available.
@@ -205,12 +208,12 @@ def generate_episode_batch(
 class SyntheticDataModule:
     """Utility to prepare synthetic datasets for each environment split."""
 
-    def __init__(self, config: Dict, env_cfgs: Dict[str, Dict], cost_cfgs: Dict[str, Dict]):
+    def __init__(self, config: dict, env_cfgs: dict[str, dict], cost_cfgs: dict[str, dict]):
         self.config = config
         self.env_cfgs = env_cfgs
         self.cost_cfgs = cost_cfgs
 
-    def prepare(self, split: str, env_names: Iterable[str]) -> Dict[str, EpisodeBatch]:
+    def prepare(self, split: str, env_names: Iterable[str]) -> dict[str, EpisodeBatch]:
         episodes_per_env = {
             "train": self.config.get("train_episodes", 1024),
             "val": self.config.get("val_episodes", 256),
@@ -218,9 +221,9 @@ class SyntheticDataModule:
             "hourly": self.config.get("hourly_episodes", 128),
         }
         num = episodes_per_env.get(split, episodes_per_env["train"])
-        batches: Dict[str, EpisodeBatch] = {}
+        batches: dict[str, EpisodeBatch] = {}
         base_seed = (int(self.config.get("seed", 0)) + _stable_seed_offset(split)) & 0xFFFFFFFF
-        for idx, name in enumerate(env_names):
+        for _idx, name in enumerate(env_names):
             env_cfg = self.env_cfgs[name]
             cost_cfg = self.cost_cfgs[env_cfg["costs"]["file"]]
             batch = generate_episode_batch(

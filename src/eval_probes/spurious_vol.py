@@ -1,4 +1,5 @@
 """Evaluation probes targeting the realized volatility features."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

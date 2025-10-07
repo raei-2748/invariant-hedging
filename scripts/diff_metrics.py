@@ -6,11 +6,10 @@ import argparse
 import json
 from pathlib import Path
 from statistics import mean
-from typing import Dict, Tuple
 
 
-def _load_metrics(path: Path) -> Dict[Tuple[int | None, str], float]:
-    data: Dict[Tuple[int | None, str], float] = {}
+def _load_metrics(path: Path) -> dict[tuple[int | None, str], float]:
+    data: dict[tuple[int | None, str], float] = {}
     with path.open("r", encoding="utf-8") as handle:
         for line in handle:
             record = json.loads(line)
@@ -21,7 +20,9 @@ def _load_metrics(path: Path) -> Dict[Tuple[int | None, str], float]:
     return data
 
 
-def _compare(first: Dict[Tuple[int | None, str], float], second: Dict[Tuple[int | None, str], float]) -> Tuple[int, float, float]:
+def _compare(
+    first: dict[tuple[int | None, str], float], second: dict[tuple[int | None, str], float]
+) -> tuple[int, float, float]:
     keys = sorted(set(first) & set(second))
     if not keys:
         raise ValueError("No overlapping metrics between the provided files.")
@@ -32,7 +33,9 @@ def _compare(first: Dict[Tuple[int | None, str], float], second: Dict[Tuple[int 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("paths", nargs=2, type=Path, help="Two metrics.jsonl files to compare")
-    parser.add_argument("--tolerance", type=float, default=1e-6, help="Mean absolute difference tolerance")
+    parser.add_argument(
+        "--tolerance", type=float, default=1e-6, help="Mean absolute difference tolerance"
+    )
     args = parser.parse_args()
 
     first = _load_metrics(args.paths[0])
@@ -52,6 +55,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    import sys
 
     raise SystemExit(main())

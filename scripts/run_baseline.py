@@ -8,9 +8,8 @@ import json
 import os
 import subprocess
 import sys
-from datetime import datetime
 from pathlib import Path
-from typing import Iterable, List, Sequence, Tuple
+from typing import Sequence
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_RUN_DIR = REPO_ROOT / "runs"
@@ -18,9 +17,9 @@ DEFAULT_EVAL_DIR = REPO_ROOT / "runs_eval"
 DEFAULT_SUMMARY = REPO_ROOT / "outputs" / "_baseline_erm_base" / "ERM_base_crisis.csv"
 
 
-def parse_seeds(raw: str) -> List[int]:
+def parse_seeds(raw: str) -> list[int]:
     parts = raw.replace(";", ",").split(",")
-    seeds: List[int] = []
+    seeds: list[int] = []
     for part in parts:
         part = part.strip()
         if not part:
@@ -80,9 +79,9 @@ def _maybe_float(value: object) -> float | None:
 def write_summary(rows: Sequence[dict[str, object]], summary_path: Path) -> None:
     if not rows:
         return
-    fieldnames: List[str] = []
+    fieldnames: list[str] = []
     for row in rows:
-        for key in row.keys():
+        for key in row:
             if key not in fieldnames:
                 fieldnames.append(key)
     summary_path.parent.mkdir(parents=True, exist_ok=True)
@@ -96,7 +95,7 @@ def write_summary(rows: Sequence[dict[str, object]], summary_path: Path) -> None
     if metric_keys:
         print("Averages:")
         for key in metric_keys:
-            values: List[float] = []
+            values: list[float] = []
             for row in rows:
                 val = _maybe_float(row.get(key))
                 if val is not None:
@@ -109,22 +108,40 @@ def write_summary(rows: Sequence[dict[str, object]], summary_path: Path) -> None
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--seeds", default="0-4", help="Comma- or dash-separated list of seeds (e.g. '0-4,7')")
+    parser.add_argument(
+        "--seeds", default="0-4", help="Comma- or dash-separated list of seeds (e.g. '0-4,7')"
+    )
     parser.add_argument("--config", default="train/erm", help="Hydra config name for training")
-    parser.add_argument("--eval-config", default="train/erm", help="Hydra config name for evaluation")
+    parser.add_argument(
+        "--eval-config", default="train/erm", help="Hydra config name for evaluation"
+    )
     parser.add_argument("--steps", type=int, default=20000, help="Training steps per seed")
-    parser.add_argument("--pretrain", type=int, default=2000, help="Pre-train steps before penalties")
-    parser.add_argument("--irm-ramp", type=int, default=1000, help="IRM ramp steps to keep overrides in sync")
-    parser.add_argument("--summary", default=str(DEFAULT_SUMMARY), help="Where to write the CSV summary")
-    parser.add_argument("--run-dir", default=str(DEFAULT_RUN_DIR), help="Directory where Hydra writes train runs")
-    parser.add_argument("--eval-dir", default=str(DEFAULT_EVAL_DIR), help="Directory where Hydra writes eval runs")
+    parser.add_argument(
+        "--pretrain", type=int, default=2000, help="Pre-train steps before penalties"
+    )
+    parser.add_argument(
+        "--irm-ramp", type=int, default=1000, help="IRM ramp steps to keep overrides in sync"
+    )
+    parser.add_argument(
+        "--summary", default=str(DEFAULT_SUMMARY), help="Where to write the CSV summary"
+    )
+    parser.add_argument(
+        "--run-dir", default=str(DEFAULT_RUN_DIR), help="Directory where Hydra writes train runs"
+    )
+    parser.add_argument(
+        "--eval-dir", default=str(DEFAULT_EVAL_DIR), help="Directory where Hydra writes eval runs"
+    )
     parser.add_argument(
         "--max-trade-warning-factor",
         type=float,
         default=1.2,
         help="Multiplier applied to model.max_position for trade spike warnings",
     )
-    parser.add_argument("--keep-eval", action="store_true", help="Keep eval directories (default removes them after summarising)")
+    parser.add_argument(
+        "--keep-eval",
+        action="store_true",
+        help="Keep eval directories (default removes them after summarising)",
+    )
     args, extra = parser.parse_known_args()
 
     seeds = parse_seeds(args.seeds)
@@ -139,7 +156,7 @@ def main() -> None:
     env = os.environ.copy()
     env.setdefault("OMP_NUM_THREADS", "1")
 
-    run_rows: List[dict[str, object]] = []
+    run_rows: list[dict[str, object]] = []
 
     for seed in seeds:
         print(f"=== Training seed {seed} ===")

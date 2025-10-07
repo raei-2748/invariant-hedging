@@ -11,7 +11,7 @@ import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, Tuple
+from typing import Iterable, Iterator, Mapping, Sequence
 
 try:  # pragma: no cover - optional dependency
     import yaml
@@ -23,10 +23,10 @@ LOGGER = logging.getLogger("compute_diagnostics")
 
 @dataclass
 class RunMetadata:
-    method: Optional[str]
-    seed: Optional[int]
+    method: str | None
+    seed: int | None
     path: Path
-    config_tag: Optional[str]
+    config_tag: str | None
 
 
 def _setup_logging(verbose: bool) -> None:
@@ -39,14 +39,14 @@ def _require_yaml() -> None:
         raise RuntimeError("PyYAML is required to read Hydra config files")
 
 
-def _parse_methods(value: str) -> List[str]:
+def _parse_methods(value: str) -> list[str]:
     methods = [item.strip() for item in value.split(",") if item.strip()]
     if not methods:
         raise ValueError("No methods parsed from specification")
     return methods
 
 
-def _parse_range(value: str) -> List[int]:
+def _parse_range(value: str) -> list[int]:
     value = value.strip()
     if ".." in value:
         lo, hi = value.split("..", 1)
@@ -58,13 +58,13 @@ def _parse_range(value: str) -> List[int]:
     return [int(token.strip()) for token in value.split(",") if token.strip()]
 
 
-def _parse_envs(value: str) -> List[str]:
+def _parse_envs(value: str) -> list[str]:
     if not value:
         return []
     return [token.strip().lower() for token in value.split(",") if token.strip()]
 
 
-def _candidate_run_roots(default: Path) -> List[Path]:
+def _candidate_run_roots(default: Path) -> list[Path]:
     roots = [default]
     extra = os.environ.get("HIRM_EXTRA_RUN_DIRS")
     if extra:
@@ -89,7 +89,7 @@ _METHOD_CANONICAL = {
 }
 
 
-def _canonical_method(name: object | None) -> Optional[str]:
+def _canonical_method(name: object | None) -> str | None:
     if name is None:
         return None
     key = str(name).strip().lower()
@@ -121,7 +121,7 @@ def _load_json(path: Path) -> Mapping[str, object]:
     return {}
 
 
-def _extract_seed_from_config(config: Mapping[str, object]) -> Optional[int]:
+def _extract_seed_from_config(config: Mapping[str, object]) -> int | None:
     for key in ("seed", "random_seed"):
         if key in config:
             try:
@@ -145,17 +145,18 @@ def _extract_seed_from_config(config: Mapping[str, object]) -> Optional[int]:
     return None
 
 
-def _extract_method_from_config(config: Mapping[str, object]) -> Optional[str]:
+def _extract_method_from_config(config: Mapping[str, object]) -> str | None:
     model_cfg = config.get("model") if isinstance(config, Mapping) else None
     if isinstance(model_cfg, Mapping):
-        if (method := _canonical_method(model_cfg.get("name"))):
+        if method := _canonical_method(model_cfg.get("name")):
             return method
-        if (method := _canonical_method(model_cfg.get("objective"))):
+        if method := _canonical_method(model_cfg.get("objective")):
             return method
     algorithm_cfg = config.get("algorithm") if isinstance(config, Mapping) else None
-    if isinstance(algorithm_cfg, Mapping):
-        if (method := _canonical_method(algorithm_cfg.get("name"))):
-            return method
+    if isinstance(algorithm_cfg, Mapping) and (
+        method := _canonical_method(algorithm_cfg.get("name"))
+    ):
+        return method
     if "method" in config:
         return _canonical_method(config.get("method"))
     return None
@@ -189,7 +190,7 @@ def _normalize_key(key: str) -> str:
     return key.replace("/", "_").replace("-", "_").lower()
 
 
-_METRIC_ALIASES: Mapping[str, Tuple[str, ...]] = {
+_METRIC_ALIASES: Mapping[str, tuple[str, ...]] = {
     "es90": (
         "es90",
         "cvar90",
@@ -222,21 +223,23 @@ _METRIC_ALIASES: Mapping[str, Tuple[str, ...]] = {
 }
 
 
-def _find_metric(metrics: Mapping[str, object], split: str, metric: str) -> Optional[float]:
+def _find_metric(metrics: Mapping[str, object], split: str, metric: str) -> float | None:
     if not metrics:
         return None
     split_key = split.lower()
     normalized = {_normalize_key(k): v for k, v in metrics.items()}
     aliases = list(_METRIC_ALIASES.get(metric, ()))
-    candidates: List[str] = []
+    candidates: list[str] = []
     for alias in aliases:
-        candidates.extend([
-            alias,
-            f"{split_key}_{alias}",
-            f"test_{split_key}_{alias}",
-            f"test/{split_key}_{alias}",
-            f"test/{split_key}/{alias}",
-        ])
+        candidates.extend(
+            [
+                alias,
+                f"{split_key}_{alias}",
+                f"test_{split_key}_{alias}",
+                f"test/{split_key}_{alias}",
+                f"test/{split_key}/{alias}",
+            ]
+        )
     for cand in candidates:
         key = _normalize_key(cand)
         if key in normalized:
@@ -247,8 +250,8 @@ def _find_metric(metrics: Mapping[str, object], split: str, metric: str) -> Opti
     return None
 
 
-def _load_diagnostics_record(run_dir: Path) -> Tuple[Optional[Mapping[str, object]], float]:
-    latest_record: Optional[Mapping[str, object]] = None
+def _load_diagnostics_record(run_dir: Path) -> tuple[Mapping[str, object] | None, float]:
+    latest_record: Mapping[str, object] | None = None
     latest_mtime = 0.0
     for base in (run_dir, run_dir / "artifacts"):
         jsonl_path = base / "diagnostics.jsonl"
@@ -274,14 +277,14 @@ def _load_diagnostics_record(run_dir: Path) -> Tuple[Optional[Mapping[str, objec
 def _collect_env_values(
     env_metrics: Mapping[str, Mapping[str, object]] | None,
     target_names: Iterable[str],
-    expected_split: Optional[str],
+    expected_split: str | None,
     risk_key: str,
-) -> List[float]:
+) -> list[float]:
     if not env_metrics:
         return []
     names = {name.lower() for name in target_names if name}
-    values: List[float] = []
-    fallback: List[float] = []
+    values: list[float] = []
+    fallback: list[float] = []
     for env_name, metrics in env_metrics.items():
         if not isinstance(metrics, Mapping):
             continue
@@ -311,16 +314,16 @@ def _collect_env_values(
 def _extract_single_env_metric(
     env_metrics: Mapping[str, Mapping[str, object]] | None,
     target_names: Iterable[str],
-    expected_split: Optional[str],
+    expected_split: str | None,
     risk_key: str,
-) -> Optional[float]:
+) -> float | None:
     candidates = _collect_env_values(env_metrics, target_names, expected_split, risk_key)
     if candidates:
         return candidates[0]
     return None
 
 
-def _gap(values: Iterable[float]) -> Optional[float]:
+def _gap(values: Iterable[float]) -> float | None:
     vals = [float(v) for v in values if v is not None and not math.isnan(v)]
     if not vals:
         return None
@@ -337,7 +340,7 @@ def _min_or_nan(values: Iterable[float]) -> float:
     return min(vals) if vals else math.nan
 
 
-def _compute_wg(train_vals: Iterable[float], test_vals: Iterable[float]) -> Optional[float]:
+def _compute_wg(train_vals: Iterable[float], test_vals: Iterable[float]) -> float | None:
     train_list = [float(v) for v in train_vals if v is not None and not math.isnan(v)]
     test_list = [float(v) for v in test_vals if v is not None and not math.isnan(v)]
     if not train_list or not test_list:
@@ -345,7 +348,7 @@ def _compute_wg(train_vals: Iterable[float], test_vals: Iterable[float]) -> Opti
     return max(test_list) - max(train_list)
 
 
-def _empty_row(method: str, seed: int) -> Dict[str, object]:
+def _empty_row(method: str, seed: int) -> dict[str, object]:
     return {
         "method": method,
         "seed": seed,
@@ -381,7 +384,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--phase", default="phase2", help="Experiment phase label")
     parser.add_argument("--commit_hash", default="UNKNOWN", help="Commit hash for provenance")
     parser.add_argument("--config_tag", default=None, help="Optional config tag override")
-    parser.add_argument("--run_roots", default=None, help="Additional run directories (os.pathsep separated)")
+    parser.add_argument(
+        "--run_roots", default=None, help="Additional run directories (os.pathsep separated)"
+    )
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
     args = parser.parse_args(argv)
     args.methods = _parse_methods(args.methods)
@@ -400,11 +405,11 @@ def _collect_diagnostics(
     train_envs: Sequence[str],
     val_envs: Sequence[str],
     test_envs: Sequence[str],
-) -> Tuple[Dict[Tuple[str, int], Dict[str, object]], Dict[str, str]]:
+) -> tuple[dict[tuple[str, int], dict[str, object]], dict[str, str]]:
     method_lookup = {method.upper(): method for method in methods}
     seed_set = set(seeds)
-    records: Dict[Tuple[str, int], Tuple[float, Dict[str, object]]] = {}
-    config_tags: Dict[str, str] = {}
+    records: dict[tuple[str, int], tuple[float, dict[str, object]]] = {}
+    config_tags: dict[str, str] = {}
     for meta in _iter_run_metadata(roots):
         if meta.method is None or meta.seed is None:
             continue
@@ -416,19 +421,31 @@ def _collect_diagnostics(
             continue
         final_metrics = _load_json(meta.path / "final_metrics.json")
         diag_record, diag_mtime = _load_diagnostics_record(meta.path)
-        metrics_mtime = (meta.path / "final_metrics.json").stat().st_mtime if (meta.path / "final_metrics.json").exists() else meta.path.stat().st_mtime
+        metrics_mtime = (
+            (meta.path / "final_metrics.json").stat().st_mtime
+            if (meta.path / "final_metrics.json").exists()
+            else meta.path.stat().st_mtime
+        )
         combined_mtime = max(metrics_mtime, diag_mtime)
         env_metrics = diag_record.get("env_metrics") if isinstance(diag_record, Mapping) else None
         train_vals = _collect_env_values(env_metrics, train_envs, "train", "ES95")
         test_vals = _collect_env_values(env_metrics, test_envs, "test", "ES95")
         ig = None
         if isinstance(diag_record, Mapping):
-            ig = diag_record.get("IG", {}).get("ES95") if isinstance(diag_record.get("IG"), Mapping) else None
+            ig = (
+                diag_record.get("IG", {}).get("ES95")
+                if isinstance(diag_record.get("IG"), Mapping)
+                else None
+            )
         if ig is None:
             ig = _gap(train_vals)
         wg = None
         if isinstance(diag_record, Mapping):
-            wg = diag_record.get("WG", {}).get("ES95") if isinstance(diag_record.get("WG"), Mapping) else None
+            wg = (
+                diag_record.get("WG", {}).get("ES95")
+                if isinstance(diag_record.get("WG"), Mapping)
+                else None
+            )
         if wg is None:
             wg = _compute_wg(train_vals, test_vals)
         msi = None
@@ -516,7 +533,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.val_envs,
         args.test_envs,
     )
-    rows: List[Dict[str, object]] = []
+    rows: list[dict[str, object]] = []
     for method in args.methods:
         for seed in args.seeds:
             key = (method, seed)

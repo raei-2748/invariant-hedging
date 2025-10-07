@@ -7,7 +7,7 @@ import csv
 import json
 import sys
 from pathlib import Path
-from typing import Dict, List, Sequence
+from typing import Sequence
 
 try:
     import yaml
@@ -15,7 +15,7 @@ except ImportError:  # pragma: no cover
     yaml = None  # type: ignore
 
 
-def _load_yaml(path: Path) -> Dict:
+def _load_yaml(path: Path) -> dict:
     if yaml is None or not path.exists():
         return {}
     with path.open("r", encoding="utf-8") as fh:
@@ -23,8 +23,8 @@ def _load_yaml(path: Path) -> Dict:
     return data if isinstance(data, dict) else {}
 
 
-def collect_rows(root: Path, pattern: str, steps_filter: int | None) -> List[Dict[str, object]]:
-    rows: List[Dict[str, object]] = []
+def collect_rows(root: Path, pattern: str, steps_filter: int | None) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
     for run_dir in sorted(root.glob(pattern)):
         if not run_dir.is_dir():
             continue
@@ -45,7 +45,7 @@ def collect_rows(root: Path, pattern: str, steps_filter: int | None) -> List[Dic
         if steps_filter is not None and steps != steps_filter:
             continue
 
-        row: Dict[str, object] = {
+        row: dict[str, object] = {
             "run": run_dir.name,
             "seed": seed,
             "steps": steps,
@@ -56,10 +56,10 @@ def collect_rows(root: Path, pattern: str, steps_filter: int | None) -> List[Dic
     return rows
 
 
-def fieldnames_from_rows(rows: Sequence[Dict[str, object]]) -> List[str]:
-    ordered: List[str] = ["run", "seed", "steps"]
+def fieldnames_from_rows(rows: Sequence[dict[str, object]]) -> list[str]:
+    ordered: list[str] = ["run", "seed", "steps"]
     for row in rows:
-        for key in row.keys():
+        for key in row:
             if key in ordered:
                 continue
             ordered.append(key)
@@ -68,7 +68,9 @@ def fieldnames_from_rows(rows: Sequence[Dict[str, object]]) -> List[str]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", default="runs", help="Root directory containing Hydra run folders")
+    parser.add_argument(
+        "--root", default="runs", help="Root directory containing Hydra run folders"
+    )
     parser.add_argument(
         "--pattern",
         default="*",

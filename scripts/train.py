@@ -7,7 +7,6 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import List, Tuple
 
 _THREAD_DEFAULTS = {
     "OMP_NUM_THREADS": "1",
@@ -24,10 +23,10 @@ def _prepare_env() -> None:
     os.environ.setdefault("WANDB_MODE", "offline")
 
 
-def _rewrite_overrides(cli_args: List[str]) -> Tuple[List[str], str, str | None]:
-    overrides: List[str] = []
+def _rewrite_overrides(cli_args: list[str]) -> tuple[list[str], str, str | None]:
+    overrides: list[str] = []
     config_name: str | None = None
-    tag_parts: List[str] = []
+    tag_parts: list[str] = []
     for arg in cli_args:
         if arg.startswith("config="):
             config_name = arg.split("=", 1)[1]
@@ -53,7 +52,7 @@ def _rewrite_overrides(cli_args: List[str]) -> Tuple[List[str], str, str | None]
     return overrides, tag, config_name
 
 
-def _call_train(overrides: List[str], config_name: str | None) -> int:
+def _call_train(overrides: list[str], config_name: str | None) -> int:
     cmd = [sys.executable, "-m", "src.train"]
     if config_name:
         cmd.extend(["--config-name", config_name])
@@ -89,7 +88,7 @@ def _latest_run_symlink(tag: str) -> None:
         counter += 1
 
 
-def main(argv: List[str] | None = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "overrides",

@@ -1,10 +1,11 @@
 """Training loop for invariant hedging experiments."""
+
 from __future__ import annotations
 
+import contextlib
 import math
 import os
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import hydra
 import torch
@@ -14,6 +15,7 @@ from omegaconf import DictConfig, OmegaConf
 
 from .data.features import FeatureEngineer
 from .diagnostics import metrics as diag_metrics
+from .envs.single_asset import SingleAssetHedgingEnv
 from .models import (
     HIRMHead,
     HIRMHybrid,
@@ -23,24 +25,19 @@ from .models import (
 )
 from .objectives import cvar as cvar_obj
 from .objectives import penalties
-from .utils import checkpoints, logging as log_utils, seed as seed_utils, stats
+from .utils import checkpoints, stats
+from .utils import logging as log_utils
+from .utils import seed as seed_utils
 from .utils.configs import build_envs, prepare_data_module, unwrap_experiment_config
-
-
-
 
 _TORCH_THREAD_ENV = os.environ.get("HIRM_TORCH_NUM_THREADS") or os.environ.get("OMP_NUM_THREADS")
 
 if _TORCH_THREAD_ENV:
-    try:
+    with contextlib.suppress(TypeError, ValueError):
         torch.set_num_threads(max(1, int(_TORCH_THREAD_ENV)))
-    except (TypeError, ValueError):
-        pass
 
-try:
+with contextlib.suppress(TypeError, RuntimeError, AttributeError):
     torch.set_num_interop_threads(1)
-except (TypeError, RuntimeError, AttributeError):
-    pass
 
 
 def _device(runtime_cfg: DictConfig) -> torch.device:
@@ -71,12 +68,12 @@ def _init_risk_head(cfg: DictConfig, representation_dim: int):
 
 def _evaluate(
     policy,
-    envs: Dict[str, "SingleAssetHedgingEnv"],
+    envs: dict[str, SingleAssetHedgingEnv],
     device: torch.device,
     alpha: float,
-) -> Dict[str, Dict[str, float]]:
+) -> dict[str, dict[str, float]]:
     policy.eval()
-    results: Dict[str, Dict[str, float]] = {}
+    results: dict[str, dict[str, float]] = {}
     with torch.no_grad():
         for name, env in envs.items():
             indices = torch.arange(env.batch.spot.shape[0])
@@ -130,7 +127,9 @@ def _label_smoothing(pnl: torch.Tensor, smoothing: float) -> torch.Tensor:
     return (1 - smoothing) * pnl + smoothing * mean
 
 
-def _setup_optimizer(policy: torch.nn.Module, cfg: DictConfig, extra_params=None) -> torch.optim.Optimizer:
+def _setup_optimizer(
+    policy: torch.nn.Module, cfg: DictConfig, extra_params=None
+) -> torch.optim.Optimizer:
     name = cfg.optimizer.name.lower()
     params = list(policy.parameters())
     if extra_params is not None:
@@ -209,9 +208,13 @@ def main(cfg: DictConfig) -> None:
 
     optimizer = _setup_optimizer(policy, cfg, extra_params=extra_params)
     scheduler = _setup_scheduler(optimizer, cfg)
-    scaler = torch.cuda.amp.GradScaler(enabled=(device.type == "cuda" and cfg.runtime.get("mixed_precision", True)))
+    scaler = torch.cuda.amp.GradScaler(
+        enabled=(device.type == "cuda" and cfg.runtime.get("mixed_precision", True))
+    )
 
-    run_logger = log_utils.RunLogger(OmegaConf.to_container(cfg.logging, resolve=True), resolved_cfg)
+    run_logger = log_utils.RunLogger(
+        OmegaConf.to_container(cfg.logging, resolve=True), resolved_cfg
+    )
     checkpoint_dir = Path(run_logger.checkpoint_dir)
     ckpt_manager = checkpoints.CheckpointManager(checkpoint_dir, top_k=cfg.train.checkpoint_topk)
 
@@ -229,15 +232,15 @@ def main(cfg: DictConfig) -> None:
 
     for step in range(1, cfg.train.steps + 1):
         optimizer.zero_grad()
-        env_losses: List[torch.Tensor] = []
+        env_losses: list[torch.Tensor] = []
         metrics_to_log = {}
         dummy = torch.tensor(1.0, requires_grad=(objective == "irm"), device=device)
-        risk_losses: List[torch.Tensor] = []
-        irm_penalties_env: List[torch.Tensor] = []
-        msi_values: List[float] = []
-        gate_snapshot: Optional[float] = None
+        risk_losses: list[torch.Tensor] = []
+        irm_penalties_env: list[torch.Tensor] = []
+        msi_values: list[float] = []
+        gate_snapshot: float | None = None
 
-        for env_idx, env_name in enumerate(cfg.envs.train):
+        for _env_idx, env_name in enumerate(cfg.envs.train):
             env = train_envs[env_name]
             indices = env.sample_indices(per_env_batch, generator)
             collect_rep = is_hirm_head or is_hirm_hybrid
@@ -258,7 +261,9 @@ def main(cfg: DictConfig) -> None:
             loss = cvar_obj.differentiable_cvar(-pnl, alpha)
             env_losses.append(loss)
             metrics_to_log[f"train/{env_name}_mean_pnl"] = float(pnl.mean().item())
-            metrics_to_log[f"train/{env_name}_cvar"] = float(cvar_obj.cvar_from_pnl(pnl, alpha).item())
+            metrics_to_log[f"train/{env_name}_cvar"] = float(
+                cvar_obj.cvar_from_pnl(pnl, alpha).item()
+            )
             metrics_to_log[f"train/{env_name}_turnover"] = float(sim.turnover.mean().item())
             trades = sim.positions[:, 1:] - sim.positions[:, :-1]
             final_trade = -sim.positions[:, -1:]
@@ -267,7 +272,11 @@ def main(cfg: DictConfig) -> None:
             metrics_to_log[f"train/{env_name}_mean_abs_trade"] = mean_abs_trade
             max_trade_val = float(sim.max_trade.max().item())
             metrics_to_log[f"train/{env_name}_max_trade"] = max_trade_val
-            if max_trade_warn > 0 and max_trade_val > max_trade_warn and env_name not in spike_alerted_envs:
+            if (
+                max_trade_warn > 0
+                and max_trade_val > max_trade_warn
+                and env_name not in spike_alerted_envs
+            ):
                 print(
                     f"[warn] large trade magnitude detected: {max_trade_val:.2f} "
                     f"(threshold {max_trade_warn:.2f}) in env '{env_name}' at step {step}"
@@ -289,7 +298,7 @@ def main(cfg: DictConfig) -> None:
                     risk_pred = risk_model(rep_detached)
                     mse_loss = F.mse_loss(risk_pred.squeeze(-1), target)
                     risk_losses.append(mse_loss)
-                    scaled_pred = (risk_pred * risk_model.w)
+                    scaled_pred = risk_pred * risk_model.w
                     inv_loss = F.mse_loss(scaled_pred.squeeze(-1), target)
                     irm_penalties_env.append(hirm_head_penalty(inv_loss, risk_model.w))
                     diag_pred = risk_model(rep_for_msi)
@@ -389,7 +398,9 @@ def main(cfg: DictConfig) -> None:
             if risk_model is not None:
                 risk_model.eval()
             val_metrics = _evaluate(policy, val_envs, device, alpha)
-            log_payload = {f"val/{k}_{m}": v for k, metrics in val_metrics.items() for m, v in metrics.items()}
+            log_payload = {
+                f"val/{k}_{m}": v for k, metrics in val_metrics.items() for m, v in metrics.items()
+            }
             run_logger.log_metrics(log_payload, step=step)
             primary_env = cfg.envs.val[0]
             score = -val_metrics[primary_env]["cvar"]
@@ -416,7 +427,9 @@ def main(cfg: DictConfig) -> None:
     if risk_model is not None:
         risk_model.eval()
     test_metrics = _evaluate(policy, test_envs, device, alpha)
-    run_logger.log_final({f"test/{k}_{m}": v for k, metrics in test_metrics.items() for m, v in metrics.items()})
+    run_logger.log_final(
+        {f"test/{k}_{m}": v for k, metrics in test_metrics.items() for m, v in metrics.items()}
+    )
     if risk_model is not None:
         risk_model.train()
     run_logger.close()

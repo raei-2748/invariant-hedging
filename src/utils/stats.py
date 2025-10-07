@@ -1,8 +1,8 @@
 """Statistical utilities for evaluation and reporting."""
+
 from __future__ import annotations
 
 import math
-from typing import Dict, Tuple
 
 import numpy as np
 import torch
@@ -30,7 +30,7 @@ def turnover_ratio(turnover: torch.Tensor, notional: float) -> torch.Tensor:
     return turnover / (notional + 1e-8)
 
 
-def qq_plot_data(pnl: torch.Tensor, reference: torch.Tensor) -> Dict[str, np.ndarray]:
+def qq_plot_data(pnl: torch.Tensor, reference: torch.Tensor) -> dict[str, np.ndarray]:
     pnl_sorted, _ = torch.sort(pnl)
     ref_sorted, _ = torch.sort(reference)
     n = min(pnl_sorted.numel(), ref_sorted.numel())
@@ -40,7 +40,9 @@ def qq_plot_data(pnl: torch.Tensor, reference: torch.Tensor) -> Dict[str, np.nda
     return {"quantiles": q.numpy(), "model": pnl_quant.numpy(), "reference": ref_quant.numpy()}
 
 
-def bootstrap_mean_ci(values: torch.Tensor, samples: int = 1000, confidence: float = 0.95, seed: int = 0) -> Tuple[float, float, float]:
+def bootstrap_mean_ci(
+    values: torch.Tensor, samples: int = 1000, confidence: float = 0.95, seed: int = 0
+) -> tuple[float, float, float]:
     rng = np.random.default_rng(seed)
     arr = values.detach().cpu().numpy().reshape(-1)
     est = []

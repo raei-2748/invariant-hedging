@@ -1,7 +1,8 @@
 """Invariance penalties specialized for head-only IRM training."""
+
 from __future__ import annotations
 
-from typing import Callable, Iterable, List, Optional
+from typing import Callable, Iterable, Optional
 
 import torch
 from torch import nn
@@ -9,10 +10,10 @@ from torch import nn
 HeadLossFn = Callable[[nn.Module, torch.Tensor, Optional[torch.Tensor], torch.Tensor], torch.Tensor]
 
 
-def collect_head_parameters(module: nn.Module) -> List[nn.Parameter]:
+def collect_head_parameters(module: nn.Module) -> list[nn.Parameter]:
     """Collect learnable parameters belonging to a head module."""
 
-    params: List[nn.Parameter] = [p for p in module.parameters() if p.requires_grad]
+    params: list[nn.Parameter] = [p for p in module.parameters() if p.requires_grad]
     if not params:
         raise ValueError("Head module has no trainable parameters for IRM penalty.")
     return params
@@ -21,7 +22,7 @@ def collect_head_parameters(module: nn.Module) -> List[nn.Parameter]:
 def irm_penalty(
     head_module: nn.Module,
     env_features: Iterable[torch.Tensor],
-    env_targets: Optional[Iterable[Optional[torch.Tensor]]],
+    env_targets: Iterable[torch.Tensor | None] | None,
     loss_fn: HeadLossFn,
     *,
     scope: str = "head",
@@ -49,7 +50,7 @@ def irm_penalty(
         raise ValueError(f"Unsupported IRM scope: {scope}")
 
     features_list = list(env_features)
-    targets_list: List[Optional[torch.Tensor]]
+    targets_list: list[torch.Tensor | None]
     if env_targets is None:
         targets_list = [None for _ in features_list]
     else:
@@ -57,7 +58,7 @@ def irm_penalty(
         if len(targets_list) != len(features_list):
             raise ValueError("env_features and env_targets must have the same length")
 
-    penalties: List[torch.Tensor] = []
+    penalties: list[torch.Tensor] = []
     for features, target in zip(features_list, targets_list):
         dummy = torch.tensor(1.0, device=features.device, requires_grad=True)
         env_loss = loss_fn(head_module, features, target, dummy)

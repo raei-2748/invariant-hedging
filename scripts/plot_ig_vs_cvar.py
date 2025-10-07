@@ -6,7 +6,7 @@ import argparse
 import logging
 import math
 from pathlib import Path
-from typing import Dict, Sequence, Tuple
+from typing import Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -33,7 +33,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _pearsonr(x: np.ndarray, y: np.ndarray) -> Tuple[float, float]:
+def _pearsonr(x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
     if x.size < 2:
         return math.nan, math.nan
     try:  # pragma: no cover - prefer SciPy when available
@@ -46,7 +46,7 @@ def _pearsonr(x: np.ndarray, y: np.ndarray) -> Tuple[float, float]:
         y_mean = float(y.mean())
         xm = x - x_mean
         ym = y - y_mean
-        denom = math.sqrt(float(np.sum(xm ** 2)) * float(np.sum(ym ** 2)))
+        denom = math.sqrt(float(np.sum(xm**2)) * float(np.sum(ym**2)))
         if denom == 0:
             return math.nan, math.nan
         r = float(np.sum(xm * ym) / denom)
@@ -82,7 +82,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     plt.style.use("seaborn-v0_8")
     fig, ax = plt.subplots(figsize=(8, 6))
     cmap = plt.get_cmap("tab10")
-    method_colors: Dict[str, Tuple[float, float, float, float]] = {}
+    method_colors: dict[str, tuple[float, float, float, float]] = {}
 
     for idx, method in enumerate(sorted(df["method"].unique())):
         method_colors[method] = cmap(idx % cmap.N)
@@ -104,7 +104,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     if x.size >= 2:
         slope, intercept = np.polyfit(x, y, 1)
         xs = np.linspace(float(x.min()), float(x.max()), num=200)
-        ax.plot(xs, slope * xs + intercept, color="black", linestyle="--", linewidth=1.5, label="Least-squares fit")
+        ax.plot(
+            xs,
+            slope * xs + intercept,
+            color="black",
+            linestyle="--",
+            linewidth=1.5,
+            label="Least-squares fit",
+        )
         r, p = _pearsonr(x, y)
         caption = f"r = {r:.3f}, p = {p:.3g}" if not math.isnan(r) else "r unavailable"
         ax.text(0.02, 0.95, caption, transform=ax.transAxes, ha="left", va="top", fontsize=11)

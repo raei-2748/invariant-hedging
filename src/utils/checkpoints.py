@@ -1,11 +1,11 @@
 """Checkpoint management utilities."""
+
 from __future__ import annotations
 
 import heapq
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List
 
 import torch
 
@@ -21,10 +21,10 @@ class CheckpointManager:
         self.directory = directory
         self.directory.mkdir(parents=True, exist_ok=True)
         self.top_k = top_k
-        self.heap: List[CheckpointEntry] = []
+        self.heap: list[CheckpointEntry] = []
         self._load_manifest()
 
-    def save(self, step: int, score: float, state: Dict) -> Path:
+    def save(self, step: int, score: float, state: dict) -> Path:
         path = self.directory / f"checkpoint_{step}.pt"
         torch.save(state, path)
         entry = CheckpointEntry(score=score, path=path)

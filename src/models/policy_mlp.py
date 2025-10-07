@@ -1,7 +1,6 @@
 """MLP policy network with environment adapters and representation head."""
-from __future__ import annotations
 
-from typing import Optional
+from __future__ import annotations
 
 import torch
 from torch import nn
@@ -51,7 +50,7 @@ class PolicyMLP(nn.Module):
         self,
         features: torch.Tensor,
         env_index: int,
-        representation_scale: Optional[torch.Tensor] = None,
+        representation_scale: torch.Tensor | None = None,
     ) -> dict[str, torch.Tensor]:
         h = self.backbone(features)
         rep = self.representation(h)

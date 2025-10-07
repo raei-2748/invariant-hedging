@@ -1,8 +1,10 @@
 """Model exports for invariant hedging."""
-from .policy_mlp import PolicyMLP
-from .heads import RiskHead, RepresentationHead
-from .hirm_head import HIRMHead, irm_penalty as hirm_head_penalty
+
+from .heads import RepresentationHead, RiskHead
+from .hirm_head import HIRMHead
+from .hirm_head import irm_penalty as hirm_head_penalty
 from .hirm_hybrid import HIRMHybrid
+from .policy_mlp import PolicyMLP
 
 __all__ = [
     "PolicyMLP",

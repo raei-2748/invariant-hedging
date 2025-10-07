@@ -21,7 +21,6 @@ def test_bootstrap_ci_has_width():
     assert result.upper > result.lower
 
 
-
 def test_cvar_scales_down_with_losses():
     losses = torch.linspace(-2.0, 2.0, 500)
     scaled = losses * 0.5

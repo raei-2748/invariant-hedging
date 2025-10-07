@@ -1,9 +1,9 @@
 """Load a thin SPY options slice for the real-data anchor."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict
 
 import numpy as np
 import pandas as pd
@@ -59,7 +59,7 @@ class RealSPYDataset:
         return batch
 
 
-def load_real_dataset(config: Dict) -> EpisodeBatch:
+def load_real_dataset(config: dict) -> EpisodeBatch:
     cfg = RealDataConfig(
         file=config.get("file"),
         slippage_bps=float(config.get("slippage_bps", 5)),

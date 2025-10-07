@@ -1,4 +1,5 @@
 """Conditional Value-at-Risk utilities."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

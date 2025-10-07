@@ -1,4 +1,5 @@
 """Risk-only IRM head used for HIRM-Head experiments."""
+
 from __future__ import annotations
 
 import torch
@@ -26,9 +27,8 @@ def irm_penalty(per_env_loss: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
 
     if per_env_loss.ndim != 0:
         per_env_loss = per_env_loss.mean()
-    grad = torch.autograd.grad(per_env_loss * (w ** 2), [w], create_graph=True)[0]
-    return torch.sum(grad ** 2)
+    grad = torch.autograd.grad(per_env_loss * (w**2), [w], create_graph=True)[0]
+    return torch.sum(grad**2)
 
 
 __all__ = ["HIRMHead", "irm_penalty"]
-

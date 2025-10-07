@@ -1,9 +1,9 @@
 """Single-asset hedging environment with daily rebalancing."""
+
 from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import List, Optional
 
 import torch
 
@@ -22,8 +22,8 @@ class SimulationOutput:
     positions: torch.Tensor
     step_pnl: torch.Tensor
     max_trade: torch.Tensor
-    probe: Optional[List[dict[str, float]]] = None
-    representations: Optional[torch.Tensor] = None
+    probe: list[dict[str, float]] | None = None
+    representations: torch.Tensor | None = None
 
 
 class SingleAssetHedgingEnv:
@@ -43,7 +43,9 @@ class SingleAssetHedgingEnv:
         self._debug_probe_enabled = bool(debug_flag)
         self._debug_episode_logged = False
 
-    def sample_indices(self, batch_size: int, generator: Optional[torch.Generator] = None) -> torch.Tensor:
+    def sample_indices(
+        self, batch_size: int, generator: torch.Generator | None = None
+    ) -> torch.Tensor:
         num = self.batch.spot.shape[0]
         if generator is None:
             return torch.randint(0, num, (batch_size,))
@@ -54,7 +56,7 @@ class SingleAssetHedgingEnv:
         policy,
         indices: torch.Tensor,
         device: torch.device,
-        representation_scale: Optional[torch.Tensor] = None,
+        representation_scale: torch.Tensor | None = None,
         collect_representation: bool = False,
     ) -> SimulationOutput:
         sub_batch = self.batch.subset(indices.tolist()).to(device)
@@ -78,14 +80,16 @@ class SingleAssetHedgingEnv:
         step_pnl = torch.zeros(batch_size, steps, device=device)
         max_trade = torch.zeros(batch_size, device=device)
 
-        probe_records: List[dict[str, float]] = []
-        representations: Optional[List[torch.Tensor]] = [] if collect_representation else None
+        probe_records: list[dict[str, float]] = []
+        representations: list[torch.Tensor] | None = [] if collect_representation else None
 
         for t in range(steps):
             inv = positions[:, t] / self.notional
             feat_t = torch.cat([base_features[:, t, :], inv.unsqueeze(-1)], dim=-1)
             feat_t = (feat_t - mean) / std
-            out = policy(feat_t, env_index=self.env_index, representation_scale=representation_scale)
+            out = policy(
+                feat_t, env_index=self.env_index, representation_scale=representation_scale
+            )
             action = out["action"].squeeze(-1)
             raw_action = out.get("raw_action")
             if raw_action is not None:
@@ -118,10 +122,7 @@ class SingleAssetHedgingEnv:
                 target_position = positions[episode_idx, t + 1]
                 trade_val = trade[episode_idx]
                 cost_val = cost_t[episode_idx]
-                if raw_action is not None:
-                    raw_val = raw_action[episode_idx]
-                else:
-                    raw_val = target_position
+                raw_val = raw_action[episode_idx] if raw_action is not None else target_position
                 probe_records.append(
                     {
                         "t": int(t),
@@ -151,7 +152,7 @@ class SingleAssetHedgingEnv:
         if self._debug_probe_enabled and probe_records:
             self._debug_episode_logged = True
 
-        rep_tensor: Optional[torch.Tensor] = None
+        rep_tensor: torch.Tensor | None = None
         if collect_representation and representations:
             rep_tensor = torch.stack(representations, dim=1)
 

@@ -1,13 +1,14 @@
 """Regularization penalties used in distributionally robust training."""
+
 from __future__ import annotations
 
-from typing import Iterable, List
+from typing import Iterable
 
 import torch
 
 
 def irm_penalty(env_losses: Iterable[torch.Tensor], dummy: torch.Tensor) -> torch.Tensor:
-    penalties: List[torch.Tensor] = []
+    penalties: list[torch.Tensor] = []
     for loss in env_losses:
         grad = torch.autograd.grad(loss, dummy, create_graph=True)[0]
         penalties.append(grad.pow(2))

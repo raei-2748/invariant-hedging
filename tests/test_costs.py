@@ -9,6 +9,6 @@ def test_execution_cost_linear_quadratic():
     cfg = {"linear_bps": 10, "quadratic": 0.2, "slippage_multiplier": 1.0}
     cost = execution_cost(trade, spot, cfg)
     expected_linear = torch.abs(trade) * spot * 10e-4
-    expected_quad = trade ** 2 * 0.2
+    expected_quad = trade**2 * 0.2
     expected = expected_linear + expected_quad
     assert torch.allclose(cost, expected)

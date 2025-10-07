@@ -1,4 +1,5 @@
 """Entropic risk measures for comparison baselines."""
+
 from __future__ import annotations
 
 import torch

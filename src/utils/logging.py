@@ -1,4 +1,5 @@
 """Dual logging to Weights & Biases and local JSON/CSV mirrors."""
+
 from __future__ import annotations
 
 import json
@@ -8,7 +9,6 @@ import subprocess
 import time
 import warnings
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import yaml
 
@@ -30,14 +30,16 @@ except ImportError:  # pragma: no cover
 
 
 class RunLogger:
-    def __init__(self, config: Dict, resolved_config: Dict):
+    def __init__(self, config: dict, resolved_config: dict):
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         local_cfg = config.get("local_mirror", {})
         base_dir = Path(local_cfg.get("base_dir", "runs")) / timestamp
         self.base_dir = base_dir
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.metrics_path = self.base_dir / local_cfg.get("metrics_file", "metrics.jsonl")
-        self.final_metrics_path = self.base_dir / local_cfg.get("final_metrics_file", "final_metrics.json")
+        self.final_metrics_path = self.base_dir / local_cfg.get(
+            "final_metrics_file", "final_metrics.json"
+        )
         self.config_path = self.base_dir / local_cfg.get("config_file", "config.yaml")
         self.checkpoint_dir = self.base_dir / local_cfg.get("checkpoints_dir", "checkpoints")
         self.artifacts_dir = self.base_dir / local_cfg.get("artifacts_dir", "artifacts")
@@ -51,7 +53,11 @@ class RunLogger:
         self.wandb_run = None
         wandb_cfg = config.get("wandb", {})
         if wandb_cfg.get("enabled", False) and wandb is not None:
-            mode = "offline" if wandb_cfg.get("offline_ok", False) and os.getenv("WANDB_MODE") == "offline" else None
+            mode = (
+                "offline"
+                if wandb_cfg.get("offline_ok", False) and os.getenv("WANDB_MODE") == "offline"
+                else None
+            )
             self.wandb_run = wandb.init(
                 project=wandb_cfg.get("project", "invariant-hedging"),
                 entity=wandb_cfg.get("entity"),
@@ -59,16 +65,16 @@ class RunLogger:
                 mode=mode,
                 dir=wandb_cfg.get("dir"),
             )
-        self.metrics_file = open(self.metrics_path, "a", encoding="utf-8")
+        self.metrics_path.touch(exist_ok=True)
 
-    def log_metrics(self, metrics: Dict, step: Optional[int] = None) -> None:
+    def log_metrics(self, metrics: dict, step: int | None = None) -> None:
         record = {"step": step, **metrics}
-        self.metrics_file.write(json.dumps(record) + "\n")
-        self.metrics_file.flush()
+        with self.metrics_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record) + "\n")
         if self.wandb_run is not None:
             self.wandb_run.log(metrics, step=step)
 
-    def log_probe(self, env_name: str, step: int, records: List[Dict[str, float]]) -> None:
+    def log_probe(self, env_name: str, step: int, records: list[dict[str, float]]) -> None:
         if not records:
             return
         probe_dir = self.artifacts_dir / "train" / f"{env_name}_probe"
@@ -78,13 +84,13 @@ class RunLogger:
         with open(path, "w", encoding="utf-8") as handle:
             json.dump(payload, handle, indent=2)
 
-    def log_final(self, metrics: Dict) -> None:
+    def log_final(self, metrics: dict) -> None:
         with open(self.final_metrics_path, "w", encoding="utf-8") as f:
             json.dump(metrics, f, indent=2)
         if self.wandb_run is not None:
             self.wandb_run.log({f"final/{k}": v for k, v in metrics.items()})
 
-    def save_artifact(self, path: Path, name: Optional[str] = None) -> None:
+    def save_artifact(self, path: Path, name: str | None = None) -> None:
         target = self.artifacts_dir / (name or path.name)
         if path.is_dir():
             if target.exists():
@@ -100,17 +106,17 @@ class RunLogger:
             self.wandb_run.log_artifact(artifact)
 
     def close(self) -> None:
-        self.metrics_file.close()
         if self.wandb_run is not None:
             self.wandb_run.finish()
 
-    def info(self) -> Dict[str, str]:
+    def info(self) -> dict[str, str]:
         return {"base_dir": str(self.base_dir)}
 
-    def _system_info(self) -> Dict[str, object]:
-        info: Dict[str, object] = {
+    def _system_info(self) -> dict[str, object]:
+        version_info = os.sys.version_info
+        info: dict[str, object] = {
             "git_commit": _get_git_commit(),
-            "python": f"{os.sys.version_info.major}.{os.sys.version_info.minor}.{os.sys.version_info.micro}",
+            "python": f"{version_info.major}.{version_info.minor}.{version_info.micro}",
             "platform": platform.platform(),
         }
         git_status = _get_git_status_clean()
@@ -129,7 +135,7 @@ def _get_git_commit() -> str:
         return "unknown"
 
 
-def _get_git_status_clean() -> Optional[bool]:
+def _get_git_status_clean() -> bool | None:
     try:
         output = subprocess.check_output(["git", "status", "--short"], text=True).strip()
         return output == ""

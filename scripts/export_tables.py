@@ -7,7 +7,7 @@ import csv
 import logging
 import math
 from pathlib import Path
-from typing import Dict, List, Mapping, Sequence
+from typing import Mapping, Sequence
 
 LOGGER = logging.getLogger("export_tables")
 
@@ -53,7 +53,7 @@ def _setup_logging(verbose: bool) -> None:
     logging.basicConfig(level=level, format="%(levelname)s | %(message)s")
 
 
-def _load_rows(path: Path) -> List[Dict[str, object]]:
+def _load_rows(path: Path) -> list[dict[str, object]]:
     if not path.exists():
         raise FileNotFoundError(path)
     with path.open("r", encoding="utf-8") as handle:
@@ -94,7 +94,7 @@ def _format_pct(value: object) -> str:
 
 
 def _markdown_table(rows: Sequence[Mapping[str, object]]) -> str:
-    table_rows: List[List[str]] = [MARKDOWN_HEADERS, ["---"] * len(MARKDOWN_HEADERS)]
+    table_rows: list[list[str]] = [MARKDOWN_HEADERS, ["---"] * len(MARKDOWN_HEADERS)]
     for row in rows:
         table_rows.append(
             [
@@ -103,8 +103,14 @@ def _markdown_table(rows: Sequence[Mapping[str, object]]) -> str:
                 _format_ci(row.get("es90_mean"), row.get("es90_ci_low"), row.get("es90_ci_high")),
                 _format_ci(row.get("es95_mean"), row.get("es95_ci_low"), row.get("es95_ci_high")),
                 _format_ci(row.get("es99_mean"), row.get("es99_ci_low"), row.get("es99_ci_high")),
-                _format_ci(row.get("meanpnl_mean"), row.get("meanpnl_ci_low"), row.get("meanpnl_ci_high")),
-                _format_ci(row.get("turnover_mean"), row.get("turnover_ci_low"), row.get("turnover_ci_high")),
+                _format_ci(
+                    row.get("meanpnl_mean"), row.get("meanpnl_ci_low"), row.get("meanpnl_ci_high")
+                ),
+                _format_ci(
+                    row.get("turnover_mean"),
+                    row.get("turnover_ci_low"),
+                    row.get("turnover_ci_high"),
+                ),
                 _format_pct(row.get("d_es95_vs_ERM_pct")),
                 _format_pct(row.get("d_meanpnl_vs_ERM_pct")),
                 _format_pct(row.get("d_turnover_vs_ERM_pct")),
@@ -117,8 +123,9 @@ def _latex_table(rows: Sequence[Mapping[str, object]]) -> str:
     header = r"\begin{tabular}{lrrrrrrrrr}\toprule"
     lines = [header]
     lines.append(
-        r"Method & Seeds & ES90 (95\% CI) & ES95 (95\% CI) & ES99 (95\% CI) & Mean PnL (95\% CI) & Turnover (95\% CI) & "
-        r"\(\Delta\)ES95 vs ERM (\%) & \(\Delta\)MeanPnL vs ERM (\%) & \(\Delta\)Turnover vs ERM (\%) \\"
+        r"Method & Seeds & ES90 (95\% CI) & ES95 (95\% CI) & ES99 (95\% CI) & "
+        r"Mean PnL (95\% CI) & Turnover (95\% CI) & \(\Delta\)ES95 vs ERM (\%) & "
+        r"\(\Delta\)MeanPnL vs ERM (\%) & \(\Delta\)Turnover vs ERM (\%) \\"
     )
     lines.append(r"\midrule")
     for row in rows:
@@ -128,8 +135,12 @@ def _latex_table(rows: Sequence[Mapping[str, object]]) -> str:
             _format_ci(row.get("es90_mean"), row.get("es90_ci_low"), row.get("es90_ci_high")),
             _format_ci(row.get("es95_mean"), row.get("es95_ci_low"), row.get("es95_ci_high")),
             _format_ci(row.get("es99_mean"), row.get("es99_ci_low"), row.get("es99_ci_high")),
-            _format_ci(row.get("meanpnl_mean"), row.get("meanpnl_ci_low"), row.get("meanpnl_ci_high")),
-            _format_ci(row.get("turnover_mean"), row.get("turnover_ci_low"), row.get("turnover_ci_high")),
+            _format_ci(
+                row.get("meanpnl_mean"), row.get("meanpnl_ci_low"), row.get("meanpnl_ci_high")
+            ),
+            _format_ci(
+                row.get("turnover_mean"), row.get("turnover_ci_low"), row.get("turnover_ci_high")
+            ),
             _format_pct(row.get("d_es95_vs_ERM_pct")),
             _format_pct(row.get("d_meanpnl_vs_ERM_pct")),
             _format_pct(row.get("d_turnover_vs_ERM_pct")),

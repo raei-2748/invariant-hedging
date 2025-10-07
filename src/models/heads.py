@@ -1,4 +1,5 @@
 """Representation heads used by IRM penalties."""
+
 from __future__ import annotations
 
 import torch

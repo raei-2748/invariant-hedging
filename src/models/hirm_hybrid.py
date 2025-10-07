@@ -1,4 +1,5 @@
 """Hybrid risk head combining invariant and adaptive estimates."""
+
 from __future__ import annotations
 
 import torch
@@ -21,7 +22,9 @@ class HIRMHybrid(nn.Module):
         self.repr = base_repr
         self.h_inv = risk_head_inv
         self.h_adapt = risk_head_adapt
-        self.alpha = nn.Parameter(torch.tensor(alpha_init, dtype=torch.float32), requires_grad=not freeze_alpha)
+        self.alpha = nn.Parameter(
+            torch.tensor(alpha_init, dtype=torch.float32), requires_grad=not freeze_alpha
+        )
         self.w_inv = nn.Parameter(torch.ones(1))
 
     def forward(self, features: torch.Tensor):
@@ -37,4 +40,3 @@ class HIRMHybrid(nn.Module):
 
 
 __all__ = ["HIRMHybrid"]
-

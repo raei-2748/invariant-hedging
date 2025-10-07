@@ -6,7 +6,7 @@ import argparse
 import logging
 import math
 from pathlib import Path
-from typing import List, Sequence, Tuple
+from typing import Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -28,7 +28,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--scorecard", required=True, help="Path to scorecard.csv")
     parser.add_argument("--out", required=True, help="Output image path")
-    parser.add_argument("--notional", type=float, default=1.0, help="Notional scaling (unused placeholder)")
+    parser.add_argument(
+        "--notional", type=float, default=1.0, help="Notional scaling (unused placeholder)"
+    )
     parser.add_argument("--dpi", type=int, default=200, help="Output figure DPI")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
     return parser.parse_args(argv)
@@ -40,8 +42,8 @@ def _load_scorecard(path: Path) -> pd.DataFrame:
     return pd.read_csv(path)
 
 
-def _pareto_front(points: List[Tuple[str, float, float]]) -> List[str]:
-    dominant: List[str] = []
+def _pareto_front(points: list[tuple[str, float, float]]) -> list[str]:
+    dominant: list[str] = []
     for name_i, risk_i, pnl_i in points:
         if math.isnan(risk_i) or math.isnan(pnl_i):
             continue
@@ -101,7 +103,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         size = 120 * (1 + (0 if math.isnan(turn) else (turn - min_turn) / turn_range))
         edgecolor = "black" if method in pareto else color
         facecolor = color if method in pareto else (*color[:3], 0.5)
-        ax.scatter(risk, pnl, s=size, color=facecolor, edgecolor=edgecolor, linewidths=1.0, alpha=0.85, zorder=3)
+        ax.scatter(
+            risk,
+            pnl,
+            s=size,
+            color=facecolor,
+            edgecolor=edgecolor,
+            linewidths=1.0,
+            alpha=0.85,
+            zorder=3,
+        )
         ax.text(risk, pnl, f" {method}", ha="left", va="center", fontsize=9)
 
     ax.set_xlabel("|ES95 Mean|")
@@ -109,8 +120,25 @@ def main(argv: Sequence[str] | None = None) -> int:
     ax.set_title("Capital-Efficiency Frontier")
     ax.grid(alpha=0.3)
     legend_elements = [
-        plt.Line2D([0], [0], marker="o", color="black", label="Pareto-dominant", markerfacecolor="none", markersize=8),
-        plt.Line2D([0], [0], marker="o", color="gray", label="Non-dominant", markerfacecolor="gray", alpha=0.5, markersize=8),
+        plt.Line2D(
+            [0],
+            [0],
+            marker="o",
+            color="black",
+            label="Pareto-dominant",
+            markerfacecolor="none",
+            markersize=8,
+        ),
+        plt.Line2D(
+            [0],
+            [0],
+            marker="o",
+            color="gray",
+            label="Non-dominant",
+            markerfacecolor="gray",
+            alpha=0.5,
+            markersize=8,
+        ),
     ]
     ax.legend(handles=legend_elements, loc="best", frameon=False)
     fig.tight_layout()
