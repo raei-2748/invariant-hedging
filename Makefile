@@ -18,14 +18,14 @@ reproduce:
 lint:
 	$(PYTHON) -m ruff check src
 tests:
-        $(PYTHON) -m pytest
+	$(PYTHON) -m pytest
 smoke-train:
-        $(PYTHON) -m src.train method=erm_reg seed=0 +phase=smoke
+	$(PYTHON) -m src.train method=erm_reg seed=0 +phase=smoke
 smoke-eval:
-        $(PYTHON) -m src.eval +phase=smoke
+	$(PYTHON) -m src.eval +phase=smoke
 smoke: smoke-train smoke-eval
 phase2:
-        bash scripts/reproduce_phase2.sh
+	bash scripts/reproduce_phase2.sh
 .PHONY: phase2_scorecard
 phase2_scorecard:
 	python scripts/make_scorecard.py --methods ERM,ERM_reg,IRM,HIRM_Head,HIRM_Head_HighLite,GroupDRO,V_REx --seeds 0..29 --split crisis --outdir runs/scorecard_export --read_only true --phase phase2 --commit_hash $$(git rev-parse --short HEAD)
