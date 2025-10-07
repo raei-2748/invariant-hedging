@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
 """Bootstrap confidence intervals for metrics stored in final_metrics.json files."""
 from __future__ import annotations
-
 import argparse
 import json
 from pathlib import Path
-from typing import Iterable, List
-
+from typing import Iterable
 import numpy as np
 
 
-def _expand_paths(patterns: Iterable[str]) -> List[Path]:
-    expanded: List[Path] = []
+def _expand_paths(patterns: Iterable[str]) -> list[Path]:
+    expanded: list[Path] = []
     for pattern in patterns:
         candidate = Path(pattern)
         if candidate.is_dir():
@@ -71,11 +69,9 @@ def main() -> None:
     parser.add_argument("--confidence", type=float, default=0.95, help="Confidence level for the interval")
     parser.add_argument("--seed", type=int, default=13, help="Random seed for reproducibility")
     args = parser.parse_args()
-
     metric_files = _expand_paths(args.paths)
     if not metric_files:
         raise SystemExit("No final_metrics.json files found for the provided paths")
-
     header = ["metric", "mean", "ci_lower", "ci_upper", "n"]
     print(",".join(header))
     for metric in args.metric:
