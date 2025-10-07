@@ -17,6 +17,11 @@ import torch
 from omegaconf import DictConfig, OmegaConf
 
 from .data.features import FeatureEngineer, FeatureScaler
+from .diagnostics.metrics import (
+    invariance_gap,
+    mechanism_sensitivity_index,
+    worst_group_gap,
+)
 from .data.synthetic import EpisodeBatch
 from .models.policy_mlp import PolicyMLP
 from .objectives import cvar as cvar_obj
@@ -383,13 +388,6 @@ def _aggregate_split_metrics(records: Sequence[Dict[str, object]], es_keys: Sequ
     return summary
 
 
-def _gap(values: Iterable[float]) -> Optional[float]:
-    vals = [float(v) for v in values if v is not None and not math.isnan(v)]
-    if not vals:
-        return None
-    return max(vals) - min(vals)
-
-
 def _append_eval_matrix_rows(path: Path, fieldnames: Sequence[str], rows: Sequence[Mapping[str, object]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     exists = path.exists()
@@ -404,7 +402,12 @@ def _append_eval_matrix_rows(path: Path, fieldnames: Sequence[str], rows: Sequen
 def _compute_ig(train_metrics: Dict[str, Dict[str, float]]) -> Dict[str, Optional[float]]:
     ig: Dict[str, Optional[float]] = {}
     for risk_key in _RISK_KEYS:
-        ig[risk_key] = _gap(m[risk_key] for m in train_metrics.values())
+        per_env = {
+            env_name: metrics.get(risk_key)
+            for env_name, metrics in train_metrics.items()
+            if metrics.get(risk_key) is not None
+        }
+        ig[risk_key] = invariance_gap(per_env) if per_env else None
     return ig
 
 
@@ -414,12 +417,20 @@ def _compute_wg(
 ) -> Dict[str, Optional[float]]:
     wg: Dict[str, Optional[float]] = {}
     for risk_key in _RISK_KEYS:
-        train_vals = [m[risk_key] for m in train_metrics.values() if m.get(risk_key) is not None]
-        test_vals = [m[risk_key] for m in test_metrics.values() if m.get(risk_key) is not None]
-        if not train_vals or not test_vals:
+        train_per_env = {
+            env_name: metrics.get(risk_key)
+            for env_name, metrics in train_metrics.items()
+            if metrics.get(risk_key) is not None
+        }
+        test_per_env = {
+            env_name: metrics.get(risk_key)
+            for env_name, metrics in test_metrics.items()
+            if metrics.get(risk_key) is not None
+        }
+        if not train_per_env or not test_per_env:
             wg[risk_key] = None
             continue
-        wg[risk_key] = max(test_vals) - max(train_vals)
+        wg[risk_key] = worst_group_gap(train_per_env, test_per_env)
     return wg
 
 
@@ -544,7 +555,7 @@ def _compute_msi(
             return None
         s_phi = total_phi / total_count
         s_r = total_r / max(total_count, 1)
-        msi_val = s_phi / (s_r + _MSI_EPS)
+        msi_val = mechanism_sensitivity_index(s_phi, s_r, eps=_MSI_EPS)
         return {"value": float(msi_val), "S_phi": float(s_phi), "S_r": float(s_r), "method": "autograd"}
 
     def _compute_finite_difference() -> Optional[Dict[str, float]]:
@@ -593,7 +604,7 @@ def _compute_msi(
             return None
         s_phi = total_phi / total_count
         s_r = total_r / max(total_count, 1)
-        msi_val = s_phi / (s_r + _MSI_EPS)
+        msi_val = mechanism_sensitivity_index(s_phi, s_r, eps=_MSI_EPS)
         return {
             "value": float(msi_val),
             "S_phi": float(s_phi),

@@ -1,66 +1,35 @@
 # Phase 2 — Head-Only IRM + Diagnostics
 
-Phase 2 extends the invariant hedging study beyond the ERM baselines frozen in Phase 1. The focus is on stress-testing Invariant Risk Minimisation (IRM) and V-REx objectives when the representation is frozen and only the policy head adapts to regime shifts.
+Phase 2 revisits the invariant hedging benchmarks with locked seeds, reproducible grids, and lightweight diagnostics. All runs share the data splits from Phase 1 (train: Low + Medium, validation: High-vol, test: Crisis) and inherit common logging/metadata requirements.
 
-## Objectives
+## Experiment matrix
 
-- **Head-only IRM sweeps:** explore \(\lambda \in \{10^{-2}, 10^{-1}, 1\}\) while keeping the feature extractor fixed to the ERM baseline.
-- **V-REx diagnostics:** sweep \(\beta \in \{1, 5, 10\}\) and log variance penalties alongside tail metrics.
-- **Stress environments:** introduce jump intensity shocks combined with liquidity squeezes to expose failure modes not covered in Phase 1.
-- **Early diagnostics:** capture Integrated Gradients (IG), Wasserstein Gradients (WG), and Market Stability Indicators (MSI) throughout training to understand representation drift.
+| Method      | Config alias     | Primary sweep                             | Notes |
+|-------------|------------------|-------------------------------------------|-------|
+| ERM (baseline) | `train/erm_reg`   | none                                      | Regularised ERM control. |
+| IRM-Head    | `train/irm_head`  | \(\lambda \in \{10^{-2}, 10^{-1}, 1\}\) | Freeze representation, optimise head with IRM penalty. |
+| GroupDRO    | `train/groupdro`  | step size \(\eta \in \{0.01, 0.05\}\)   | Use same horizon/optimizer as ERM. |
+| V-REx       | `train/vrex`      | \(\beta \in \{1, 5, 10\}\)              | Variance risk extrapolation baseline. |
 
-## Milestones
+**Seed set:** `seeds/seed_list.txt` (1, 2, 3, 4, 5).
 
-1. **Reproduction harness** — integrate Phase-2 configs into the smoke/sanity tooling so they can be exercised in CI and on workstations.
-2. **Head-only IRM baseline** — finalise data loaders and schedulers for the head-only constraint and release tuned checkpoints.
-3. **Diagnostic logging** — wire IG/WG/MSI hooks into the evaluation runner with reproducible seeds.
-4. **Benchmark release** — publish crisis CVaR-95, Sharpe, turnover, and diagnostic summaries under `outputs/_phase2_snapshot/`.
+## Selection rule
 
-## Reproducibility notes
+1. Run each method × hyperparameter pair across the seed list.
+2. For IRM-Head, select \(\lambda\) using **High-vol CVaR-95**: pick the value with the lowest validation CVaR-95 averaged over seeds.
+3. For GroupDRO and V-REx use the same rule (select by High-vol CVaR-95), keeping turnover within +20% of ERM.
+4. Report crisis CVaR-95, mean PnL, turnover, IG, WG, and MSI for the chosen hyperparameters.
 
-- All experiments should use the pinned `requirements.txt` / `environment.yml` shipped with the repository.
-- Metadata (`metadata.json`) must include git SHA, torch version, and environment fingerprints for every Phase-2 run.
-- Keep seeds frozen at 0 for smoke checks; broader sweeps can expand the seed list after verification.
+## Diagnostics
 
-For status updates and detailed experiment tracking, synchronise notes with the main project board and surface blockers via issues tagged `phase2`.
-# Phase 2 Plan: Head-Only IRM and Diagnostics
+- **IG (Invariance Gap):** spread of train-regime CVaR-95.
+- **WG (Worst-Group Gap):** difference between worst test CVaR-95 and worst train CVaR-95.
+- **MSI (Mechanism Sensitivity Index):** ratio of sensitivity of invariant head to risk head.
 
-**Goal:**  
-Evaluate whether applying the IRM regularization only to the hedge head improves Crisis CVaR-95 relative to ERM and V-REx while maintaining turnover within +20 %.
+Outputs aggregate to `tables/diag.csv` and plots in `figures/` via `python -m src.diagnostics.collect` and `python -m src.diagnostics.plot`.
 
-## 1. Environments
-- Train → Low + Medium  
-- Validate → High  
-- Hold-out → Crisis  
+## Checklist
 
-## 2. Models and Sweeps
-| Model | Key Params | Config Alias |
-|--------|------------|--------------|
-| ERM | baseline | `train/erm` |
-| IRM-head | λ ∈ {1e-2, 1e-1, 1} | `train/irm_head` |
-| V-REx | β ∈ {1, 5, 10} | `train/vrex` |
-
-Example sweep:
-```bash
-make sweep model=irm_head lambda_grid="[1e-2,1e-1,1]"
-```
-
-## 3. Metrics
-- **Primary:** CVaR-95 of P&L
-- **Secondary:** Mean P&L, Turnover, Sharpe
-
-## 4. Success Criterion
-- ≥ 10 % Crisis CVaR-95 improvement vs ERM
-- ≤ 20 % increase in turnover
-
-## 5. Diagnostics to Log
-- IG (Invariance Gap)
-- WG (Worst-Group Variance)
-- MSI (Mutual Stability Index)
-
-## 6. Outputs
-- Store results in `outputs/_phase2_headIRM/`
-- Each run auto-emits `scorecard.json` and `metrics.jsonl`
-
-## 7. Paper Note
-- Figure targets: CVaR frontier, QQ plot (ERM vs IRM), λ-sweep
+- Dependencies resolved through `requirements.lock.txt` or the Docker image.
+- All runs store metadata with git SHA and torch version.
+- CI smoke suites exercise `make smoke-train`, `make smoke-eval`, and `make phase2`.
