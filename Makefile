@@ -2,23 +2,30 @@ SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 PYTHON ?= python3
 CONFIG ?= configs/experiment.yaml
-.PHONY: setup train evaluate reproduce lint tests smoke phase2 phase2_scorecard
+.PHONY: setup train evaluate reproduce lint tests smoke smoke-train smoke-eval phase2 phase2_scorecard
+
 setup:
-	$(PYTHON) -m pip install -r requirements.txt
+	$(PYTHON) -m pip install -r requirements.lock.txt
+
 train:
 	scripts/run_train.sh $(CONFIG)
+
 evaluate:
 	@if [ -z "$(CHECKPOINT)" ]; then \
 		echo "CHECKPOINT path required, e.g. make evaluate CHECKPOINT=outputs/checkpoints/checkpoint_150000.pt"; \
 		exit 1; \
 	fi
 	scripts/run_eval.sh $(CONFIG) eval.report.checkpoint_path=$(CHECKPOINT)
+
 reproduce:
 	scripts/make_reproduce.sh
+
 lint:
 	$(PYTHON) -m ruff check src
+
 tests:
 	$(PYTHON) -m pytest
+
 smoke:
 	@set -euo pipefail; \
 	python3 -m src.train --config-name=train/smoke; \
@@ -26,9 +33,20 @@ smoke:
 	if [ -z "$$LAST_RUN" ]; then echo "No run directories found" >&2; exit 1; fi; \
 	CHECKPOINT=$$(python3 scripts/find_latest_checkpoint.py "$$LAST_RUN"); \
 	python3 -m src.eval --config-name=eval/smoke eval.report.checkpoint_path=$$CHECKPOINT
+
+smoke-train:
+	python -m src.train --config-name=train/smoke
+
+smoke-eval:
+	@set -euo pipefail; \
+	LAST_RUN=$$(ls -td runs/*/ 2>/dev/null | head -1); \
+	if [ -z "$$LAST_RUN" ]; then echo "No run directories found" >&2; exit 1; fi; \
+	CHECKPOINT=$$(python scripts/find_latest_checkpoint.py "$$LAST_RUN"); \
+	python -m src.eval --config-name=eval/smoke eval.report.checkpoint_path=$$CHECKPOINT
+
 phase2:
-	@echo "See experiments/phase2_plan.md for details."
-.PHONY: phase2_scorecard
+	bash scripts/reproduce_phase2.sh
+
 phase2_scorecard:
 	python scripts/make_scorecard.py --methods ERM,ERM_reg,IRM,HIRM_Head,HIRM_Head_HighLite,GroupDRO,V_REx --seeds 0..29 --split crisis --outdir runs/scorecard_export --read_only true --phase phase2 --commit_hash $$(git rev-parse --short HEAD)
 	python scripts/compute_diagnostics.py --methods ERM,ERM_reg,IRM,HIRM_Head,HIRM_Head_HighLite,GroupDRO,V_REx --seeds 0..29 --train_envs low,medium --val_envs high --test_envs crisis --out runs/scorecard_export/diagnostics_all.csv --phase phase2 --commit_hash $$(git rev-parse --short HEAD)
