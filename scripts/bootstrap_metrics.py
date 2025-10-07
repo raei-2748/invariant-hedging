@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """Bootstrap confidence intervals for metrics stored in final_metrics.json files."""
+
 from __future__ import annotations
 
 import argparse
 import json
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, List
 
 import numpy as np
 
 
-def _expand_paths(patterns: Iterable[str]) -> List[Path]:
-    expanded: List[Path] = []
+def _expand_paths(patterns: Iterable[str]) -> list[Path]:
+    expanded: list[Path] = []
     for pattern in patterns:
         candidate = Path(pattern)
         if candidate.is_dir():
@@ -40,7 +41,9 @@ def _load_metric(path: Path, metric: str) -> float:
     return float(payload[metric])
 
 
-def _bootstrap(values: np.ndarray, samples: int, confidence: float, seed: int) -> tuple[float, float, float]:
+def _bootstrap(
+    values: np.ndarray, samples: int, confidence: float, seed: int
+) -> tuple[float, float, float]:
     rng = np.random.default_rng(seed)
     n = len(values)
     if n == 0:
@@ -51,7 +54,11 @@ def _bootstrap(values: np.ndarray, samples: int, confidence: float, seed: int) -
         estimates[i] = values[indices].mean()
     lower_q = (1.0 - confidence) / 2.0
     upper_q = 1.0 - lower_q
-    return float(values.mean()), float(np.quantile(estimates, lower_q)), float(np.quantile(estimates, upper_q))
+    return (
+        float(values.mean()),
+        float(np.quantile(estimates, lower_q)),
+        float(np.quantile(estimates, upper_q)),
+    )
 
 
 def main() -> None:
@@ -59,7 +66,10 @@ def main() -> None:
     parser.add_argument(
         "paths",
         nargs="+",
-        help="Run directories, final_metrics.json files, or glob patterns (e.g. 'runs/2025*/')",
+        help=(
+            "Run directories, final_metrics.json files, or glob patterns "
+            "(e.g. 'runs/2025*/')"
+        ),
     )
     parser.add_argument(
         "--metric",
@@ -67,21 +77,46 @@ def main() -> None:
         required=True,
         help="Metric key to analyse (repeat for multiple metrics)",
     )
-    parser.add_argument("--samples", type=int, default=1000, help="Number of bootstrap resamples")
-    parser.add_argument("--confidence", type=float, default=0.95, help="Confidence level for the interval")
-    parser.add_argument("--seed", type=int, default=13, help="Random seed for reproducibility")
+    parser.add_argument(
+        "--samples",
+        type=int,
+        default=1000,
+        help="Number of bootstrap resamples",
+    )
+    parser.add_argument(
+        "--confidence",
+        type=float,
+        default=0.95,
+        help="Confidence level for the interval",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=13,
+        help="Random seed for reproducibility",
+    )
     args = parser.parse_args()
 
     metric_files = _expand_paths(args.paths)
     if not metric_files:
-        raise SystemExit("No final_metrics.json files found for the provided paths")
+        raise SystemExit(
+            "No final_metrics.json files found for the provided paths"
+        )
 
     header = ["metric", "mean", "ci_lower", "ci_upper", "n"]
     print(",".join(header))
+
     for metric in args.metric:
-        values = np.array([_load_metric(path, metric) for path in metric_files], dtype=float)
-        mean, lower, upper = _bootstrap(values, args.samples, args.confidence, args.seed)
-        print(f"{metric},{mean:.6f},{lower:.6f},{upper:.6f},{len(values)}")
+        values = np.array(
+            [_load_metric(path, metric) for path in metric_files],
+            dtype=float,
+        )
+        mean, lower, upper = _bootstrap(
+            values, args.samples, args.confidence, args.seed
+        )
+        print(
+            f"{metric},{mean:.6f},{lower:.6f},{upper:.6f},{len(values)}"
+        )
 
 
 if __name__ == "__main__":

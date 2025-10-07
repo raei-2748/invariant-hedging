@@ -437,6 +437,7 @@ def _collect_diagnostics(
             )
         if ig is None:
             ig = _gap(train_vals)
+
         wg = None
         if isinstance(diag_record, Mapping):
             wg = (
@@ -446,11 +447,13 @@ def _collect_diagnostics(
             )
         if wg is None:
             wg = _compute_wg(train_vals, test_vals)
+
         msi = None
         if isinstance(diag_record, Mapping):
             msi_obj = diag_record.get("MSI")
             if isinstance(msi_obj, Mapping):
                 msi = msi_obj.get("value")
+
         train_max = _max_or_nan(train_vals)
         train_min = _min_or_nan(train_vals)
         val_high = _extract_single_env_metric(env_metrics, val_envs, "val", "ES95")
@@ -462,6 +465,7 @@ def _collect_diagnostics(
             crisis_es99 = _find_metric(final_metrics, split, "es99")
         mean_pnl = _find_metric(final_metrics, split, "meanpnl")
         turnover = _find_metric(final_metrics, split, "turnover")
+
         row = {
             "method": method,
             "seed": int(meta.seed),
@@ -483,6 +487,7 @@ def _collect_diagnostics(
             records[key] = (combined_mtime, row)
         if meta.config_tag and method not in config_tags:
             config_tags[method] = meta.config_tag
+
     resolved = {key: value for key, (mtime, value) in records.items()}
     return resolved, config_tags
 
@@ -515,13 +520,19 @@ def _write_csv(path: Path, rows: Sequence[Mapping[str, object]]) -> None:
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     _setup_logging(args.verbose)
+
     run_roots = _candidate_run_roots(Path("runs"))
     if args.run_roots:
         for token in args.run_roots.split(os.pathsep):
             token = token.strip()
             if token:
                 run_roots.append(Path(token))
-    LOGGER.info("Scanning diagnostic runs under: %s", ", ".join(str(p) for p in run_roots))
+
+    LOGGER.info(
+        "Scanning diagnostic runs under: %s",
+        ", ".join(str(p) for p in run_roots),
+    )
+
     diag_records, config_tags = _collect_diagnostics(
         run_roots,
         args.methods,
@@ -531,7 +542,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.val_envs,
         args.test_envs,
     )
-    rows: List[Dict[str, object]] = []
+
+    rows: list[dict[str, object]] = []
     for method in args.methods:
         for seed in args.seeds:
             key = (method, seed)
@@ -546,11 +558,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             elif args.config_tag:
                 row["config_tag"] = args.config_tag
             rows.append(row)
+
     rows.sort(key=lambda item: (item["method"], item["seed"]))
+
     out_path = Path(args.out)
     _ensure_outdir(out_path)
     _write_csv(out_path, rows)
     LOGGER.info("Diagnostics written to %s", out_path)
+
     meta = {
         "commit": args.commit_hash,
         "phase": args.phase,
