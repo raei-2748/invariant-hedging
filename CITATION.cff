@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+title: "Invariant Hedging (HIRM) Codebase"
+message: "If you use this software, please cite it."
+authors:
+  - family-names: Wang
+    given-names: Ray
+repository-code: https://github.com/raei-2748/invariant-hedging
+license: MIT

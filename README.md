@@ -54,6 +54,13 @@ python scripts/train.py config=train/phase2 vrex.enabled=true vrex.beta=10.0
 
 Results are saved in `outputs/_phase2_snapshot/`.
 
+## Reproduce Phase-2 in one command
+```bash
+make phase2
+```
+
+Outputs go to tables/diag.csv and figures/ and will be used in the paper.
+
 
 1. **Install dependencies**
    ```bash
