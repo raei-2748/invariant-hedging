@@ -1,66 +1,46 @@
-# Phase 2 — Head-Only IRM + Diagnostics
+# Phase-2 Experiment Plan
 
-Phase 2 extends the invariant hedging study beyond the ERM baselines frozen in Phase 1. The focus is on stress-testing Invariant Risk Minimisation (IRM) and V-REx objectives when the representation is frozen and only the policy head adapts to regime shifts.
+Phase-2 introduces fully reproducible grids for the invariant hedging study. All runs must use
+`requirements.lock.txt` and the Docker image included in the repository to guarantee identical
+software stacks across machines.
 
-## Objectives
+## Experiment matrix
 
-- **Head-only IRM sweeps:** explore \(\lambda \in \{10^{-2}, 10^{-1}, 1\}\) while keeping the feature extractor fixed to the ERM baseline.
-- **V-REx diagnostics:** sweep \(\beta \in \{1, 5, 10\}\) and log variance penalties alongside tail metrics.
-- **Stress environments:** introduce jump intensity shocks combined with liquidity squeezes to expose failure modes not covered in Phase 1.
-- **Early diagnostics:** capture Integrated Gradients (IG), Wasserstein Gradients (WG), and Market Stability Indicators (MSI) throughout training to understand representation drift.
+| Method alias | Hydra entry point          | Critical grid                                                   |
+|--------------|----------------------------|-----------------------------------------------------------------|
+| `erm_reg`    | `python -m src.train`      | `model.objective=erm_reg`, `train.lambda=[0.0]`                 |
+| `irm_head`   | `python -m src.train`      | `model.objective=irm_head`, `irm.lambda=[0.01,0.1,1.0,10.0]`    |
+| `groupdro`   | `python -m src.train`      | `model.objective=groupdro`, `groupdro.step_size=[0.01,0.1]`    |
+| `vrex`       | `python -m src.train`      | `model.objective=vrex`, `model.vrex.penalty_weight=[1,5,10]`   |
 
-## Milestones
+Launch each command with `python -m src.train method=<alias> seed=<seed> +phase=phase2`.
 
-1. **Reproduction harness** — integrate Phase-2 configs into the smoke/sanity tooling so they can be exercised in CI and on workstations.
-2. **Head-only IRM baseline** — finalise data loaders and schedulers for the head-only constraint and release tuned checkpoints.
-3. **Diagnostic logging** — wire IG/WG/MSI hooks into the evaluation runner with reproducible seeds.
-4. **Benchmark release** — publish crisis CVaR-95, Sharpe, turnover, and diagnostic summaries under `outputs/_phase2_snapshot/`.
+Seeds are sourced from `seeds/seed_list.txt` (currently `1, 2, 3, 4, 5`). When launching a grid,
+run every configuration for all seeds and log outputs under `runs/phase2/`.
 
-## Reproducibility notes
+## Selection rule
 
-- All experiments should use the pinned `requirements.txt` / `environment.yml` shipped with the repository.
-- Metadata (`metadata.json`) must include git SHA, torch version, and environment fingerprints for every Phase-2 run.
-- Keep seeds frozen at 0 for smoke checks; broader sweeps can expand the seed list after verification.
+Tune on the High-vol validation environment. For each method, pick the hyper-parameter setting
+with the best High-vol CVaR-95 (lower is better). Report diagnostics using that selection and
+propagate the chosen configuration to the Crisis hold-out evaluation.
 
-For status updates and detailed experiment tracking, synchronise notes with the main project board and surface blockers via issues tagged `phase2`.
-# Phase 2 Plan: Head-Only IRM and Diagnostics
+## Required diagnostics
 
-**Goal:**  
-Evaluate whether applying the IRM regularization only to the hedge head improves Crisis CVaR-95 relative to ERM and V-REx while maintaining turnover within +20 %.
+Each run must record:
+- CVaR-95, mean PnL, Sortino ratio, turnover
+- Invariance Gap (IG), Worst-Group Gap (WG), Mechanism Sensitivity Index (MSI)
+- Git commit hash and environment fingerprint (Torch + CUDA versions)
 
-## 1. Environments
-- Train → Low + Medium  
-- Validate → High  
-- Hold-out → Crisis  
+Use `python -m src.diagnostics.collect --runs runs --out tables/diag.csv` followed by
+`python -m src.diagnostics.plot --csv tables/diag.csv` to consolidate results.
 
-## 2. Models and Sweeps
-| Model | Key Params | Config Alias |
-|--------|------------|--------------|
-| ERM | baseline | `train/erm` |
-| IRM-head | λ ∈ {1e-2, 1e-1, 1} | `train/irm_head` |
-| V-REx | β ∈ {1, 5, 10} | `train/vrex` |
+## Reproduction command
 
-Example sweep:
+Once the repository is prepared, Phase-2 can be reproduced in one command:
+
 ```bash
-make sweep model=irm_head lambda_grid="[1e-2,1e-1,1]"
+make phase2
 ```
 
-## 3. Metrics
-- **Primary:** CVaR-95 of P&L
-- **Secondary:** Mean P&L, Turnover, Sharpe
-
-## 4. Success Criterion
-- ≥ 10 % Crisis CVaR-95 improvement vs ERM
-- ≤ 20 % increase in turnover
-
-## 5. Diagnostics to Log
-- IG (Invariance Gap)
-- WG (Worst-Group Variance)
-- MSI (Mutual Stability Index)
-
-## 6. Outputs
-- Store results in `outputs/_phase2_headIRM/`
-- Each run auto-emits `scorecard.json` and `metrics.jsonl`
-
-## 7. Paper Note
-- Figure targets: CVaR frontier, QQ plot (ERM vs IRM), λ-sweep
+This executes every method/seed combination, evaluates the Phase-2 split, aggregates diagnostics,
+and generates plots under `figures/`.
