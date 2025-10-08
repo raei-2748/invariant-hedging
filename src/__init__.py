@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import os
 
-
 _OPENMP_DEFAULTS = {
     "OMP_NUM_THREADS": "1",
     "MKL_THREADING_LAYER": "SEQUENTIAL",
