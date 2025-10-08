@@ -148,13 +148,13 @@ def _extract_seed_from_config(config: Mapping[str, object]) -> Optional[int]:
 def _extract_method_from_config(config: Mapping[str, object]) -> Optional[str]:
     model_cfg = config.get("model") if isinstance(config, Mapping) else None
     if isinstance(model_cfg, Mapping):
-        if (method := _canonical_method(model_cfg.get("name"))):
+        if method := _canonical_method(model_cfg.get("name")):
             return method
-        if (method := _canonical_method(model_cfg.get("objective"))):
+        if method := _canonical_method(model_cfg.get("objective")):
             return method
     algorithm_cfg = config.get("algorithm") if isinstance(config, Mapping) else None
     if isinstance(algorithm_cfg, Mapping):
-        if (method := _canonical_method(algorithm_cfg.get("name"))):
+        if method := _canonical_method(algorithm_cfg.get("name")):
             return method
     if "method" in config:
         return _canonical_method(config.get("method"))
@@ -230,13 +230,15 @@ def _find_metric(metrics: Mapping[str, object], split: str, metric: str) -> Opti
     aliases = list(_METRIC_ALIASES.get(metric, ()))
     candidates: List[str] = []
     for alias in aliases:
-        candidates.extend([
-            alias,
-            f"{split_key}_{alias}",
-            f"test_{split_key}_{alias}",
-            f"test/{split_key}_{alias}",
-            f"test/{split_key}/{alias}",
-        ])
+        candidates.extend(
+            [
+                alias,
+                f"{split_key}_{alias}",
+                f"test_{split_key}_{alias}",
+                f"test/{split_key}_{alias}",
+                f"test/{split_key}/{alias}",
+            ]
+        )
     for cand in candidates:
         key = _normalize_key(cand)
         if key in normalized:
@@ -381,7 +383,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--phase", default="phase2", help="Experiment phase label")
     parser.add_argument("--commit_hash", default="UNKNOWN", help="Commit hash for provenance")
     parser.add_argument("--config_tag", default=None, help="Optional config tag override")
-    parser.add_argument("--run_roots", default=None, help="Additional run directories (os.pathsep separated)")
+    parser.add_argument(
+        "--run_roots", default=None, help="Additional run directories (os.pathsep separated)"
+    )
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
     args = parser.parse_args(argv)
     args.methods = _parse_methods(args.methods)
@@ -414,21 +418,32 @@ def _collect_diagnostics(
             continue
         if meta.seed not in seed_set:
             continue
-        final_metrics = _load_json(meta.path / "final_metrics.json")
+        metrics_path = meta.path / "final_metrics.json"
+        final_metrics = _load_json(metrics_path)
         diag_record, diag_mtime = _load_diagnostics_record(meta.path)
-        metrics_mtime = (meta.path / "final_metrics.json").stat().st_mtime if (meta.path / "final_metrics.json").exists() else meta.path.stat().st_mtime
+        metrics_mtime = (
+            metrics_path.stat().st_mtime if metrics_path.exists() else meta.path.stat().st_mtime
+        )
         combined_mtime = max(metrics_mtime, diag_mtime)
         env_metrics = diag_record.get("env_metrics") if isinstance(diag_record, Mapping) else None
         train_vals = _collect_env_values(env_metrics, train_envs, "train", "ES95")
         test_vals = _collect_env_values(env_metrics, test_envs, "test", "ES95")
         ig = None
         if isinstance(diag_record, Mapping):
-            ig = diag_record.get("IG", {}).get("ES95") if isinstance(diag_record.get("IG"), Mapping) else None
+            ig = (
+                diag_record.get("IG", {}).get("ES95")
+                if isinstance(diag_record.get("IG"), Mapping)
+                else None
+            )
         if ig is None:
             ig = _gap(train_vals)
         wg = None
         if isinstance(diag_record, Mapping):
-            wg = diag_record.get("WG", {}).get("ES95") if isinstance(diag_record.get("WG"), Mapping) else None
+            wg = (
+                diag_record.get("WG", {}).get("ES95")
+                if isinstance(diag_record.get("WG"), Mapping)
+                else None
+            )
         if wg is None:
             wg = _compute_wg(train_vals, test_vals)
         msi = None
