@@ -535,16 +535,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     for method in args.methods:
         for seed in args.seeds:
             key = (method, seed)
-            row = diag_records.get(key, _empty_row(method, seed))
-            row = dict(row)
+            base_row = diag_records.get(key, _empty_row(method, seed))
+            row = dict(base_row)
             row["commit"] = args.commit_hash
             row["phase"] = args.phase
-            if row.get("config_tag"):
-                pass
-            elif method in config_tags:
-                row["config_tag"] = config_tags[method]
-            elif args.config_tag:
-                row["config_tag"] = args.config_tag
+            if not row.get("config_tag"):
+                if method in config_tags:
+                    row["config_tag"] = config_tags[method]
+                elif args.config_tag:
+                    row["config_tag"] = args.config_tag
             rows.append(row)
     rows.sort(key=lambda item: (item["method"], item["seed"]))
     out_path = Path(args.out)
