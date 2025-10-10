@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-from .synthetic import EpisodeBatch
+from .types import EpisodeBatch
 
 
 @dataclass

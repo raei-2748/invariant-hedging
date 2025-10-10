@@ -8,7 +8,7 @@ from typing import List, Optional
 import torch
 
 from ..data.features import FeatureEngineer
-from ..data.synthetic import EpisodeBatch
+from ..data.types import EpisodeBatch
 from ..markets.costs import execution_cost
 
 
