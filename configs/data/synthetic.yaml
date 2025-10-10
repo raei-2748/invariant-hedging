@@ -6,6 +6,8 @@ train_episodes: 2048
 val_episodes: 512
 test_episodes: 512
 hourly_episodes: 256
+use_jumps: false
+use_liquidity_spread: false
 real_data_anchor:
   enabled: true
   file: data/spy_sample.csv
