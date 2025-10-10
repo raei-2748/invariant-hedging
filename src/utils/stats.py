@@ -26,6 +26,15 @@ def sharpe_ratio(step_pnl: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
     return daily_sharpe * math.sqrt(252)
 
 
+def sortino_ratio(step_pnl: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
+    mean = step_pnl.mean(dim=1)
+    downside = torch.clamp(-step_pnl, min=0.0)
+    downside_var = (downside**2).mean(dim=1)
+    downside_std = torch.sqrt(downside_var + eps)
+    daily_sortino = mean / (downside_std + eps)
+    return daily_sortino * math.sqrt(252)
+
+
 def turnover_ratio(turnover: torch.Tensor, notional: float) -> torch.Tensor:
     return turnover / (notional + 1e-8)
 

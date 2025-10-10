@@ -13,7 +13,7 @@ import torch.nn.functional as F
 from omegaconf import DictConfig, OmegaConf
 
 from .data.features import FeatureEngineer
-from .diagnostics import metrics as diag_metrics
+from .diagnostics import external as diag_external
 from .models import (
     HIRMHead,
     HIRMHybrid,
@@ -371,9 +371,9 @@ def main(cfg: DictConfig) -> None:
             metrics_to_log["train/lambda"] = lambda_logged
         if (is_hirm_head or is_hirm_hybrid) and env_losses:
             env_risk_vals = [float(loss.detach().item()) for loss in env_losses]
-            metrics_to_log["train/ig"] = diag_metrics.invariant_gap(env_risk_vals)
-            metrics_to_log["train/wg"] = diag_metrics.worst_group(env_risk_vals)
-            metrics_to_log["train/msi"] = diag_metrics.mechanistic_sensitivity(msi_values)
+            ig_val = diag_external.compute_ig(env_risk_vals) or 0.0
+            metrics_to_log["train/ig"] = ig_val
+            metrics_to_log["train/wg"] = max(env_risk_vals)
             if risk_loss is not None:
                 metrics_to_log["train/risk_loss"] = float(risk_loss.item())
             if is_hirm_hybrid and gate_snapshot is not None:

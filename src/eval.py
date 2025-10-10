@@ -18,6 +18,8 @@ from omegaconf import DictConfig, OmegaConf
 
 from .data.features import FeatureEngineer, FeatureScaler
 from .data.synthetic import EpisodeBatch
+from .diagnostics import external as diag_external
+from .diagnostics import isi as isi_metrics
 from .models.policy_mlp import PolicyMLP
 from .objectives import cvar as cvar_obj
 from .utils import logging as log_utils, stats
@@ -210,6 +212,7 @@ def _evaluate_env(
         es_values[key] = float(es_val.item())
     mean_loss = losses.mean()
     sharpe = stats.sharpe_ratio(step_pnl).mean()
+    sortino = stats.sortino_ratio(step_pnl).mean()
     turnover_mean = turnover.mean()
     cvar_ci = cvar_obj.bootstrap_cvar_ci(pnl, primary_alpha)
     primary_key = _es_key(primary_alpha)
@@ -220,6 +223,7 @@ def _evaluate_env(
         "mean_pnl": float(pnl.mean().item()),
         "max_drawdown": float(stats.max_drawdown(step_pnl).mean().item()),
         "sharpe": float(sharpe.item()),
+        "sortino": float(sortino.item()),
         "turnover": float(turnover_mean.item()),
         "risks": {
             **{key: es_values.get(key) for key in es_keys},
@@ -321,6 +325,7 @@ def _evaluate_baselines(
                 **{risk: result["risks"].get(risk) for risk in _RISK_KEYS},
                 "mean_pnl": result["mean_pnl"],
                 "sharpe": result["sharpe"],
+                "sortino": result["sortino"],
                 "turnover": result["turnover"],
                 "cvar": result["cvar"],
                 "cvar_lower": result["cvar_lower"],
@@ -399,28 +404,6 @@ def _append_eval_matrix_rows(path: Path, fieldnames: Sequence[str], rows: Sequen
             writer.writeheader()
         for row in rows:
             writer.writerow(row)
-
-
-def _compute_ig(train_metrics: Dict[str, Dict[str, float]]) -> Dict[str, Optional[float]]:
-    ig: Dict[str, Optional[float]] = {}
-    for risk_key in _RISK_KEYS:
-        ig[risk_key] = _gap(m[risk_key] for m in train_metrics.values())
-    return ig
-
-
-def _compute_wg(
-    train_metrics: Dict[str, Dict[str, float]],
-    test_metrics: Dict[str, Dict[str, float]],
-) -> Dict[str, Optional[float]]:
-    wg: Dict[str, Optional[float]] = {}
-    for risk_key in _RISK_KEYS:
-        train_vals = [m[risk_key] for m in train_metrics.values() if m.get(risk_key) is not None]
-        test_vals = [m[risk_key] for m in test_metrics.values() if m.get(risk_key) is not None]
-        if not train_vals or not test_vals:
-            wg[risk_key] = None
-            continue
-        wg[risk_key] = max(test_vals) - max(train_vals)
-    return wg
 
 
 def _feature_groups(
@@ -652,21 +635,45 @@ def _aggregate_records(records: List[Dict]) -> Dict[str, Dict[str, object]]:
 
     def _aggregate_gap(key: str) -> Dict[str, Dict[str, float]]:
         gap_acc: Dict[str, List[float]] = {risk: [] for risk in _RISK_KEYS}
+        scalar_values: List[float] = []
         for record in records:
-            metrics = record.get(key, {})
-            for risk in _RISK_KEYS:
-                value = metrics.get(risk)
-                if value is not None and not math.isnan(value):
-                    gap_acc[risk].append(float(value))
-        return {risk: _mean_std(vals) for risk, vals in gap_acc.items()}
+            metrics = record.get(key)
+            if isinstance(metrics, Mapping):
+                for risk in _RISK_KEYS:
+                    value = metrics.get(risk)
+                    if value is not None and not math.isnan(value):
+                        gap_acc[risk].append(float(value))
+            elif metrics is not None and not math.isnan(metrics):
+                scalar_values.append(float(metrics))
+        summary = {risk: _mean_std(vals) for risk, vals in gap_acc.items()}
+        summary["value"] = _mean_std(scalar_values)
+        return summary
 
     ig_summary = _aggregate_gap("IG")
     wg_summary = _aggregate_gap("WG")
 
+    vr_values: List[float] = []
+    er_values: List[float] = []
+    tr_values: List[float] = []
+    isi_components: Dict[str, List[float]] = {"C1": [], "C2": [], "C3": [], "ISI": []}
     msi_values: List[float] = []
     s_phi_values: List[float] = []
     s_r_values: List[float] = []
     for record in records:
+        vr = record.get("VR")
+        if vr is not None and not math.isnan(vr):
+            vr_values.append(float(vr))
+        er = record.get("ER")
+        if er is not None and not math.isnan(er):
+            er_values.append(float(er))
+        tr = record.get("TR")
+        if tr is not None and not math.isnan(tr):
+            tr_values.append(float(tr))
+        isi_metrics_record = record.get("ISI") or {}
+        for key in ("C1", "C2", "C3", "ISI"):
+            value = isi_metrics_record.get(key) if isinstance(isi_metrics_record, Mapping) else None
+            if value is not None and not math.isnan(value):
+                isi_components[key].append(float(value))
         msi = record.get("MSI") or {}
         value = msi.get("value")
         if value is not None and not math.isnan(value):
@@ -682,6 +689,10 @@ def _aggregate_records(records: List[Dict]) -> Dict[str, Dict[str, object]]:
         "env_metrics": aggregated,
         "IG": ig_summary,
         "WG": wg_summary,
+        "VR": _mean_std(vr_values),
+        "ER": _mean_std(er_values),
+        "TR": _mean_std(tr_values),
+        "ISI": {key: _mean_std(vals) for key, vals in isi_components.items()},
         "MSI": {
             "value": _mean_std(msi_values),
             "S_phi": _mean_std(s_phi_values),
@@ -783,9 +794,39 @@ def main(cfg: DictConfig) -> None:
                 **{f"{split}/env_{env.env_index}/{k}": v for k, v in risk_metrics.items()},
                 f"{split}/{env_name}/mean_pnl": result["mean_pnl"],
                 f"{split}/{env_name}/sharpe": result["sharpe"],
+                f"{split}/{env_name}/sortino": result["sortino"],
                 f"{split}/{env_name}/turnover": result["turnover"],
             }
             run_logger.log_metrics(metrics_to_log)
+
+    test_primary_values: List[float] = []
+    test_mean_pnls: List[float] = []
+    test_sortinos: List[float] = []
+    test_turnovers: List[float] = []
+    test_env_vectors: List[List[float]] = []
+    for record in evaluation_records:
+        if record.get("split") != "test":
+            continue
+        risks = record.get("risks", {})
+        primary_val = risks.get(primary_key) if isinstance(risks, Mapping) else None
+        if primary_val is None or math.isnan(primary_val):
+            continue
+        primary_float = float(primary_val)
+        mean_val = float(record.get("mean_pnl", 0.0))
+        sortino_val = float(record.get("sortino", 0.0))
+        turnover_val = float(record.get("turnover", 0.0))
+        test_primary_values.append(primary_float)
+        test_mean_pnls.append(mean_val)
+        test_sortinos.append(sortino_val)
+        test_turnovers.append(turnover_val)
+        test_env_vectors.append(
+            [
+                primary_float,
+                mean_val,
+                sortino_val,
+                turnover_val,
+            ]
+        )
 
     horizons_cfg = cfg.eval.get("horizons") if cfg.eval else None
     cost_cfg = cfg.eval.get("cost_multipliers") if cfg.eval else None
@@ -878,6 +919,7 @@ def main(cfg: DictConfig) -> None:
                     for key in [*es_keys, "Mean", "SharpeRisk", "Turnover", "mean_pnl", "sharpe"]
                     if key in row
                 }
+                metrics[f"baseline/{row['baseline']}_{row['env']}/sortino"] = row.get("sortino")
                 run_logger.log_metrics(metrics)
 
     plot_dir = Path(run_logger.artifacts_dir) / cfg.eval.report.plot_dir
@@ -885,13 +927,6 @@ def main(cfg: DictConfig) -> None:
     for record in evaluation_records:
         qq_path = plot_dir / f"qq_{record['env']}.png"
         _plot_qq(record, qq_path)
-
-    ig = _compute_ig(train_metrics) if train_metrics else {risk: None for risk in _RISK_KEYS}
-    wg = (
-        _compute_wg(train_metrics, test_metrics)
-        if train_metrics and test_metrics
-        else {risk: None for risk in _RISK_KEYS}
-    )
 
     compute_msi_flag = bool(cfg.eval.get("compute_msi", False))
     msi_batch_size = int(cfg.eval.get("msi_batch_size", 512))
@@ -914,15 +949,144 @@ def main(cfg: DictConfig) -> None:
     if msi is None:
         msi = {"value": None, "S_phi": None, "S_r": None, "method": None}
 
+    diagnostics_cfg = cfg.eval.get("diagnostics") if cfg.eval else None
+    if diagnostics_cfg is not None:
+        diagnostics_cfg = OmegaConf.to_container(diagnostics_cfg, resolve=True)
+    diag_cfg: Mapping[str, object] = diagnostics_cfg or {}
+    trim_fraction = float(diag_cfg.get("trim_fraction", 0.0))
+    clamp_cfg = diag_cfg.get("clamp") if isinstance(diag_cfg, Mapping) else None
+    clamp_tuple: Optional[Tuple[Optional[float], Optional[float]]] = None
+    if isinstance(clamp_cfg, Mapping):
+        clamp_min = clamp_cfg.get("min")
+        clamp_max = clamp_cfg.get("max")
+        clamp_tuple = (
+            float(clamp_min) if clamp_min is not None else None,
+            float(clamp_max) if clamp_max is not None else None,
+        )
+    elif isinstance(clamp_cfg, Sequence) and len(clamp_cfg) == 2:
+        clamp_tuple = (
+            float(clamp_cfg[0]) if clamp_cfg[0] is not None else None,
+            float(clamp_cfg[1]) if clamp_cfg[1] is not None else None,
+        )
+    alignment_mode = str(diag_cfg.get("alignment", "cosine"))
+    covariance_mode = str(diag_cfg.get("covariance_dispersion", "trace"))
+    tail_quantile = float(diag_cfg.get("tail_quantile", 0.95))
+    compute_isi_flag = bool(diag_cfg.get("compute_isi", False))
+
+    train_primary_values = [
+        float(metrics.get(primary_key))
+        for metrics in train_metrics.values()
+        if metrics.get(primary_key) is not None and not math.isnan(metrics.get(primary_key))
+    ]
+
+    ig_source = train_primary_values if train_primary_values else test_primary_values
+    ig_value = (
+        diag_external.compute_ig(ig_source, trim_fraction=trim_fraction, clamp=clamp_tuple)
+        if ig_source
+        else None
+    )
+    wg_value = (
+        diag_external.compute_wg(
+            train_primary_values,
+            test_primary_values,
+            trim_fraction=trim_fraction,
+            clamp=clamp_tuple,
+        )
+        if train_primary_values and test_primary_values
+        else None
+    )
+    vr_value = (
+        diag_external.compute_variation_ratio(
+            test_env_vectors,
+            trim_fraction=trim_fraction,
+            clamp=clamp_tuple,
+            alignment=alignment_mode,
+            covariance_dispersion=covariance_mode,
+        )
+        if test_env_vectors
+        else None
+    )
+    er_value = (
+        diag_external.compute_expected_risk(
+            test_primary_values,
+            trim_fraction=trim_fraction,
+            clamp=clamp_tuple,
+        )
+        if test_primary_values
+        else None
+    )
+    tr_value = (
+        diag_external.compute_tail_risk(
+            test_primary_values,
+            trim_fraction=trim_fraction,
+            clamp=clamp_tuple,
+            covariance_dispersion=covariance_mode,
+            quantile=tail_quantile,
+        )
+        if test_primary_values
+        else None
+    )
+    isi_values = (
+        isi_metrics.compute_ISI(
+            test_env_vectors,
+            trim_fraction=trim_fraction,
+            clamp=clamp_tuple,
+            alignment=alignment_mode,
+            covariance_dispersion=covariance_mode,
+        )
+        if compute_isi_flag and test_env_vectors
+        else {"C1": None, "C2": None, "C3": None, "ISI": None}
+    )
+
     diagnostics_record = {
         "seed": seed_value,
         "env_metrics": env_metric_payload,
-        "IG": {risk: ig.get(risk) if ig is not None else None for risk in _RISK_KEYS},
-        "WG": {risk: wg.get(risk) if wg is not None else None for risk in _RISK_KEYS},
+        "IG": ig_value,
+        "WG": wg_value,
+        "VR": vr_value,
+        "ER": er_value,
+        "TR": tr_value,
+        "ISI": isi_values,
         "MSI": msi,
         "method": method_name,
         "config_tag": config_tag,
     }
+
+    def _safe_mean(values: Sequence[float]) -> Optional[float]:
+        valid = [float(v) for v in values if v is not None and not math.isnan(v)]
+        if not valid:
+            return None
+        return sum(valid) / len(valid)
+
+    avg_cvar = _safe_mean(test_primary_values)
+    avg_mean_pnl = _safe_mean(test_mean_pnls)
+    avg_sortino = _safe_mean(test_sortinos)
+    avg_turnover = _safe_mean(test_turnovers)
+    env_label = str(cfg.eval.get("name", "eval")) if cfg.eval else "eval"
+    report_cfg = cfg.eval.report if cfg.eval and hasattr(cfg.eval, "report") else None
+    window_label = "test"
+    if report_cfg is not None and hasattr(report_cfg, "get"):
+        window_label = str(report_cfg.get("window", "test"))
+    per_seed_row = {
+        "seed": seed_value,
+        "method": method_name,
+        "env": env_label,
+        "window": window_label,
+        "CVaR95": avg_cvar,
+        "mean_pnl": avg_mean_pnl,
+        "sortino": avg_sortino,
+        "turnover": avg_turnover,
+        "IG": ig_value,
+        "WG": wg_value,
+        "VR": vr_value,
+        "ER": er_value,
+        "TR": tr_value,
+        "C1": isi_values.get("C1") if isinstance(isi_values, Mapping) else None,
+        "C2": isi_values.get("C2") if isinstance(isi_values, Mapping) else None,
+        "C3": isi_values.get("C3") if isinstance(isi_values, Mapping) else None,
+        "ISI": isi_values.get("ISI") if isinstance(isi_values, Mapping) else None,
+    }
+    run_logger.log_diagnostics_row(per_seed_row)
 
     diagnostics_path = Path(run_logger.artifacts_dir) / "diagnostics.jsonl"
     existing_records: List[Dict] = []
@@ -949,13 +1113,27 @@ def main(cfg: DictConfig) -> None:
         for key, value in metrics.items():
             if value is not None:
                 final_metrics[f"test/{env_name}/{key}"] = value
-    for key, value in diagnostics_record["IG"].items():
-        if value is not None:
-            final_metrics[f"diagnostics/IG/{key}"] = value
-    for key, value in diagnostics_record["WG"].items():
-        if value is not None:
-            final_metrics[f"diagnostics/WG/{key}"] = value
-    for comp_key, comp_value in diagnostics_record["MSI"].items():
+    ig_value = diagnostics_record.get("IG")
+    if isinstance(ig_value, (int, float)) and ig_value is not None and not math.isnan(ig_value):
+        final_metrics["diagnostics/IG"] = float(ig_value)
+    wg_value = diagnostics_record.get("WG")
+    if isinstance(wg_value, (int, float)) and wg_value is not None and not math.isnan(wg_value):
+        final_metrics["diagnostics/WG"] = float(wg_value)
+    vr_value = diagnostics_record.get("VR")
+    if isinstance(vr_value, (int, float)) and vr_value is not None and not math.isnan(vr_value):
+        final_metrics["diagnostics/VR"] = float(vr_value)
+    er_value = diagnostics_record.get("ER")
+    if isinstance(er_value, (int, float)) and er_value is not None and not math.isnan(er_value):
+        final_metrics["diagnostics/ER"] = float(er_value)
+    tr_value = diagnostics_record.get("TR")
+    if isinstance(tr_value, (int, float)) and tr_value is not None and not math.isnan(tr_value):
+        final_metrics["diagnostics/TR"] = float(tr_value)
+    isi_comp = diagnostics_record.get("ISI")
+    if isinstance(isi_comp, Mapping):
+        for comp_key, comp_value in isi_comp.items():
+            if isinstance(comp_value, (int, float)) and comp_value is not None and not math.isnan(comp_value):
+                final_metrics[f"diagnostics/ISI/{comp_key}"] = float(comp_value)
+    for comp_key, comp_value in diagnostics_record.get("MSI", {}).items():
         if isinstance(comp_value, (int, float)) and comp_value is not None and not math.isnan(comp_value):
             final_metrics[f"diagnostics/MSI/{comp_key}"] = float(comp_value)
 
