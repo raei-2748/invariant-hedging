@@ -1,7 +1,9 @@
 name: real_spy
-file: data/spy_sample.csv
-slippage_bps: 10
-rate: 0.01
-min_volume: 1000
-start_date: 2019-01-01
-end_date: 2020-12-31
+real:
+  mode: smoke
+  spy_path: data/spy_sample.csv
+  rate: 0.01
+  include_gfc: false
+  base_linear_bps: 10
+  base_quadratic: 0.0
+  base_slippage_multiplier: 1.0
