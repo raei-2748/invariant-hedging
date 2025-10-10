@@ -1,9 +1,11 @@
 # @package _global_
 
 defaults:
-  - /data: synthetic
+  - /data: sim
   - /envs: daily
   - /model: vrex
+  - /irm
+  - /diagnostics/isi
   - /eval: daily
   - /logging: default
   - _self_
@@ -36,5 +38,5 @@ logging:
   log_interval: 100
   eval_interval: 1000
 
-vrex:
-  penalty_weight: 10.0
+irm:
+  enabled: false

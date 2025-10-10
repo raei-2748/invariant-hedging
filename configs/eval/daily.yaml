@@ -1,11 +1,10 @@
+defaults:
+  - /diagnostics/isi
+  - _self_
+
 name: daily
 seeds: [0, 1, 2]
 compute_per_env_metrics: true
-compute_msi: false
-msi_batch_size: 512
-msi_feature_groups:
-  invariants: []
-  spurious: []
 report:
   alpha: 0.95
   bootstrap_samples: 1000

@@ -1,9 +1,11 @@
 # @package _global_
 
 defaults:
-  - /data: synthetic
+  - /data: sim
   - /envs: daily
   - /model: irm
+  - /irm
+  - /diagnostics/isi
   - /eval: daily
   - /logging: default
   - _self_
@@ -37,6 +39,7 @@ logging:
   eval_interval: 1000
 
 irm:
-  lambda_init: 0.0
-  lambda_target: 1.0
-  ramp_steps: 10000
+  enabled: true
+  lambda_I: 1.0
+  schedule: linear
+  warmup_steps: 10000

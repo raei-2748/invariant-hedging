@@ -1,0 +1,30 @@
+name: sim
+mode: synthetic
+seed: 0
+spot_init: 100.0
+rate: 0.01
+episodes:
+  train: 2048
+  val: 512
+  test: 512
+  hourly: 256
+regimes:
+  schedule:
+    train: [low, med]
+    val: [high]
+    test: [crisis]
+  jumps:
+    enabled: false
+  liquidity:
+    enabled: false
+windows:
+  hourly:
+    steps: ${episodes.hourly}
+real_data_anchor:
+  enabled: true
+  file: data/spy_sample.csv
+  slippage_bps: 5
+train_episodes: ${episodes.train}
+val_episodes: ${episodes.val}
+test_episodes: ${episodes.test}
+hourly_episodes: ${episodes.hourly}

@@ -1,0 +1,5 @@
+compute_msi: false
+msi_batch_size: 512
+msi_feature_groups:
+  invariants: []
+  spurious: []

@@ -48,6 +48,19 @@ def _rewrite_overrides(cli_args: List[str]) -> Tuple[List[str], str, str | None]
             overrides.append(f"train.seed={value}")
             tag_parts.append(f"seed{value}")
             continue
+        if arg.startswith("train="):
+            value = arg.split("=", 1)[1]
+            if value == "hirm_head":
+                print("[warn] train=hirm_head is deprecated. Using train=hirm.", file=sys.stderr)
+                overrides.append("train=hirm")
+                tag_parts.append("train_hirm")
+                continue
+            if value == "hirm_hybrid":
+                print(
+                    "[error] train=hirm_hybrid has been removed. Use train=hirm with irm.mode=hybrid.",
+                    file=sys.stderr,
+                )
+                raise SystemExit(1)
         overrides.append(arg)
     tag = "_".join(tag_parts) if tag_parts else "default"
     return overrides, tag, config_name
@@ -98,6 +111,15 @@ def main(argv: List[str] | None = None) -> int:
     )
     parsed = parser.parse_args(argv)
     overrides, tag, config_name = _rewrite_overrides(parsed.overrides)
+    if config_name == "train/hirm_head":
+        print("[warn] config=train/hirm_head is deprecated. Using train/hirm.", file=sys.stderr)
+        config_name = "train/hirm"
+    elif config_name == "train/hirm_hybrid":
+        print(
+            "[error] config=train/hirm_hybrid has been removed. Use train/hirm with irm.mode=hybrid.",
+            file=sys.stderr,
+        )
+        return 1
     _prepare_env()
     status = _call_train(overrides, config_name)
     if status == 0:

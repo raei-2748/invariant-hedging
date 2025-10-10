@@ -143,6 +143,10 @@ GitHub Actions executes the test suite together with a smoke train/eval pass on 
 
 The synthetic generator supports GBM and Heston dynamics with environment-specific transaction costs. A tiny SPY options slice (`data/spy_sample.csv`) is bundled as a deterministic real-data anchor that exercises the full feature pipeline.
 
+`configs/data/sim.yaml` now surfaces the regime schedule, jump/liquidity toggles, and hourly window sizing so you can script stress programs without editing Python. Historical anchors share the same surface under `configs/data/real.yaml`, which exposes named train/val/test windows mapped to the bundled SPY excerpt.
+
+IRM/HIRM behaviour is centralised in `configs/irm.yaml`. Toggle the penalty via `enabled`, adjust the annealing target with `lambda_I`, and use `mode`/`freeze.*` to control which heads are updated. The legacy `hirm_head` alias now resolves to the canonical `hirm` objective; update any custom scripts accordingly.
+
 Episode configuration, cost files and model settings live under `configs/`. Adjust these as needed for experiments or sweeps. The default training protocol performs 20k ERM pre-training steps, a 10k IRM ramp, and continues until 150k total updates with environment-balanced batching.
 
 ## Reproducibility

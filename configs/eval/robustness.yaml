@@ -1,3 +1,7 @@
+defaults:
+  - /diagnostics/isi
+  - _self_
+
 name: robustness
 hourly:
   enabled: true

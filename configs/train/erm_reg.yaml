@@ -1,9 +1,11 @@
 # @package _global_
 
 defaults:
-  - /data: synthetic
+  - /data: sim
   - /envs: daily
   - /model: erm_reg
+  - /irm
+  - /diagnostics/isi
   - /eval: daily
   - /logging: default
   - _self_
@@ -35,3 +37,6 @@ scheduler:
 logging:
   log_interval: 100
   eval_interval: 1000
+
+irm:
+  enabled: false

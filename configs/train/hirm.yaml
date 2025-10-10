@@ -17,7 +17,7 @@ train:
   seed: 0
   eval_interval: 1000
   checkpoint_topk: 3
-  max_trade_warning_factor: 1.0
+  max_trade_warning_factor: 1.2
   pretrain_steps: 20000
   irm_ramp_steps: 20000
 
@@ -35,17 +35,12 @@ scheduler:
   warmup_steps: 1000
 
 logging:
-  log_interval: 200
+  log_interval: 100
   eval_interval: 1000
 
 irm:
   enabled: true
-  lambda_I: 0.01
+  lambda_I: 1.0
   schedule: linear
   warmup_steps: 20000
   mode: head
-
-hydra:
-  sweeper:
-    params:
-      irm.lambda_I: 0.01,0.1

@@ -6,6 +6,7 @@ import json
 import logging
 import math
 import os
+import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, TYPE_CHECKING
@@ -59,9 +60,9 @@ _METHOD_CANONICAL: Mapping[str, str] = {
     "erm_reg": "ERM_reg",
     "irm": "IRM",
     "hirm": "HIRM",
-    "hirm_head": "HIRM_Head",
-    "hirm_head_highlite": "HIRM_Head_HighLite",
-    "hirm_highlite": "HIRM_Head_HighLite",
+    "hirm_head": "HIRM",
+    "hirm_head_highlite": "HIRM_HighLite",
+    "hirm_highlite": "HIRM_HighLite",
     "groupdro": "GroupDRO",
     "group_dro": "GroupDRO",
     "vrex": "V_REx",
@@ -693,6 +694,19 @@ def _aggregate_records(records: List[Dict]) -> Dict[str, Dict[str, object]]:
 @hydra.main(config_path="../configs", config_name="experiment", version_base=None)
 def main(cfg: DictConfig) -> None:
     cfg = unwrap_experiment_config(cfg)
+    if cfg.get("legacy") and cfg.legacy.get("hybrid_enabled"):
+        raise RuntimeError(
+            "Legacy HIRM hybrid support has been removed. Set irm.mode='head' and rerun."
+        )
+
+    method_env = os.environ.get("METHOD")
+    if method_env and method_env.lower() == "hirm_head":
+        warnings.warn(
+            "METHOD=hirm_head is deprecated; falling back to METHOD=hirm.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
     resolved_cfg = OmegaConf.to_container(cfg, resolve=True)
     device = _device(cfg.get("runtime", {}))
     data_ctx = prepare_data_module(cfg)

@@ -1,10 +1,12 @@
 # Master Hydra experiment configuration
 # Provides defaults for training and evaluation workflows.
 defaults:
-  - /data: synthetic
+  - /data: sim
   - /envs: daily
   - /costs: low
   - /model: erm
+  - /irm
+  - /diagnostics/isi
   - /train: erm
   - /eval: daily
   - /logging: default

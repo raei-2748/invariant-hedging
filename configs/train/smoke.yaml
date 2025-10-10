@@ -1,9 +1,11 @@
 # @package _global_
 
 defaults:
-  - /data: synthetic
+  - /data: sim
   - /envs: daily
   - /model: erm
+  - /irm
+  - /diagnostics/isi
   - /eval: daily
   - /logging: default
   - _self_

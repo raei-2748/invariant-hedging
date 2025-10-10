@@ -1,0 +1,19 @@
+name: real
+mode: historical
+file: data/spy_sample.csv
+slippage_bps: 10
+rate: 0.01
+min_volume: 1000
+windows:
+  train:
+    - name: pre_covid
+      start: 2018-01-02
+      end: 2019-12-31
+  val:
+    - name: early_volatility
+      start: 2020-01-02
+      end: 2020-02-28
+  test:
+    - name: covid_crisis
+      start: 2020-03-01
+      end: 2020-06-30

@@ -1,40 +1,8 @@
 # @package _global_
 
 defaults:
-  - /data: synthetic
-  - /envs: daily
-  - /model: hirm_hybrid
-  - /eval: daily
-  - /logging: default
+  - hirm
   - _self_
 
-train:
-  steps: 150000
-  batch_size: 128
-  grad_clip: 1.0
-  seed: 0
-  eval_interval: 1000
-  checkpoint_topk: 3
-  max_trade_warning_factor: 1.2
-
-loss:
-  name: cvar
-  cvar_alpha: 0.95
-
-optimizer:
-  name: adamw
-  lr: 1.0e-4
-  weight_decay: 1.0e-6
-
-scheduler:
-  name: cosine
-  warmup_steps: 1000
-
-logging:
-  log_interval: 100
-  eval_interval: 1000
-
-irm:
-  lambda_target: 0.5
-  schedule: linear
-  warmup_steps: 20000
+legacy:
+  hybrid_enabled: true

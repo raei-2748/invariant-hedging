@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import math
 import os
+import warnings
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -103,10 +104,10 @@ def _lambda_schedule(step: int, cfg: DictConfig) -> float:
         return cfg.irm.get("lambda_init", 0.0)
     if step < pretrain + ramp:
         progress = (step - pretrain) / max(ramp, 1)
-        return cfg.irm.get("lambda_init", 0.0) + progress * (
-            cfg.irm.get("lambda_target", cfg.model.irm.penalty_weight)
-        )
-    return cfg.irm.get("lambda_target", cfg.model.irm.penalty_weight)
+        target = cfg.irm.get("lambda_I", cfg.irm.get("lambda_target", 0.0))
+        init = cfg.irm.get("lambda_init", 0.0)
+        return init + progress * (target - init)
+    return cfg.irm.get("lambda_I", cfg.irm.get("lambda_target", 0.0))
 
 
 def lambda_at_step(step: int, *, target: float, schedule: str, warmup_steps: int) -> float:
@@ -161,6 +162,19 @@ def _setup_scheduler(optimizer: torch.optim.Optimizer, cfg: DictConfig):
 @hydra.main(config_path="../configs", config_name="experiment", version_base=None)
 def main(cfg: DictConfig) -> None:
     cfg = unwrap_experiment_config(cfg)
+    if cfg.get("legacy") and cfg.legacy.get("hybrid_enabled"):
+        raise RuntimeError(
+            "Legacy HIRM hybrid support has been removed. Set irm.mode='head' and rerun."
+        )
+
+    method_env = os.environ.get("METHOD")
+    if method_env and method_env.lower() == "hirm_head":
+        warnings.warn(
+            "METHOD=hirm_head is deprecated; falling back to METHOD=hirm.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
     resolved_cfg = OmegaConf.to_container(cfg, resolve=True)
     device = _device(cfg.get("runtime", {}))
     generator = seed_utils.seed_everything(cfg.train.seed)
@@ -176,6 +190,22 @@ def main(cfg: DictConfig) -> None:
     test_envs = build_envs(test_batches, feature_engineer, data_ctx.name_to_index)
 
     objective = cfg.model.get("objective", cfg.model.get("name", "erm"))
+    legacy_objective = objective
+    if objective == "hirm_head":
+        warnings.warn(
+            "Model objective 'hirm_head' has been renamed to 'hirm'. Please update your configs.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        objective = "hirm"
+    elif objective == "hirm_hybrid":
+        raise RuntimeError(
+            "Model objective 'hirm_hybrid' has been removed. Use 'hirm' with irm.mode='hybrid' if required."
+        )
+    if legacy_objective != objective:
+        cfg.model.objective = objective
+        if getattr(cfg.model, "name", None) == legacy_objective:
+            cfg.model.name = objective
     policy = _init_policy(
         cfg,
         feature_dim=len(feature_engineer.feature_names),
@@ -183,23 +213,26 @@ def main(cfg: DictConfig) -> None:
     )
     policy.to(device)
 
-    is_hirm_head = objective == "hirm_head"
-    is_hirm_hybrid = objective == "hirm_hybrid"
+    is_hirm = objective == "hirm"
     risk_model = None
-    if is_hirm_head:
-        head_module = _init_risk_head(cfg, cfg.model.representation_dim)
-        risk_model = HIRMHead(nn.Identity(), head_module)
-    elif is_hirm_hybrid:
-        inv_head = _init_risk_head(cfg, cfg.model.representation_dim)
-        adapt_head = _init_risk_head(cfg, cfg.model.representation_dim)
-        hybrid_cfg = cfg.get("hybrid", {})
-        risk_model = HIRMHybrid(
-            nn.Identity(),
-            inv_head,
-            adapt_head,
-            alpha_init=hybrid_cfg.get("init_alpha", cfg.model.get("alpha_init", 0.0)),
-            freeze_alpha=hybrid_cfg.get("freeze_alpha", cfg.model.get("freeze_alpha", False)),
-        )
+    irm_mode = str(cfg.irm.get("mode", "head")).lower() if cfg.get("irm") else "head"
+    if is_hirm:
+        if irm_mode == "head":
+            head_module = _init_risk_head(cfg, cfg.model.representation_dim)
+            risk_model = HIRMHead(nn.Identity(), head_module)
+        elif irm_mode == "hybrid":
+            inv_head = _init_risk_head(cfg, cfg.model.representation_dim)
+            adapt_head = _init_risk_head(cfg, cfg.model.representation_dim)
+            hybrid_cfg = cfg.get("hybrid", {})
+            risk_model = HIRMHybrid(
+                nn.Identity(),
+                inv_head,
+                adapt_head,
+                alpha_init=hybrid_cfg.get("init_alpha", cfg.model.get("alpha_init", 0.0)),
+                freeze_alpha=hybrid_cfg.get("freeze_alpha", cfg.model.get("freeze_alpha", False)),
+            )
+        else:
+            raise ValueError(f"Unsupported HIRM mode '{irm_mode}'.")
     if risk_model is not None:
         risk_model.to(device)
 
@@ -210,6 +243,16 @@ def main(cfg: DictConfig) -> None:
     optimizer = _setup_optimizer(policy, cfg, extra_params=extra_params)
     scheduler = _setup_scheduler(optimizer, cfg)
     scaler = torch.cuda.amp.GradScaler(enabled=(device.type == "cuda" and cfg.runtime.get("mixed_precision", True)))
+
+    freeze_cfg = cfg.irm.get("freeze", {}) if cfg.get("irm") else {}
+    if freeze_cfg.get("policy"):
+        for param in policy.parameters():
+            param.requires_grad_(False)
+    if risk_model is not None and freeze_cfg.get("risk"):
+        for param in risk_model.parameters():
+            param.requires_grad_(False)
+    if risk_model is not None and freeze_cfg.get("alpha") and hasattr(risk_model, "alpha"):
+        risk_model.alpha.requires_grad_(False)
 
     run_logger = log_utils.RunLogger(OmegaConf.to_container(cfg.logging, resolve=True), resolved_cfg)
     checkpoint_dir = Path(run_logger.checkpoint_dir)
@@ -240,7 +283,7 @@ def main(cfg: DictConfig) -> None:
         for env_idx, env_name in enumerate(cfg.envs.train):
             env = train_envs[env_name]
             indices = env.sample_indices(per_env_batch, generator)
-            collect_rep = is_hirm_head or is_hirm_hybrid
+            collect_rep = is_hirm
             rep_scale = dummy if objective == "irm" else None
             sim = env.simulate(
                 policy,
@@ -285,7 +328,7 @@ def main(cfg: DictConfig) -> None:
                 if risk_model is None:
                     diag_pred = None
                     mse_loss = torch.tensor(0.0, device=device)
-                elif is_hirm_head:
+                elif is_hirm and irm_mode == "head":
                     risk_pred = risk_model(rep_detached)
                     mse_loss = F.mse_loss(risk_pred.squeeze(-1), target)
                     risk_losses.append(mse_loss)
@@ -293,7 +336,7 @@ def main(cfg: DictConfig) -> None:
                     inv_loss = F.mse_loss(scaled_pred.squeeze(-1), target)
                     irm_penalties_env.append(hirm_head_penalty(inv_loss, risk_model.w))
                     diag_pred = risk_model(rep_for_msi)
-                else:  # hirm_hybrid
+                else:  # irm_mode == "hybrid"
                     r_hat, r_inv, _, gate_val = risk_model(rep_detached)
                     mse_loss = F.mse_loss(r_hat.squeeze(-1), target)
                     risk_losses.append(mse_loss)
@@ -334,21 +377,22 @@ def main(cfg: DictConfig) -> None:
             weight = cfg.model.vrex.penalty_weight
             total_loss = total_loss + weight * vrex_pen
             penalty_value = float(vrex_pen.item())
-        elif objective in {"hirm_head", "hirm_hybrid"}:
+        elif is_hirm:
             irm_cfg = cfg.get("irm", {})
-            lambda_weight = lambda_at_step(
-                step,
-                target=float(irm_cfg.get("lambda_target", 0.0)),
-                schedule=irm_cfg.get("schedule", "none"),
-                warmup_steps=int(irm_cfg.get("warmup_steps", 0)),
-            )
-            if irm_penalties_env:
-                head_penalty = torch.stack(irm_penalties_env).mean()
-                total_loss = total_loss + lambda_weight * head_penalty
-                penalty_value = float(head_penalty.item())
-            lambda_logged = lambda_weight
+            if irm_cfg.get("enabled", True):
+                lambda_weight = lambda_at_step(
+                    step,
+                    target=float(irm_cfg.get("lambda_I", irm_cfg.get("lambda_target", 0.0))),
+                    schedule=irm_cfg.get("schedule", "none"),
+                    warmup_steps=int(irm_cfg.get("warmup_steps", 0)),
+                )
+                if irm_penalties_env:
+                    head_penalty = torch.stack(irm_penalties_env).mean()
+                    total_loss = total_loss + lambda_weight * head_penalty
+                    penalty_value = float(head_penalty.item())
+                lambda_logged = lambda_weight
 
-        if (is_hirm_head or is_hirm_hybrid) and risk_losses:
+        if is_hirm and risk_losses:
             risk_weight = cfg.model.get("risk_loss_weight", 1.0)
             risk_loss = torch.stack(risk_losses).mean()
             total_loss = total_loss + risk_weight * risk_loss
@@ -367,16 +411,16 @@ def main(cfg: DictConfig) -> None:
                 group_weights, env_losses, cfg.model.groupdro.step_size
             )
 
-        if objective in {"hirm_head", "hirm_hybrid", "irm"}:
+        if objective in {"hirm", "irm"}:
             metrics_to_log["train/lambda"] = lambda_logged
-        if (is_hirm_head or is_hirm_hybrid) and env_losses:
+        if is_hirm and env_losses:
             env_risk_vals = [float(loss.detach().item()) for loss in env_losses]
             metrics_to_log["train/ig"] = diag_metrics.invariant_gap(env_risk_vals)
             metrics_to_log["train/wg"] = diag_metrics.worst_group(env_risk_vals)
             metrics_to_log["train/msi"] = diag_metrics.mechanistic_sensitivity(msi_values)
             if risk_loss is not None:
                 metrics_to_log["train/risk_loss"] = float(risk_loss.item())
-            if is_hirm_hybrid and gate_snapshot is not None:
+            if irm_mode == "hybrid" and gate_snapshot is not None:
                 metrics_to_log["train/gate"] = gate_snapshot
 
         if step % log_interval == 0 or step == 1:

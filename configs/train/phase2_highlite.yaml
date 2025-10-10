@@ -1,9 +1,11 @@
 # @package _global_
 
 defaults:
-  - /data: synthetic
+  - /data: sim
   - /envs: daily
-  - /model: hirm_head
+  - /model: hirm
+  - /irm
+  - /diagnostics/isi
   - /eval: daily
   - /logging: default
   - _self_
@@ -15,10 +17,9 @@ train:
   seed: 0
   eval_interval: 1000
   checkpoint_topk: 3
-  max_trade_warning_factor: 1.0
-  envs: [low, med, high_slim]
-  env_weights: [0.45, 0.45, 0.10]
-  lambda_grid: [0.1, 1.0, 10.0, 100.0]
+  max_trade_warning_factor: 1.2
+  pretrain_steps: 20000
+  irm_ramp_steps: 20000
 
 loss:
   name: cvar
@@ -31,17 +32,15 @@ optimizer:
 
 scheduler:
   name: cosine
+  warmup_steps: 1000
 
 logging:
-  log_interval: 200
+  log_interval: 100
   eval_interval: 1000
 
 irm:
-  lambda_target: 0.01
+  enabled: true
+  lambda_I: 0.5
   schedule: linear
   warmup_steps: 20000
-
-hydra:
-  sweeper:
-    params:
-      irm.lambda_target: 0.01,0.1
+  mode: head

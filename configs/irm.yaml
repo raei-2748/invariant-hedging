@@ -1,0 +1,12 @@
+irm:
+  enabled: false
+  lambda_I: 0.0
+  schedule: none
+  warmup_steps: 0
+  mode: head
+  freeze:
+    policy: false
+    risk: false
+    alpha: false
+legacy:
+  hybrid_enabled: false
