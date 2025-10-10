@@ -30,8 +30,8 @@ phase2:
 	@echo "See experiments/phase2_plan.md for details."
 .PHONY: phase2_scorecard
 phase2_scorecard:
-	python scripts/make_scorecard.py --methods ERM,ERM_reg,IRM,HIRM_Head,HIRM_Head_HighLite,GroupDRO,V_REx --seeds 0..29 --split crisis --outdir runs/scorecard_export --read_only true --phase phase2 --commit_hash $$(git rev-parse --short HEAD)
-	python scripts/compute_diagnostics.py --methods ERM,ERM_reg,IRM,HIRM_Head,HIRM_Head_HighLite,GroupDRO,V_REx --seeds 0..29 --train_envs low,medium --val_envs high --test_envs crisis --out runs/scorecard_export/diagnostics_all.csv --phase phase2 --commit_hash $$(git rev-parse --short HEAD)
+        python scripts/make_scorecard.py --methods ERM,ERM_reg,IRM,HIRM,HIRM_HighLite,GroupDRO,V_REx --seeds 0..29 --split crisis --outdir runs/scorecard_export --read_only true --phase phase2 --commit_hash $$(git rev-parse --short HEAD)
+        python scripts/compute_diagnostics.py --methods ERM,ERM_reg,IRM,HIRM,HIRM_HighLite,GroupDRO,V_REx --seeds 0..29 --train_envs low,medium --val_envs high --test_envs crisis --out runs/scorecard_export/diagnostics_all.csv --phase phase2 --commit_hash $$(git rev-parse --short HEAD)
 	python scripts/plot_cvar_violin.py --diagnostics runs/scorecard_export/diagnostics_all.csv --out runs/scorecard_export/figs/fig_cvar_violin.png
 	python scripts/plot_ig_vs_cvar.py --diagnostics runs/scorecard_export/diagnostics_all.csv --out runs/scorecard_export/figs/fig_ig_vs_cvar.png
 	python scripts/plot_capital_frontier.py --scorecard runs/scorecard_export/scorecard.csv --out runs/scorecard_export/figs/fig_capital_frontier.png --notional 1.0

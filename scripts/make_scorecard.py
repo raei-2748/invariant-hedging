@@ -26,7 +26,7 @@ _METHOD_CANONICAL = {
     "erm": "ERM",
     "erm_reg": "ERM_reg",
     "irm": "IRM",
-    "hirm_head": "HIRM_Head",
+    "hirm_head": "HIRM",
     "hirm": "HIRM",
     "groupdro": "GroupDRO",
     "group_dro": "GroupDRO",
