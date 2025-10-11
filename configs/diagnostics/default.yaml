@@ -1,0 +1,22 @@
+diagnostics:
+  enabled: true
+  probe:
+    batch_size: 256
+    n_batches: 4
+    envs: []
+    seed: 1234
+    split_name: test
+    regime_tag: baseline
+    is_eval_split: true
+  isi:
+    weights:
+      C1: 0.3333
+      C2: 0.3333
+      C3: 0.3333
+    c1_max_dispersion: 1.0
+    c3_max_distance: 1.0
+  outputs:
+    dir: runs
+  units:
+    return: per_step
+    risk: cvar_surrogate
