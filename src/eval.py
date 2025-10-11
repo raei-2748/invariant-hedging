@@ -20,6 +20,7 @@ from .data.features import FeatureEngineer, FeatureScaler
 from .data.synthetic import EpisodeBatch
 from .diagnostics import external as diag_external
 from .diagnostics import isi as isi_metrics
+from .data.types import EpisodeBatch
 from .models.policy_mlp import PolicyMLP
 from .objectives import cvar as cvar_obj
 from .utils import logging as log_utils, stats
