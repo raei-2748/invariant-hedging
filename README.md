@@ -115,6 +115,16 @@ Every run (train or eval) writes to `runs/<timestamp>/` with the following struc
 
 If W&B credentials are available the same metrics are mirrored to the `invariant-hedging` project; offline mode is supported via `WANDB_MODE=offline`.
 
+### Reports
+
+Aggregate tables and publication-ready figures can be regenerated locally with:
+
+```bash
+make report
+```
+
+This command scans the latest per-seed CSV exports, renders the Phase-2 diagnostics (penalty sweeps, ablations, ISI decomposition, cross-regime heatmaps, and existing scorecard charts), and writes all artefacts to [`outputs/report_assets/`](outputs/report_assets/). The legacy `make phase2_scorecard` entry point now forwards to `make report` for backward compatibility.
+
 ## Testing
 
 Unit tests cover pricing Greeks, CVaR estimation, cost kernels and deterministic seeding. Run them with:

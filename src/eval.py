@@ -17,9 +17,7 @@ import torch
 from omegaconf import DictConfig, OmegaConf
 
 from .data.features import FeatureEngineer, FeatureScaler
-from .data.synthetic import EpisodeBatch
-from .diagnostics import external as diag_external
-from .diagnostics import isi as isi_metrics
+from .data.types import EpisodeBatch
 from .models.policy_mlp import PolicyMLP
 from .objectives import cvar as cvar_obj
 from .utils import logging as log_utils, stats
@@ -61,9 +59,9 @@ _METHOD_CANONICAL: Mapping[str, str] = {
     "erm_reg": "ERM_reg",
     "irm": "IRM",
     "hirm": "HIRM",
-    "hirm_head": "HIRM_Head",
-    "hirm_head_highlite": "HIRM_Head_HighLite",
-    "hirm_highlite": "HIRM_Head_HighLite",
+    "hirm_head": "HIRM",
+    "hirm_head_highlite": "HIRM_HighLite",
+    "hirm_highlite": "HIRM_HighLite",
     "groupdro": "GroupDRO",
     "group_dro": "GroupDRO",
     "vrex": "V_REx",
