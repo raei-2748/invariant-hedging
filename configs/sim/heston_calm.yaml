@@ -1,0 +1,12 @@
+base_model: "heston"
+s0: 100.0
+kappa: 1.5
+theta: 0.04
+xi: 0.3
+rho: -0.6
+v0: 0.04
+rate: 0.0
+div_yield: 0.0
+year_days: 252
+scheme: "QE"
+seed: 123

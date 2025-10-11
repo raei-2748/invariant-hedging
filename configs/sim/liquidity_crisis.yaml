@@ -1,0 +1,4 @@
+enabled: true
+base_spread_bps: 3.0
+alpha_var_link: 0.2
+impact_multiplier: 1.0
