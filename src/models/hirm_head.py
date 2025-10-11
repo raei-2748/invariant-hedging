@@ -1,11 +1,13 @@
-"""Risk-only IRM head used for HIRM-Head experiments."""
+"""Risk-only IRM head used for HIRM experiments."""
 from __future__ import annotations
+
+import warnings
 
 import torch
 from torch import nn
 
 
-class HIRMHead(nn.Module):
+class HIRM(nn.Module):
     """Risk estimator head equipped with an IRMv1 scaling parameter."""
 
     def __init__(self, base_repr: nn.Module, risk_head: nn.Module) -> None:
@@ -30,5 +32,18 @@ def irm_penalty(per_env_loss: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
     return torch.sum(grad ** 2)
 
 
-__all__ = ["HIRMHead", "irm_penalty"]
+class _HIRMHead(HIRM):
+    def __init__(self, *args, **kwargs):  # pragma: no cover - compatibility shim
+        warnings.warn(
+            "`HIRMHead` is deprecated; use `HIRM` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        super().__init__(*args, **kwargs)
+
+
+HIRMHead = _HIRMHead
+
+
+__all__ = ["HIRM", "HIRMHead", "irm_penalty"]
 

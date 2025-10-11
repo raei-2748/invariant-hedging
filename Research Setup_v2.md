@@ -223,6 +223,7 @@ Because IRM is sensitive to the regularization parameter λ, *we will experiment
 * Section 5 (Training Protocol): add “ERM-reg” config.
 * Section 6 (Evaluation): include pre-commit thresholds for CVaR, turnover, mean P&L.
 * Section 7 (Analysis): add coverage table and spread-sensitivity plot.
+* Reporting: `make report` rebuilds the Phase-2 scorecard figures and tables under `outputs/report_assets/` (deprecated `make phase2_scorecard`).
 * Turnover diagnostics: enable `HIRM_DEBUG_PROBE=1` to log structured probes.
 * Trade spike guard: `train.max_trade_warning_factor` logs max-trade metrics.
 * Baselines packaging: run `scripts/run_baseline.py` to refresh ERM baseline; outputs land in `outputs/_baseline_erm_base/ERM_base_crisis.csv`.
