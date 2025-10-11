@@ -19,12 +19,12 @@ regimes:
     enabled: false
 windows:
   hourly:
-    steps: ${episodes.hourly}
+    steps: ${...episodes.hourly}
 real_data_anchor:
   enabled: true
   file: data/spy_sample.csv
   slippage_bps: 5
-train_episodes: ${episodes.train}
-val_episodes: ${episodes.val}
-test_episodes: ${episodes.test}
-hourly_episodes: ${episodes.hourly}
+train_episodes: ${.episodes.train}
+val_episodes: ${.episodes.val}
+test_episodes: ${.episodes.test}
+hourly_episodes: ${.episodes.hourly}
