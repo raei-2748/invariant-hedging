@@ -1,0 +1,28 @@
+report:
+  seeds: 30
+  seed_dirs: ["runs/*"]
+  outputs_dir: "outputs/report_assets"
+  regimes_order: ["train_main", "crisis_2018", "crisis_2020", "crisis_2022", "crisis_2008"]
+  confidence_level: 0.95
+  include_gfc: true
+  metrics:
+    invariance: ["ISI", "C1_global_stability", "C2_mechanistic_stability", "C3_structural_stability", "IG"]
+    robustness: ["WG_risk", "VR_risk", "CVaR_95"]
+    efficiency: ["ER_mean_pnl", "TR_turnover"]
+  qq:
+    reference: "gaussian"
+    bins: 100
+  figures:
+    dpi_preview: 160
+    backend: "agg"
+  latex:
+    table_float: "t"
+    column_format: "lrrrrr"
+    booktabs: true
+  generate_3d: true
+  ire3d:
+    winsor_pct: [2.5, 97.5]
+    axis_I: "IG"
+    axis_R_source: "CVaR_95"
+    E_alpha_mode: "sd_equalize"
+    projections: ["top", "front", "side"]
