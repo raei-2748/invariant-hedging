@@ -1,6 +1,7 @@
 """Dual logging to Weights & Biases and local JSON/CSV mirrors."""
 from __future__ import annotations
 
+import csv
 import json
 import os
 import platform
@@ -83,6 +84,37 @@ class RunLogger:
             json.dump(metrics, f, indent=2)
         if self.wandb_run is not None:
             self.wandb_run.log({f"final/{k}": v for k, v in metrics.items()})
+
+    def log_diagnostics_row(self, row: Dict[str, object]) -> None:
+        fieldnames = [
+            "seed",
+            "method",
+            "env",
+            "window",
+            "CVaR95",
+            "mean_pnl",
+            "sortino",
+            "turnover",
+            "IG",
+            "WG",
+            "VR",
+            "ER",
+            "TR",
+            "C1",
+            "C2",
+            "C3",
+            "ISI",
+        ]
+        diagnostics_dir = self.base_dir / "diagnostics"
+        diagnostics_dir.mkdir(parents=True, exist_ok=True)
+        path = diagnostics_dir / "per_seed.csv"
+        exists = path.exists()
+        with path.open("a", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            if not exists:
+                writer.writeheader()
+            ordered = {key: row.get(key) for key in fieldnames}
+            writer.writerow(ordered)
 
     def save_artifact(self, path: Path, name: Optional[str] = None) -> None:
         target = self.artifacts_dir / (name or path.name)
