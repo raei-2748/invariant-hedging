@@ -5,7 +5,7 @@ following top-level groups. Key parameters you may want to override:
 
 - `data`: Selects the dataset generator and loader. `synthetic` spawns GBM/Heston regimes.
 - `envs`: Lists training/validation/test environments by name. Override to balance regimes.
-- `model`: Controls the policy architecture and objective (`erm`, `irm`, `hirm_head`, `vrex`).
+- `model`: Controls the policy architecture and objective (`erm`, `irm`, `hirm`, `vrex`).
 - `train`: Epoch-level hyperparameters such as `steps`, `batch_size`, `grad_clip`, and `seed`.
 - `irm`: Additional penalty settings (`lambda_target`, `schedule`, `warmup_steps`) when IRM-style
   penalties are active.

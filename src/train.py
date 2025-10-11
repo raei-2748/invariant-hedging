@@ -3,13 +3,12 @@ from __future__ import annotations
 
 import math
 import os
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional
 
 import hydra
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 from omegaconf import DictConfig, OmegaConf
 
 from .data.features import FeatureEngineer
@@ -21,8 +20,11 @@ from .models import (
     RiskHead,
     hirm_head_penalty,
 )
+from .diagnostics import metrics as diag_metrics
+from .models import PolicyMLP
 from .objectives import cvar as cvar_obj
 from .objectives import penalties
+from .objectives.hirm import hirm_loss
 from .utils import checkpoints, logging as log_utils, seed as seed_utils, stats
 from .utils.configs import build_envs, prepare_data_module, unwrap_experiment_config
 
@@ -65,11 +67,6 @@ def _init_policy(cfg: DictConfig, feature_dim: int, num_envs: int):
         adapter_hidden=cfg.model.adapter_hidden,
         max_position=cfg.model.max_position,
     )
-
-
-def _init_risk_head(cfg: DictConfig, representation_dim: int):
-    hidden = cfg.model.get("risk_hidden", cfg.model.adapter_hidden)
-    return RiskHead(representation_dim, hidden)
 
 
 def _evaluate(
@@ -135,10 +132,9 @@ def _label_smoothing(pnl: torch.Tensor, smoothing: float) -> torch.Tensor:
 
 def _setup_optimizer(policy: torch.nn.Module, cfg: DictConfig, extra_params=None) -> torch.optim.Optimizer:
     name = cfg.optimizer.name.lower()
-    params = list(policy.parameters())
+    params = [p for p in policy.parameters() if p.requires_grad]
     if extra_params is not None:
-        for param in extra_params:
-            params.append(param)
+        params.extend(param for param in extra_params if param.requires_grad)
     lr = cfg.optimizer.lr
     weight_decay = cfg.optimizer.weight_decay
     if cfg.model.name == "erm_reg":
@@ -161,10 +157,70 @@ def _setup_scheduler(optimizer: torch.optim.Optimizer, cfg: DictConfig):
     raise ValueError(f"Unsupported scheduler: {cfg.scheduler.name}")
 
 
+def _canonical_objective(cfg: DictConfig) -> str:
+    raw_obj = cfg.model.get("objective", cfg.model.get("name", "erm"))
+    objective = str(raw_obj).lower()
+    if objective == "hirm_hybrid":
+        raise RuntimeError("The hybrid HIRM objective has been removed; use 'hirm'.")
+    if objective == "hirm_head":
+        warnings.warn(
+            "Objective 'hirm_head' is deprecated; please switch to 'hirm'.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        objective = "hirm"
+    return objective
+
+
+def _enforce_legacy_flags(cfg: DictConfig) -> None:
+    legacy_cfg = cfg.get("legacy")
+    if legacy_cfg is not None and bool(getattr(legacy_cfg, "hybrid_enabled", False)):
+        raise RuntimeError("Legacy hybrid support has been removed; disable legacy.hybrid_enabled.")
+
+
+def _maybe_patch_method_env() -> None:
+    method_env = os.environ.get("METHOD")
+    if method_env and method_env.lower() == "hirm_head":
+        warnings.warn(
+            "METHOD=hirm_head is deprecated; redirecting to METHOD=hirm.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        os.environ["METHOD"] = "hirm"
+
+
+def _freeze_policy_components(policy: PolicyMLP, cfg: DictConfig) -> None:
+    irm_cfg = cfg.get("irm")
+    freeze_cfg = None if irm_cfg is None else irm_cfg.get("freeze")
+    if not freeze_cfg:
+        return
+
+    def _flag(name: str) -> bool:
+        if freeze_cfg is None:
+            return False
+        if isinstance(freeze_cfg, dict):
+            return bool(freeze_cfg.get(name, False))
+        return bool(getattr(freeze_cfg, name, False))
+
+    def _freeze(module: torch.nn.Module, enabled: bool) -> None:
+        if not enabled or module is None:
+            return
+        for param in module.parameters():
+            param.requires_grad_(False)
+
+    _freeze(policy.backbone, _flag("backbone"))
+    _freeze(policy.representation, _flag("representation"))
+    if _flag("adapters"):
+        for adapter in policy.env_adapters:
+            _freeze(adapter, True)
+
+
 @hydra.main(config_path="../configs", config_name="experiment", version_base=None)
 def main(cfg: DictConfig) -> None:
     cfg = unwrap_experiment_config(cfg)
     resolved_cfg = OmegaConf.to_container(cfg, resolve=True)
+    _maybe_patch_method_env()
+    _enforce_legacy_flags(cfg)
     device = _device(cfg.get("runtime", {}))
     generator = seed_utils.seed_everything(cfg.train.seed)
     data_ctx = prepare_data_module(cfg)
@@ -178,39 +234,16 @@ def main(cfg: DictConfig) -> None:
     val_envs = build_envs(val_batches, feature_engineer, data_ctx.name_to_index)
     test_envs = build_envs(test_batches, feature_engineer, data_ctx.name_to_index)
 
-    objective = cfg.model.get("objective", cfg.model.get("name", "erm"))
+    objective = _canonical_objective(cfg)
     policy = _init_policy(
         cfg,
         feature_dim=len(feature_engineer.feature_names),
         num_envs=len(data_ctx.env_order),
     )
     policy.to(device)
+    _freeze_policy_components(policy, cfg)
 
-    is_hirm_head = objective == "hirm_head"
-    is_hirm_hybrid = objective == "hirm_hybrid"
-    risk_model = None
-    if is_hirm_head:
-        head_module = _init_risk_head(cfg, cfg.model.representation_dim)
-        risk_model = HIRMHead(nn.Identity(), head_module)
-    elif is_hirm_hybrid:
-        inv_head = _init_risk_head(cfg, cfg.model.representation_dim)
-        adapt_head = _init_risk_head(cfg, cfg.model.representation_dim)
-        hybrid_cfg = cfg.get("hybrid", {})
-        risk_model = HIRMHybrid(
-            nn.Identity(),
-            inv_head,
-            adapt_head,
-            alpha_init=hybrid_cfg.get("init_alpha", cfg.model.get("alpha_init", 0.0)),
-            freeze_alpha=hybrid_cfg.get("freeze_alpha", cfg.model.get("freeze_alpha", False)),
-        )
-    if risk_model is not None:
-        risk_model.to(device)
-
-    extra_params = None
-    if risk_model is not None:
-        extra_params = list(risk_model.parameters())
-
-    optimizer = _setup_optimizer(policy, cfg, extra_params=extra_params)
+    optimizer = _setup_optimizer(policy, cfg)
     scheduler = _setup_scheduler(optimizer, cfg)
     scaler = torch.cuda.amp.GradScaler(enabled=(device.type == "cuda" and cfg.runtime.get("mixed_precision", True)))
 
@@ -229,28 +262,25 @@ def main(cfg: DictConfig) -> None:
     max_position = float(cfg.model.max_position)
     max_trade_warn = warning_factor * max_position if warning_factor > 0 else 0.0
     spike_alerted_envs: set[str] = set()
+    is_hirm = objective == "hirm"
 
     for step in range(1, cfg.train.steps + 1):
         optimizer.zero_grad()
         env_losses: List[torch.Tensor] = []
         metrics_to_log = {}
         dummy = torch.tensor(1.0, requires_grad=(objective == "irm"), device=device)
-        risk_losses: List[torch.Tensor] = []
-        irm_penalties_env: List[torch.Tensor] = []
-        msi_values: List[float] = []
-        gate_snapshot: Optional[float] = None
+        head_grads: List[List[torch.Tensor]] = []
 
         for env_idx, env_name in enumerate(cfg.envs.train):
             env = train_envs[env_name]
             indices = env.sample_indices(per_env_batch, generator)
-            collect_rep = is_hirm_head or is_hirm_hybrid
             rep_scale = dummy if objective == "irm" else None
             sim = env.simulate(
                 policy,
                 indices,
                 device,
                 representation_scale=rep_scale,
-                collect_representation=collect_rep,
+                collect_representation=False,
             )
             if sim.probe:
                 run_logger.log_probe(env_name, step, sim.probe)
@@ -277,46 +307,24 @@ def main(cfg: DictConfig) -> None:
                 )
                 spike_alerted_envs.add(env_name)
 
-            if collect_rep:
-                if sim.representations is None:
-                    raise RuntimeError("Representations were not collected for HIRM objective.")
-                rep_summary = sim.representations.mean(dim=1)
-                rep_detached = rep_summary.detach()
-                rep_for_msi = rep_detached.clone().requires_grad_(True)
-                target = (-pnl).detach()
-
-                if risk_model is None:
-                    diag_pred = None
-                    mse_loss = torch.tensor(0.0, device=device)
-                elif is_hirm_head:
-                    risk_pred = risk_model(rep_detached)
-                    mse_loss = F.mse_loss(risk_pred.squeeze(-1), target)
-                    risk_losses.append(mse_loss)
-                    scaled_pred = (risk_pred * risk_model.w)
-                    inv_loss = F.mse_loss(scaled_pred.squeeze(-1), target)
-                    irm_penalties_env.append(hirm_head_penalty(inv_loss, risk_model.w))
-                    diag_pred = risk_model(rep_for_msi)
-                else:  # hirm_hybrid
-                    r_hat, r_inv, _, gate_val = risk_model(rep_detached)
-                    mse_loss = F.mse_loss(r_hat.squeeze(-1), target)
-                    risk_losses.append(mse_loss)
-                    inv_scaled = r_inv * risk_model.w_inv
-                    inv_loss = F.mse_loss(inv_scaled.squeeze(-1), target)
-                    irm_penalties_env.append(hirm_head_penalty(inv_loss, risk_model.w_inv))
-                    diag_outputs = risk_model(rep_for_msi)
-                    diag_pred = diag_outputs[0]
-                    gate_snapshot = float(gate_val.item())
-
-                if diag_pred is not None:
-                    grad = torch.autograd.grad(
-                        diag_pred.mean(),
-                        rep_for_msi,
-                        retain_graph=False,
+            if is_hirm:
+                adapter = policy.env_adapters[env.env_index]
+                params = [p for p in adapter.parameters() if p.requires_grad]
+                if params:
+                    grads_raw = torch.autograd.grad(
+                        loss,
+                        params,
+                        retain_graph=True,
+                        create_graph=True,
                         allow_unused=True,
-                    )[0]
-                    if grad is not None:
-                        msi_values.append(float(grad.abs().mean().item()))
-                metrics_to_log[f"train/{env_name}_risk_mse"] = float(mse_loss.item())
+                    )
+                    grads = [
+                        g if g is not None else torch.zeros_like(param)
+                        for g, param in zip(grads_raw, params)
+                    ]
+                else:
+                    grads = [loss.new_zeros(1)]
+                head_grads.append(grads)
 
         loss_tensor = torch.stack(env_losses)
         if objective == "groupdro":
@@ -326,6 +334,7 @@ def main(cfg: DictConfig) -> None:
 
         penalty_value = 0.0
         lambda_logged = 0.0
+        hirm_diag_metrics: Optional[Dict[str, torch.Tensor]] = None
         if objective == "irm":
             lambda_weight = _lambda_schedule(step, cfg)
             irm_pen = penalties.irm_penalty(env_losses, dummy)
@@ -337,7 +346,7 @@ def main(cfg: DictConfig) -> None:
             weight = cfg.model.vrex.penalty_weight
             total_loss = total_loss + weight * vrex_pen
             penalty_value = float(vrex_pen.item())
-        elif objective in {"hirm_head", "hirm_hybrid"}:
+        elif objective == "hirm":
             irm_cfg = cfg.get("irm", {})
             lambda_weight = lambda_at_step(
                 step,
@@ -345,18 +354,18 @@ def main(cfg: DictConfig) -> None:
                 schedule=irm_cfg.get("schedule", "none"),
                 warmup_steps=int(irm_cfg.get("warmup_steps", 0)),
             )
-            if irm_penalties_env:
-                head_penalty = torch.stack(irm_penalties_env).mean()
-                total_loss = total_loss + lambda_weight * head_penalty
-                penalty_value = float(head_penalty.item())
+            alignment_weight = float(irm_cfg.get("alignment_weight", 1.0))
+            variance_weight = float(irm_cfg.get("variance_weight", 0.0))
+            total_loss, hirm_diag = hirm_loss(
+                env_losses,
+                head_grads,
+                lambda_weight=lambda_weight,
+                alignment_weight=alignment_weight,
+                variance_weight=variance_weight,
+            )
+            penalty_value = float(hirm_diag["penalty"].item())
             lambda_logged = lambda_weight
-
-        if (is_hirm_head or is_hirm_hybrid) and risk_losses:
-            risk_weight = cfg.model.get("risk_loss_weight", 1.0)
-            risk_loss = torch.stack(risk_losses).mean()
-            total_loss = total_loss + risk_weight * risk_loss
-        else:
-            risk_loss = None
+            hirm_diag_metrics = hirm_diag
 
         scaler.scale(total_loss).backward()
         torch.nn.utils.clip_grad_norm_(policy.parameters(), cfg.train.grad_clip)
@@ -365,14 +374,14 @@ def main(cfg: DictConfig) -> None:
         if scheduler is not None:
             scheduler.step()
 
-        if cfg.model.objective == "groupdro":
+        if objective == "groupdro":
             group_weights = penalties.update_groupdro_weights(
                 group_weights, env_losses, cfg.model.groupdro.step_size
             )
 
-        if objective in {"hirm_head", "hirm_hybrid", "irm"}:
+        if objective in {"irm", "hirm"}:
             metrics_to_log["train/lambda"] = lambda_logged
-        if (is_hirm_head or is_hirm_hybrid) and env_losses:
+        if objective == "hirm" and env_losses:
             env_risk_vals = [float(loss.detach().item()) for loss in env_losses]
             ig_val = diag_external.compute_ig(env_risk_vals) or 0.0
             metrics_to_log["train/ig"] = ig_val
@@ -381,6 +390,14 @@ def main(cfg: DictConfig) -> None:
                 metrics_to_log["train/risk_loss"] = float(risk_loss.item())
             if is_hirm_hybrid and gate_snapshot is not None:
                 metrics_to_log["train/gate"] = gate_snapshot
+            metrics_to_log["train/ig"] = diag_metrics.invariant_gap(env_risk_vals)
+            metrics_to_log["train/wg"] = diag_metrics.worst_group(env_risk_vals)
+            if hirm_diag_metrics is not None:
+                metrics_to_log["train/hirm_alignment"] = float(hirm_diag_metrics["alignment"].item())
+                metrics_to_log["train/hirm_variance"] = float(hirm_diag_metrics["variance"].item())
+                metrics_to_log["train/hirm_cosine"] = float(hirm_diag_metrics["cosine"].item())
+                metrics_to_log["train/hirm_variance_raw"] = float(hirm_diag_metrics["variance_raw"].item())
+                metrics_to_log["train/hirm_base"] = float(hirm_diag_metrics["base"].item())
 
         if step % log_interval == 0 or step == 1:
             metrics_to_log["train/loss"] = float(total_loss.item())
@@ -389,8 +406,6 @@ def main(cfg: DictConfig) -> None:
             run_logger.log_metrics(metrics_to_log, step=step)
 
         if step % eval_interval == 0 or step == cfg.train.steps:
-            if risk_model is not None:
-                risk_model.eval()
             val_metrics = _evaluate(policy, val_envs, device, alpha)
             log_payload = {f"val/{k}_{m}": v for k, metrics in val_metrics.items() for m, v in metrics.items()}
             run_logger.log_metrics(log_payload, step=step)
@@ -406,22 +421,13 @@ def main(cfg: DictConfig) -> None:
                     "std": feature_engineer.scaler.std.cpu(),
                 },
             }
-            if risk_model is not None:
-                ckpt_payload["risk_model"] = risk_model.state_dict()
             ckpt_manager.save(
                 step,
                 score,
                 ckpt_payload,
             )
-            if risk_model is not None:
-                risk_model.train()
-
-    if risk_model is not None:
-        risk_model.eval()
     test_metrics = _evaluate(policy, test_envs, device, alpha)
     run_logger.log_final({f"test/{k}_{m}": v for k, metrics in test_metrics.items() for m, v in metrics.items()})
-    if risk_model is not None:
-        risk_model.train()
     run_logger.close()
 
 
