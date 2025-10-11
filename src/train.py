@@ -4,7 +4,7 @@ from __future__ import annotations
 import math
 import os
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 import hydra
 import torch
@@ -25,6 +25,9 @@ from .objectives import cvar as cvar_obj
 from .objectives import penalties
 from .utils import checkpoints, logging as log_utils, seed as seed_utils, stats
 from .utils.configs import build_envs, prepare_data_module, unwrap_experiment_config
+
+if TYPE_CHECKING:  # pragma: no cover - import for type hints only
+    from .envs.single_asset import SingleAssetHedgingEnv
 
 
 

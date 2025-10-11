@@ -239,7 +239,6 @@ def _evaluate_env(
 
 def _plot_qq(record: Dict, output_path: Path) -> None:
     pnl = record["pnl"].numpy()
-    ref = torch.from_numpy(pnl).mean().item()
     quantiles = torch.linspace(0, 1, len(pnl))
     sorted_pnl = torch.sort(torch.from_numpy(pnl))[0]
     normal = torch.distributions.Normal(sorted_pnl.mean(), sorted_pnl.std(unbiased=False))
@@ -746,6 +745,7 @@ def main(cfg: DictConfig) -> None:
     }
 
     primary_alpha = float(cfg.eval.report.alpha)
+    primary_key = _es_key(primary_alpha)
     alpha_candidates = []
     cfg_alphas = cfg.eval.get("es_alpha_list") if cfg.eval else None
     if cfg_alphas is not None:
