@@ -35,6 +35,12 @@ logging:
   eval_interval: 1000
 
 irm:
-  lambda_target: 1.0
-  schedule: linear
-  warmup_steps: 20000
+  enabled: true
+  type: cosine
+  lambda: 1.0
+  normalize: l2
+  eps: 1.0e-12
+  env_min: 2
+  freeze_backbone: true
+  logging:
+    log_irm_grads: true

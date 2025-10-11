@@ -5,7 +5,7 @@ import math
 import os
 import warnings
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import hydra
 import torch
@@ -16,7 +16,9 @@ from .diagnostics import metrics as diag_metrics
 from .models import PolicyMLP
 from .objectives import cvar as cvar_obj
 from .objectives import penalties
-from .objectives.hirm import hirm_loss
+from .irm.configs import IRMConfig
+from .irm.head_grads import compute_env_head_grads, freeze_backbone
+from .irm.penalties import cosine_alignment_penalty, varnorm_penalty
 from .utils import checkpoints, logging as log_utils, seed as seed_utils, stats
 from .utils.configs import build_envs, prepare_data_module, unwrap_experiment_config
 
@@ -232,6 +234,11 @@ def main(cfg: DictConfig) -> None:
     policy.to(device)
     _freeze_policy_components(policy, cfg)
 
+    irm_settings = IRMConfig.from_config(cfg.get("irm"))
+
+    if objective == "hirm" and irm_settings.enabled and irm_settings.freeze_backbone:
+        freeze_backbone(policy)
+
     optimizer = _setup_optimizer(policy, cfg)
     scheduler = _setup_scheduler(optimizer, cfg)
     scaler = torch.cuda.amp.GradScaler(enabled=(device.type == "cuda" and cfg.runtime.get("mixed_precision", True)))
@@ -251,14 +258,12 @@ def main(cfg: DictConfig) -> None:
     max_position = float(cfg.model.max_position)
     max_trade_warn = warning_factor * max_position if warning_factor > 0 else 0.0
     spike_alerted_envs: set[str] = set()
-    is_hirm = objective == "hirm"
-
     for step in range(1, cfg.train.steps + 1):
         optimizer.zero_grad()
         env_losses: List[torch.Tensor] = []
         metrics_to_log = {}
         dummy = torch.tensor(1.0, requires_grad=(objective == "irm"), device=device)
-        head_grads: List[List[torch.Tensor]] = []
+        irm_batches: List[dict] = []
 
         for env_idx, env_name in enumerate(cfg.envs.train):
             env = train_envs[env_name]
@@ -296,24 +301,8 @@ def main(cfg: DictConfig) -> None:
                 )
                 spike_alerted_envs.add(env_name)
 
-            if is_hirm:
-                adapter = policy.env_adapters[env.env_index]
-                params = [p for p in adapter.parameters() if p.requires_grad]
-                if params:
-                    grads_raw = torch.autograd.grad(
-                        loss,
-                        params,
-                        retain_graph=True,
-                        create_graph=True,
-                        allow_unused=True,
-                    )
-                    grads = [
-                        g if g is not None else torch.zeros_like(param)
-                        for g, param in zip(grads_raw, params)
-                    ]
-                else:
-                    grads = [loss.new_zeros(1)]
-                head_grads.append(grads)
+            if objective == "hirm" and irm_settings.enabled:
+                irm_batches.append({"loss": loss, "name": env_name})
 
         loss_tensor = torch.stack(env_losses)
         if objective == "groupdro":
@@ -323,7 +312,6 @@ def main(cfg: DictConfig) -> None:
 
         penalty_value = 0.0
         lambda_logged = 0.0
-        hirm_diag_metrics: Optional[Dict[str, torch.Tensor]] = None
         if objective == "irm":
             lambda_weight = _lambda_schedule(step, cfg)
             irm_pen = penalties.irm_penalty(env_losses, dummy)
@@ -336,25 +324,59 @@ def main(cfg: DictConfig) -> None:
             total_loss = total_loss + weight * vrex_pen
             penalty_value = float(vrex_pen.item())
         elif objective == "hirm":
-            irm_cfg = cfg.get("irm", {})
-            lambda_weight = lambda_at_step(
-                step,
-                target=float(irm_cfg.get("lambda_target", 0.0)),
-                schedule=irm_cfg.get("schedule", "none"),
-                warmup_steps=int(irm_cfg.get("warmup_steps", 0)),
+            lambda_logged = float(irm_settings.lambda_weight if irm_settings.enabled else 0.0)
+            irm_pen = loss_tensor.new_zeros(())
+            grad_list: List[torch.Tensor] = []
+            compute_penalty = (
+                irm_settings.enabled
+                and len(irm_batches) >= irm_settings.env_min
+                and (
+                    irm_settings.lambda_weight > 0.0
+                    or irm_settings.logging.log_irm_grads
+                )
             )
-            alignment_weight = float(irm_cfg.get("alignment_weight", 1.0))
-            variance_weight = float(irm_cfg.get("variance_weight", 0.0))
-            total_loss, hirm_diag = hirm_loss(
-                env_losses,
-                head_grads,
-                lambda_weight=lambda_weight,
-                alignment_weight=alignment_weight,
-                variance_weight=variance_weight,
-            )
-            penalty_value = float(hirm_diag["penalty"].item())
-            lambda_logged = lambda_weight
-            hirm_diag_metrics = hirm_diag
+            if compute_penalty:
+                grad_list = compute_env_head_grads(
+                    policy,
+                    lambda _model, payload: payload["loss"],
+                    irm_batches,
+                    create_graph=True,
+                )
+                if irm_settings.type == "cosine":
+                    irm_pen = cosine_alignment_penalty(grad_list, eps=irm_settings.eps)
+                else:
+                    irm_pen = varnorm_penalty(grad_list, eps=irm_settings.eps)
+                total_loss = total_loss + irm_settings.lambda_weight * irm_pen
+                penalty_value = float(irm_pen.detach().item())
+                metrics_to_log["train/irm_penalty"] = penalty_value
+                metrics_to_log["train/irm_penalty_weighted"] = float(
+                    (irm_settings.lambda_weight * irm_pen).detach().item()
+                )
+            if not compute_penalty:
+                metrics_to_log.setdefault("train/irm_penalty", 0.0)
+                metrics_to_log.setdefault("train/irm_penalty_weighted", 0.0)
+            if irm_settings.logging.log_irm_grads and grad_list:
+                norms = [g.norm().detach() for g in grad_list]
+                if norms:
+                    stacked_norms = torch.stack(norms)
+                    metrics_to_log["train/irm_grad_norm_min"] = float(stacked_norms.min().item())
+                    metrics_to_log["train/irm_grad_norm_mean"] = float(stacked_norms.mean().item())
+                    metrics_to_log["train/irm_grad_norm_max"] = float(stacked_norms.max().item())
+                if len(grad_list) >= 2:
+                    normalised = []
+                    for grad in grad_list:
+                        norm = grad.norm()
+                        if norm <= irm_settings.eps:
+                            normalised.append(torch.zeros_like(grad))
+                        else:
+                            normalised.append(grad / norm.clamp_min(irm_settings.eps))
+                    stacked = torch.stack(normalised)
+                    cos_matrix = stacked @ stacked.T
+                    idx = torch.triu_indices(cos_matrix.shape[0], cos_matrix.shape[1], offset=1)
+                    pairwise_cos = cos_matrix[idx[0], idx[1]].detach()
+                    metrics_to_log["train/irm_grad_cosine_mean"] = float(pairwise_cos.mean().item())
+                    metrics_to_log["train/irm_grad_cosine_min"] = float(pairwise_cos.min().item())
+                    metrics_to_log["train/irm_grad_cosine_max"] = float(pairwise_cos.max().item())
 
         scaler.scale(total_loss).backward()
         torch.nn.utils.clip_grad_norm_(policy.parameters(), cfg.train.grad_clip)
@@ -374,12 +396,6 @@ def main(cfg: DictConfig) -> None:
             env_risk_vals = [float(loss.detach().item()) for loss in env_losses]
             metrics_to_log["train/ig"] = diag_metrics.invariant_gap(env_risk_vals)
             metrics_to_log["train/wg"] = diag_metrics.worst_group(env_risk_vals)
-            if hirm_diag_metrics is not None:
-                metrics_to_log["train/hirm_alignment"] = float(hirm_diag_metrics["alignment"].item())
-                metrics_to_log["train/hirm_variance"] = float(hirm_diag_metrics["variance"].item())
-                metrics_to_log["train/hirm_cosine"] = float(hirm_diag_metrics["cosine"].item())
-                metrics_to_log["train/hirm_variance_raw"] = float(hirm_diag_metrics["variance_raw"].item())
-                metrics_to_log["train/hirm_base"] = float(hirm_diag_metrics["base"].item())
 
         if step % log_interval == 0 or step == 1:
             metrics_to_log["train/loss"] = float(total_loss.item())

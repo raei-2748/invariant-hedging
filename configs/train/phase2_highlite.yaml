@@ -37,11 +37,17 @@ logging:
   eval_interval: 1000
 
 irm:
-  lambda_target: 0.01
-  schedule: linear
-  warmup_steps: 20000
+  enabled: true
+  type: cosine
+  lambda: 0.01
+  normalize: l2
+  eps: 1.0e-12
+  env_min: 2
+  freeze_backbone: true
+  logging:
+    log_irm_grads: true
 
 hydra:
   sweeper:
     params:
-      irm.lambda_target: 0.01,0.1
+      irm.lambda: 0.01,0.1

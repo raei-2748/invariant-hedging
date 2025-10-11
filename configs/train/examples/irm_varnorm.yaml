@@ -1,0 +1,15 @@
+# @package _global_
+
+defaults:
+  - override /train: phase2
+
+irm:
+  enabled: true
+  type: varnorm
+  lambda: 0.05
+  normalize: l2
+  eps: 1.0e-12
+  env_min: 2
+  freeze_backbone: true
+  logging:
+    log_irm_grads: true
