@@ -1,0 +1,10 @@
+base_model: "sabr"
+beta: 1.0
+alpha: 0.2
+rho: -0.3
+nu: 0.3
+s0: 100.0
+rate: 0.0
+div_yield: 0.0
+year_days: 252
+seed: 321

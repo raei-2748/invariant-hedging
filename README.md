@@ -223,6 +223,46 @@ OMP_NUM_THREADS=1 MKL_THREADING_LAYER=SEQUENTIAL KMP_AFFINITY=disabled KMP_INIT_
 
 GitHub Actions executes the test suite together with a smoke train/eval pass on every push.
 
+## Simulation Regimes & Calibration (PR-02)
+
+PR-02 introduces YAML-driven calibration hooks so synthetic markets can flip between calm and crisis regimes without touching code. The configs live under `configs/sim`:
+
+- `heston_*.yaml` toggle the base diffusion (mean reversion, vol-of-vol, correlations) while pinning the random seed that flows into `SimRecipe`.
+- `merton_*.yaml` overlay Merton jump diffusion (λ, μ<sub>j</sub>, σ<sub>j</sub>) and can be omitted to disable jumps.
+- `liquidity_*.yaml` widen transaction costs through a variance-linked spread multiplier.
+- `sabr_*.yaml` capture lognormal SABR smiles for pricing sanity checks.
+
+Use `src.sim.calibrators.compose_sim_recipe` to merge a base diffusion with optional jump and liquidity overlays:
+
+```python
+from src.sim.calibrators import compose_sim_recipe
+
+calm_recipe = compose_sim_recipe(
+    "heston",
+    "configs/sim/heston_calm.yaml",
+    "configs/sim/merton_calm.yaml",
+    "configs/sim/liquidity_calm.yaml",
+    seed=None,
+)
+```
+
+Swapping the YAML paths selects the crisis regime (e.g. `heston_crisis.yaml`, `merton_crisis.yaml`, `liquidity_crisis.yaml`). The composed recipe exposes deterministic seeds, Heston/SABR parameters, optional jump overlays and liquidity spread helpers that downstream simulators consume.
+
+### Validation & Expected Behaviour
+
+Two pytest modules document calibration fidelity and the qualitative jump to crisis dynamics:
+
+- `tests/sim/test_calibration_moments.py` checks annualised moments, variance persistence and jump frequency for calm/crisis with and without Merton jumps. It also writes `runs/sim_tests/sim_manifest.json` with the observed stats for reproducibility.
+- `tests/sim/test_pricing_sanity.py` confirms European call prices and implied vols rise from calm to crisis and that SABR crisis parameters widen the smile.
+
+Run the CI-light suite with:
+
+```bash
+pytest -m "not heavy" tests/sim
+```
+
+The heavy 50k-path moment test is marked `@pytest.mark.heavy` for local benchmarking.
+
 ## Data
 
 The synthetic generator supports GBM and Heston dynamics with environment-specific transaction costs. A tiny SPY options slice (`data/spy_sample.csv`) is bundled as a deterministic real-data anchor that exercises the full feature pipeline.

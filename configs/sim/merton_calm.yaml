@@ -1,0 +1,4 @@
+enabled: true
+lambda_y: 0.2
+mu_j: -0.02
+sigma_j: 0.03
