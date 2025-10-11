@@ -133,6 +133,48 @@ Unit tests cover pricing Greeks, CVaR estimation, cost kernels and deterministic
 make tests
 ```
 
+## Diagnostics (PR-04): Invariance–Robustness–Efficiency
+
+The diagnostics stack exports per-seed scorecards that align with the paper’s
+I–R–E geometry. After evaluation each enabled run writes a tidy CSV and a JSON
+manifest under `runs/<timestamp>/` (or a custom directory configured via
+`diagnostics.outputs.dir`). CSV rows contain one entry per environment plus an
+`__overall__` aggregate with the following columns:
+
+| Column | Description |
+| --- | --- |
+| `seed, git_hash, exp_id` | Run provenance and experiment identifiers. |
+| `split_name, regime_tag, env_id, is_eval_split` | Split metadata and environment labels. |
+| `n_obs` | Number of observations used for the diagnostic probe. |
+| `C1_global_stability` | Normalised risk dispersion across environments (1 = stable). |
+| `C2_mechanistic_stability` | Cosine-alignment of head gradients across environments. |
+| `C3_structural_stability` | Representation similarity across environments. |
+| `ISI` | Weighted combination of C1/C2/C3 clipped to `[0, 1]`. |
+| `IG` | Invariance gap (dispersion of realised outcomes). |
+| `WG_risk`, `VR_risk` | Worst-group risk and variance across environments. |
+| `ER_mean_pnl`, `TR_turnover` | Efficiency metrics: mean PnL and turnover. |
+
+The manifest (`diagnostics_manifest.json`) records the seed, git hash,
+config hash, instrument, metric basis, ISI weights, units, and creation
+timestamp for reproducibility.
+
+### Running the diagnostics probe
+
+1. Enable diagnostics in the Hydra config (see `configs/diagnostics/default.yaml`):
+
+   ```yaml
+   defaults:
+     - diagnostics: default
+   ```
+
+2. Provide diagnostic batches (held-out from training) via
+   `diagnostics.probe`. Batches are dictionaries containing `risk`, `outcome`,
+   `positions`, and optionally `grad`/`representation` tensors per environment.
+
+3. Run evaluation. The export helper will assemble I–R–E metrics using the new
+   modules in `src/diagnostics/` and log the output CSV path via the existing
+   run logger.
+
 ## Smoke test
 
 The helper scripts export conservative Intel OpenMP settings so PyTorch runs even in sandboxes with no shared-memory segment. Kick off the short training loop with:

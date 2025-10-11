@@ -17,6 +17,7 @@ import torch
 from omegaconf import DictConfig, OmegaConf
 
 from .data.features import FeatureEngineer, FeatureScaler
+from .diagnostics.export import DiagnosticsRunContext, gather_and_export
 from .data.types import EpisodeBatch
 from .models.policy_mlp import PolicyMLP
 from .objectives import cvar as cvar_obj
@@ -923,6 +924,92 @@ def main(cfg: DictConfig) -> None:
         "method": method_name,
         "config_tag": config_tag,
     }
+
+    diagnostics_cfg = cfg.get("diagnostics")
+    if diagnostics_cfg and diagnostics_cfg.get("enabled", False):
+        diag_cfg_dict = OmegaConf.to_container(diagnostics_cfg, resolve=True)
+        probe_cfg = diag_cfg_dict.get("probe", {}) or {}
+        isi_cfg = diag_cfg_dict.get("isi", {}) or {}
+        outputs_cfg = diag_cfg_dict.get("outputs", {}) or {}
+        keys_cfg = diag_cfg_dict.get("keys", {}) or {}
+
+        base_run_dir = Path(run_logger.base_dir)
+        output_dir = Path(outputs_cfg.get("dir", base_run_dir))
+        if outputs_cfg.get("dir"):
+            output_dir = output_dir / base_run_dir.name
+
+        diagnostics_run_ctx = DiagnosticsRunContext(
+            output_dir=output_dir,
+            seed=seed_value,
+            git_hash=commit_hash,
+            exp_id=str(cfg.get("experiment", {}).get("name", "eval")),
+            split_name=str(probe_cfg.get("split_name", "test")),
+            regime_tag=str(probe_cfg.get("regime_tag", "diagnostic")),
+            is_eval_split=bool(probe_cfg.get("is_eval_split", True)),
+            config_hash=str(diag_cfg_dict.get("config_hash", commit_hash)),
+            instrument=str(diag_cfg_dict.get("instrument", cfg.get("instrument", "unknown"))),
+            metric_basis=str(diag_cfg_dict.get("metric_basis", cfg.eval.report.get("alpha", "unknown"))),
+            units=diag_cfg_dict.get("units"),
+        )
+
+        def _lookup(batch: Mapping[str, torch.Tensor], key: str) -> torch.Tensor:
+            if key not in batch:
+                raise KeyError(f"Diagnostic batch missing required key '{key}'")
+            value = batch[key]
+            if not isinstance(value, torch.Tensor):
+                raise TypeError(f"Diagnostic key '{key}' must be a tensor")
+            return value
+
+        risk_key = str(keys_cfg.get("risk", "risk"))
+        outcome_key = str(keys_cfg.get("outcome", "outcome"))
+        position_key = str(keys_cfg.get("positions", "positions"))
+        grad_key = keys_cfg.get("head_grad")
+        if grad_key is None:
+            grad_key = keys_cfg.get("grad")
+        repr_key = keys_cfg.get("representation")
+
+        def _risk_fn(_model: object, batch: Mapping[str, torch.Tensor]) -> torch.Tensor:
+            return _lookup(batch, risk_key)
+
+        def _outcome_fn(_model: object, batch: Mapping[str, torch.Tensor]) -> torch.Tensor:
+            return _lookup(batch, outcome_key)
+
+        def _position_fn(_model: object, batch: Mapping[str, torch.Tensor]) -> torch.Tensor:
+            return _lookup(batch, position_key)
+
+        head_grad_fn = None
+        if grad_key:
+            grad_key = str(grad_key)
+
+            def _head_grad_fn(_model: object, batch: Mapping[str, torch.Tensor]) -> torch.Tensor:
+                return _lookup(batch, grad_key)
+
+            head_grad_fn = _head_grad_fn
+
+        representation_fn = None
+        if repr_key:
+            repr_key = str(repr_key)
+
+            def _repr_fn(_model: object, batch: Mapping[str, torch.Tensor]) -> torch.Tensor:
+                return _lookup(batch, repr_key)
+
+            representation_fn = _repr_fn
+
+        try:
+            csv_path = gather_and_export(
+                diagnostics_run_ctx,
+                policy,
+                probe_cfg,
+                isi_cfg,
+                _risk_fn,
+                _outcome_fn,
+                _position_fn,
+                head_gradient_fn=head_grad_fn,
+                representation_fn=representation_fn,
+            )
+            run_logger.log_metrics({"diagnostics/csv_path": str(csv_path)})
+        except Exception as exc:  # pragma: no cover - defensive logging
+            LOGGER.warning("Diagnostics export failed: %s", exc)
 
     diagnostics_path = Path(run_logger.artifacts_dir) / "diagnostics.jsonl"
     existing_records: List[Dict] = []
