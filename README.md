@@ -46,13 +46,45 @@ Phase 2 expands the baseline to test **head-only IRM**, **V-REx**, and early dia
 
 ```bash
 # IRM-head sweep (λ in {1e-2, 1e-1, 1})
-python scripts/train.py config=train/phase2 irm.enabled=true irm.mode=head_only irm.lambda=0.1
+python scripts/train.py config=train/phase2 irm.enabled=true irm.type=cosine irm.lambda=0.1
 
 # V-REx sweep (β in {1, 5, 10})
 python scripts/train.py config=train/phase2 vrex.enabled=true vrex.beta=10.0
 ```
 
 Results are saved in `outputs/_phase2_snapshot/`.
+
+
+### HIRM penalties (head-only)
+
+Head-only invariance acts exclusively on the decision head parameters \(\psi\). For each
+training environment \(e\) we compute the risk gradient
+\(g_e = \nabla_{\psi} R_e\) and its normalised form
+\(\hat g_e = g_e / (\lVert g_e \rVert_2 + \varepsilon)\).
+
+- **Cosine alignment (HGCA).** Encourage alignment by averaging the pairwise
+  cosine gaps:
+  \[
+  \mathcal{L}_{\text{cos}} = \frac{2}{|\mathcal{E}|(|\mathcal{E}|-1)}
+  \sum_{e < e'} (1 - \hat g_e^{\top} \hat g_{e'}) .
+  \]
+- **Variance of normalised gradients (varnorm).** Measure dispersion of the
+  normalised gradients:
+  \[
+  \mathcal{L}_{\text{varnorm}} = \frac{1}{d} \sum_{j=1}^{d} 
+  \mathrm{Var}_e (\hat g_{e,j}).
+  \]
+
+The total loss becomes \(\mathcal{L}_{\text{base}} + \lambda \mathcal{L}_{\text{irm}}\),
+with \(\lambda \ge 0\). Hybrid penalties have been removed to keep the protocol
+faithful to the head-only formulation.
+
+Enable penalties via Hydra overrides, for example:
+
+```bash
+python scripts/train.py config=train/phase2 irm.enabled=true irm.type=cosine irm.lambda=0.1
+python scripts/train.py config=train/phase2 irm.enabled=true irm.type=varnorm irm.lambda=0.1
+```
 
 
 1. **Install dependencies**

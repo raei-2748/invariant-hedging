@@ -1,5 +1,5 @@
 name: hirm_head
-objective: hirm_head
+objective: hirm
 hidden_width: 192
 hidden_depth: 3
 dropout: 0.0
