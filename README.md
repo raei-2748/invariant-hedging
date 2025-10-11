@@ -117,13 +117,21 @@ If W&B credentials are available the same metrics are mirrored to the `invariant
 
 ### Reports
 
-Aggregate tables and publication-ready figures can be regenerated locally with:
+Publication-grade scorecards, heatmaps, QQ plots, seed distributions, efficiency frontiers, and the optional I–R–E 3D geometry can be generated with:
 
 ```bash
 make report
 ```
 
-This command scans the latest per-seed CSV exports, renders the Phase-2 diagnostics (penalty sweeps, ablations, ISI decomposition, cross-regime heatmaps, and existing scorecard charts), and writes all artefacts to [`outputs/report_assets/`](outputs/report_assets/). The legacy `make phase2_scorecard` entry point now forwards to `make report` for backward compatibility.
+The pipeline consumes the per-seed diagnostics under `runs/` and writes tables, vector figures, interactive assets, and a provenance manifest to [`outputs/report_assets/`](outputs/report_assets/).
+
+For lightweight CI smoke tests (≤5 seeds, 2D figures only) use:
+
+```bash
+make report-lite
+```
+
+Advanced usage is available through `scripts/aggregate.py --config configs/report/default.yaml`, which supports overrides such as `--out <dir>` and `--skip-3d` to disable interactive exports.
 
 ## Testing
 
