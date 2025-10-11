@@ -147,15 +147,16 @@ Every run (train or eval) writes to `runs/<timestamp>/` with the following struc
 
 If W&B credentials are available the same metrics are mirrored to the `invariant-hedging` project; offline mode is supported via `WANDB_MODE=offline`.
 
-### Reports
+### PR-05 Reporting
 
-Aggregate tables and publication-ready figures can be regenerated locally with:
+The reporting pipeline aggregates cross-seed diagnostics, emits publication-ready tables/figures, and captures provenance in [`outputs/report_assets/`](outputs/report_assets/). Use the convenience targets:
 
 ```bash
-make report
+make report          # full 30-seed aggregation with 3D I–R–E assets
+make report-lite     # ≤5 seeds, skips heavy plots for CI runs
 ```
 
-This command scans the latest per-seed CSV exports, renders the Phase-2 diagnostics (penalty sweeps, ablations, ISI decomposition, cross-regime heatmaps, and existing scorecard charts), and writes all artefacts to [`outputs/report_assets/`](outputs/report_assets/). The legacy `make phase2_scorecard` entry point now forwards to `make report` for backward compatibility.
+Both targets resolve [`configs/report/default.yaml`](configs/report/default.yaml). Adjust metric blocks, QQ options, and the 3D toggle there. Set `generate_3d: false` or pass `--skip-3d` via `scripts/aggregate.py` to disable the I–R–E projection entirely. Outputs include LaTeX tables, CSV mirrors, heatmaps, QQ plots, seed distributions, efficiency frontiers, and (optionally) interactive + static I–R–E visualisations.
 
 ## Testing
 
