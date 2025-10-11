@@ -7,7 +7,7 @@ from typing import Iterable, List
 import torch
 
 from ..markets import pricing
-from .synthetic import EpisodeBatch
+from .types import EpisodeBatch
 
 
 @dataclass
