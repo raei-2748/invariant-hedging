@@ -1,0 +1,6 @@
+name: spy_test_2018
+instrument: SPY
+start_date: "2018-02-01"
+end_date: "2018-02-28"
+regime_tag: crisis_2018
+notes: "Paper: 2018 crisis test."

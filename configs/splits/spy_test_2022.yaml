@@ -1,0 +1,6 @@
+name: spy_test_2022
+instrument: SPY
+start_date: "2022-06-01"
+end_date: "2022-10-31"
+regime_tag: crisis_2022
+notes: "Paper: inflation/tightening test."

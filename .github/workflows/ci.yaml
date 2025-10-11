@@ -42,5 +42,19 @@ jobs:
             python scripts/export_tables.py --scorecard runs/scorecard_export_small/scorecard.csv --out_md runs/scorecard_export_small/table_crisis.md --out_tex runs/scorecard_export_small/table_crisis.tex || echo "Table export failed, continuing..."
             echo "Phase-2 scorecard smoke test completed with available artifacts"
           else
-            echo "Scorecard not generated; skipping dependent steps"
+          echo "Scorecard not generated; skipping dependent steps"
           fi
+  spy-data-loader:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run SPY loader unit and CLI smoke tests
+        run: pytest tests/test_spy_loader.py
