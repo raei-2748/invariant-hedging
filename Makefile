@@ -2,7 +2,7 @@ SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 PYTHON ?= python3
 CONFIG ?= configs/experiment.yaml
-.PHONY: setup train evaluate reproduce lint tests smoke phase2 report phase2_scorecard
+.PHONY: setup train evaluate reproduce lint tests smoke phase2 report report-lite phase2_scorecard
 setup:
 	$(PYTHON) -m pip install -r requirements.txt
 train:
@@ -29,12 +29,14 @@ smoke:
 phase2:
 	@echo "See experiments/phase2_plan.md for details."
 .PHONY: report
+.PHONY: report-lite
 report:
-	$(PYTHON) -m report.figures
-	$(PYTHON) -m report.tables
+	$(PYTHON) scripts/aggregate.py --config configs/report/default.yaml
+
+report-lite:
+	$(PYTHON) scripts/aggregate.py --config configs/report/default.yaml --lite
 
 .PHONY: phase2_scorecard
 phase2_scorecard:
 	@echo "[DEPRECATED] 'make phase2_scorecard' now forwards to 'make report'." >&2
-	$(PYTHON) -m report.figures
-	$(PYTHON) -m report.tables
+	$(PYTHON) scripts/aggregate.py --config configs/report/default.yaml
