@@ -29,9 +29,12 @@ def _summarise(recipe: SimRecipe, result, steps: int) -> SampleMoments:
     params = recipe.heston
     assert params is not None
     log_returns = result.log_returns.reshape(-1)
+    # Work with realised simple returns so jump compensation does not bias the
+    # drift check; the multiplicative jump component makes the log + 0.5·var
+    # approximation noisier than the exact ratio of spot levels.
+    simple_returns = (result.spots[:, 1:] / result.spots[:, :-1] - 1.0).reshape(-1)
     dt = 1.0 / params.year_days
-    adjusted_returns = log_returns + 0.5 * result.variances[:, :-1].reshape(-1) * dt
-    ann_mean = annualize_mean(adjusted_returns, params.year_days)
+    ann_mean = annualize_mean(simple_returns, params.year_days)
     ann_var = annualize_variance(log_returns, params.year_days)
     var_ac1 = aggregate_ac1(result.variances[:, :-1])
     horizon_years = steps * dt
