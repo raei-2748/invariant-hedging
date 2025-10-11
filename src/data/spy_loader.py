@@ -14,7 +14,7 @@ import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Iterable, Optional
 
@@ -214,7 +214,7 @@ def write_metadata(
     csv_path: Path,
 ) -> None:
     metadata = config.to_metadata()
-    timestamp = datetime.now(UTC).replace(microsecond=0)
+    timestamp = datetime.now(timezone.utc).replace(microsecond=0)
     metadata.update(
         {
             "row_count": int(row_count),
@@ -256,7 +256,7 @@ def run_loader(
                 "Writing parquet requires optional dependency pyarrow or fastparquet."
             ) from exc
 
-    run_stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
+    run_stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
     unique_suffix = os.urandom(3).hex()
     run_dir = runs_dir / f"{run_stamp}_{unique_suffix}"
     write_metadata(run_dir, config, len(enriched), csv_path)
