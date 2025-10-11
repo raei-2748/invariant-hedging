@@ -1,3 +1,14 @@
 # Backward-compatible alias for the canonical sim dataset.
 defaults:
   - sim
+
+name: synthetic
+episodes:
+  train: 2048
+  val: 512
+  test: 512
+  hourly: 256
+train_episodes: ${episodes.train}
+val_episodes: ${episodes.val}
+test_episodes: ${episodes.test}
+hourly_episodes: ${episodes.hourly}

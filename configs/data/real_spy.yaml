@@ -1,3 +1,18 @@
 # Backward-compatible alias for the canonical real dataset.
 defaults:
   - real
+
+name: real_spy
+windows:
+  train:
+    - name: legacy_train
+      start: 2019-01-02
+      end: 2020-06-30
+  val:
+    - name: legacy_val
+      start: 2020-07-01
+      end: 2020-09-30
+  test:
+    - name: legacy_test
+      start: 2020-10-01
+      end: 2020-12-31
