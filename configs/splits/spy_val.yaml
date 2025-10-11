@@ -1,0 +1,7 @@
+name: spy_val_2018q4
+instrument: SPY
+start_date: "2018-10-01"
+end_date: "2018-12-31"
+regime_tag: val_2018
+no_overlap_with_tests: true
+notes: "Paper: validate on 2018 volatility spike; exact dates are author-confirmed and editable here."

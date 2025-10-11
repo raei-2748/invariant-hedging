@@ -1,0 +1,6 @@
+name: spy_test_2020
+instrument: SPY
+start_date: "2020-02-15"
+end_date: "2020-04-15"
+regime_tag: crisis_2020
+notes: "Paper: COVID crash test."

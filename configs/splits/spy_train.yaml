@@ -1,0 +1,6 @@
+name: spy_train
+instrument: SPY
+start_date: "2017-01-03"
+end_date: "2019-12-31"
+regime_tag: train_main
+notes: "Paper: train on SPY low–medium volatility 2017–2019."

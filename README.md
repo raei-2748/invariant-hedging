@@ -227,6 +227,23 @@ GitHub Actions executes the test suite together with a smoke train/eval pass on 
 
 The synthetic generator supports GBM and Heston dynamics with environment-specific transaction costs. A tiny SPY options slice (`data/spy_sample.csv`) is bundled as a deterministic real-data anchor that exercises the full feature pipeline.
 
+### SPY real-data splits (paper-aligned)
+
+Paper experiments reference fixed SPY windows for training, validation, and crisis tests. The repository now encodes those ranges as versioned YAML under [`configs/splits/`](configs/splits/):
+
+- [`spy_train.yaml`](configs/splits/spy_train.yaml) — train on low/medium volatility from **2017-01-03 → 2019-12-31**.
+- [`spy_val.yaml`](configs/splits/spy_val.yaml) — validate on the **2018 volatility spike** (default `2018-10-01 → 2018-12-31`). The paper leaves the exact endpoints unspecified; this default is **paper-unspecified—settable via YAML** so authors can refine the window without code changes.
+- Crisis tests [`spy_test_2018.yaml`](configs/splits/spy_test_2018.yaml), [`spy_test_2020.yaml`](configs/splits/spy_test_2020.yaml), [`spy_test_2022.yaml`](configs/splits/spy_test_2022.yaml) capture Volmageddon, COVID, and inflation/tightening regimes, respectively.
+- [`spy_test_2008.yaml`](configs/splits/spy_test_2008.yaml) adds a held-out **GFC anchor** for extended stress testing.
+
+Generate a slice with:
+
+```bash
+python -m src.data.spy_loader --split configs/splits/spy_train.yaml --out_parquet outputs/slices/spy_train.parquet --runs_dir runs/spy_train
+```
+
+Each invocation prints the covered date span, writes an optional Parquet file, and records provenance (split YAML, git hash, Python/platform fingerprint) under `runs/<timestamp>/metadata.json`. Because the splits live in YAML, downstream papers should update and version-control any boundary tweaks alongside their experiment logs.
+
 Episode configuration, cost files and model settings live under `configs/`. Adjust these as needed for experiments or sweeps. The default training protocol performs 20k ERM pre-training steps, a 10k IRM ramp, and continues until 150k total updates with environment-balanced batching.
 
 ## Reproducibility

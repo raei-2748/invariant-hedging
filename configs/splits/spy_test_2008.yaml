@@ -1,0 +1,7 @@
+name: spy_test_2008
+instrument: SPY
+start_date: "2008-09-01"
+end_date: "2009-03-31"
+regime_tag: crisis_2008
+include_gfc: true
+notes: "Paper: optional GFC anchor—now included by author request."
