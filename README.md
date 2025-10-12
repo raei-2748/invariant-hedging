@@ -104,7 +104,8 @@ python scripts/train.py config=train/phase2 irm.enabled=true irm.type=varnorm ir
    ```bash
    scripts/make_reproduce.sh
    ```
-   Each run mirrors metrics locally under `runs/<timestamp>/` and, if W&B is available, logs to the `invariant-hedging` project.
+   Each run mirrors metrics locally under `runs/<timestamp>/`. Enable remote logging with `logger.use_wandb=true` (defaults to
+   `false`) to stream metrics to the `invariant-hedging` project when credentials are available.
 
 ## Roadmap
 
@@ -145,7 +146,7 @@ Every run (train or eval) writes to `runs/<timestamp>/` with the following struc
 - `artifacts/`: crisis tables, QQ plots and any additional evaluation artefacts
 - `metadata.json`: git commit hash, platform fingerprint, Python and PyTorch versions
 
-If W&B credentials are available the same metrics are mirrored to the `invariant-hedging` project; offline mode is supported via `WANDB_MODE=offline`.
+Set `logger.use_wandb=false` (the default) to keep runs completely local while still writing identical `final_metrics.json`, `metadata.json`, and artefacts under `runs/<timestamp>/`. Use `logger.use_wandb=true` to stream to W&B alongside the local mirror.
 
 ### PR-05 Reporting
 

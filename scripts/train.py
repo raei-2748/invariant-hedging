@@ -21,7 +21,6 @@ def _prepare_env() -> None:
     for key, value in _THREAD_DEFAULTS.items():
         os.environ.setdefault(key, value)
     os.environ.setdefault("HIRM_TORCH_NUM_THREADS", os.environ.get("OMP_NUM_THREADS", "1"))
-    os.environ.setdefault("WANDB_MODE", "offline")
 
 
 def _rewrite_overrides(cli_args: List[str]) -> Tuple[List[str], str, str | None]:

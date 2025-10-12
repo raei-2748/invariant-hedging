@@ -1,5 +1,5 @@
 wandb:
-  enabled: false
+  enabled: ${oc.get:logger.use_wandb,false}
   project: invariant-hedging
   entity: null
   offline_ok: true

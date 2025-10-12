@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import platform
+import shutil
 import subprocess
 import time
 import warnings
@@ -50,15 +51,42 @@ class RunLogger:
             json.dump(self._system_info(), f, indent=2)
         self.wandb_run = None
         wandb_cfg = config.get("wandb", {})
-        if wandb_cfg.get("enabled", False) and wandb is not None:
-            mode = "offline" if wandb_cfg.get("offline_ok", False) and os.getenv("WANDB_MODE") == "offline" else None
-            self.wandb_run = wandb.init(
-                project=wandb_cfg.get("project", "invariant-hedging"),
-                entity=wandb_cfg.get("entity"),
-                config=resolved_config,
-                mode=mode,
-                dir=wandb_cfg.get("dir"),
-            )
+        if wandb_cfg.get("enabled", False):
+            if wandb is None:
+                warnings.warn(
+                    "Weights & Biases logging requested but the 'wandb' package is not installed. "
+                    "Continuing with local logging only.",
+                    RuntimeWarning,
+                )
+            else:
+                mode = wandb_cfg.get("mode")
+                if (
+                    mode is None
+                    and wandb_cfg.get("offline_ok", False)
+                    and os.getenv("WANDB_MODE") == "offline"
+                ):
+                    mode = "offline"
+                init_kwargs = {
+                    "project": wandb_cfg.get("project", "invariant-hedging"),
+                    "entity": wandb_cfg.get("entity"),
+                    "config": resolved_config,
+                    "dir": wandb_cfg.get("dir"),
+                }
+                if mode is not None:
+                    init_kwargs["mode"] = mode
+                if wandb_cfg.get("group") is not None:
+                    init_kwargs["group"] = wandb_cfg.get("group")
+                if wandb_cfg.get("tags") is not None:
+                    init_kwargs["tags"] = wandb_cfg.get("tags")
+                try:
+                    self.wandb_run = wandb.init(**init_kwargs)
+                except Exception as exc:  # pragma: no cover - warn and continue
+                    warnings.warn(
+                        f"Failed to initialize Weights & Biases logging ({exc!s}). "
+                        "Continuing with local logging only.",
+                        RuntimeWarning,
+                    )
+                    self.wandb_run = None
         self.metrics_file = open(self.metrics_path, "a", encoding="utf-8")
 
     def log_metrics(self, metrics: Dict, step: Optional[int] = None) -> None:
@@ -86,17 +114,23 @@ class RunLogger:
 
     def save_artifact(self, path: Path, name: Optional[str] = None) -> None:
         target = self.artifacts_dir / (name or path.name)
+        source = path.resolve()
+        destination = target.resolve()
+        if source == destination:
+            return
         if path.is_dir():
-            if target.exists():
-                return
-            target.mkdir(parents=True, exist_ok=True)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(source, destination, dirs_exist_ok=True)
         else:
-            if path.resolve() == target.resolve():
-                return
-            target.write_bytes(path.read_bytes())
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
         if self.wandb_run is not None and wandb is not None:
-            artifact = wandb.Artifact(name or path.name, type="file")
-            artifact.add_file(str(path))
+            artifact_type = "directory" if path.is_dir() else "file"
+            artifact = wandb.Artifact(name or path.name, type=artifact_type)
+            if path.is_dir():
+                artifact.add_dir(str(path))
+            else:
+                artifact.add_file(str(path))
             self.wandb_run.log_artifact(artifact)
 
     def close(self) -> None:
