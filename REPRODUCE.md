@@ -1,40 +1,78 @@
-# Reproduction Checklist
+# Paper reproduction playbook
 
-The baseline phase-1 experiments (ERM, ERM-reg, IRM, GroupDRO, V-REx) can be re-run using the convenience scripts provided in this
-repository. All commands mirror metrics locally under `runs/<timestamp>/` and, when desired, can stream updates to Weights &
-Biases (W&B).
+This guide provides the exact commands, environment assumptions, and artefact
+checkpoints required to regenerate the paper figures and tables from scratch.
+It mirrors the configuration used to build the "paper" snapshot referenced in
+the manuscript.
 
-## Disable or enable W&B logging
+## Reference environment
 
-Local mirrors are always written under `runs/<timestamp>/`. To keep runs fully offline pass `logger.use_wandb=false` (this is the
-default) to any Hydra-driven command:
+| Component | Reference value |
+| --- | --- |
+| OS | Ubuntu 22.04 LTS |
+| Python | 3.10.13 |
+| Hardware | 8 vCPU (Intel Ice Lake), 32 GB RAM, **no GPU required** |
+| Expected wall-clock | ≈5 minutes end-to-end |
 
-```bash
-scripts/run_train.sh train/erm logger.use_wandb=false
-scripts/run_eval.sh train/erm logger.use_wandb=false eval.report.checkpoint_path=/path/to/checkpoint.pt
-```
+The commands below were validated on the configuration above. Slower laptops
+can expect proportionally longer runtimes, but the workflow remains entirely
+CPU-compatible.
 
-When you want to send metrics to W&B, flip the flag:
+## Step-by-step commands
 
-```bash
-scripts/run_train.sh train/erm logger.use_wandb=true
-```
+1. **Stage the dataset**
+   ```bash
+   make data
+   ```
+   Copies `data/spy_sample.csv` into `outputs/paper_data/`. Replace the source
+   file with your institutional SPY export before running this step for the
+   full reproduction. *(Expected runtime: <1 s).* 
 
-Both modes produce identical `final_metrics.json`, `metadata.json`, checkpoints, and artefacts inside `runs/<timestamp>/` so you
-can compare results or archive them locally regardless of the remote logging state.
+2. **Dry-run the orchestration script**
+   ```bash
+   scripts/run_of_record.sh --dry-run
+   ```
+   Prints the training and evaluation commands that will run, verifying that
+   Hydra configs resolve correctly on your machine. *(Expected runtime: <1 s).* 
 
-## Phase 1 baseline sweep
+3. **Train and evaluate the paper configuration**
+   ```bash
+   make paper
+   ```
+   Executes `configs/train/paper.yaml` and `configs/eval/paper.yaml`, writing
+   artefacts to `runs/paper/` and `runs/paper_eval/`. Checkpoints, resolved
+   configs, and diagnostics CSV files are created here. *(Expected runtime: ≈3
+   min on the reference CPU).* 
 
-```bash
-scripts/make_reproduce.sh
-```
+4. **Generate publication-ready tables and plots**
+   ```bash
+   make report-paper
+   ```
+   Aggregates the evaluation outputs into `outputs/report_paper/` using
+   `configs/report/paper.yaml`. Produces LaTeX/CSV tables, scorecard heatmaps,
+   and a provenance manifest. *(Expected runtime: ≈2 min on the reference CPU).* 
 
-By default this replays the ERM, ERM-reg, IRM, GroupDRO, and V-REx configurations with the recommended deterministic seed. Append
-Hydra overrides as needed, for example to disable W&B across the sweep:
+### Optional follow-up
 
-```bash
-scripts/make_reproduce.sh logger.use_wandb=false
-```
+- `make report` — rebuilds the full 30-seed aggregate using
+  `configs/report/default.yaml`. This is unnecessary for the single-seed smoke
+  check but reproduces the full paper appendix when all seeds are available.
 
-The script will train each configuration, locate the freshest checkpoint, and immediately evaluate it on the crisis regime. All
-results are mirrored locally under `runs/` and the generated reports land in `outputs/_baseline_erm_base/`.
+## Provenance and artifact tracking
+
+- **Git state.** Record the commit hash from `runs/paper/*/metadata.json` and
+  `runs/paper_eval/*/metadata.json`. The script captures a `git_status_clean`
+  flag; rerun after committing local patches so the flag is `true`.
+- **Data lineage.** Retain the original SPY export path and acquisition
+  agreement. When sharing artefacts, redact raw prices and provide aggregate
+  metrics only.
+- **Runtime manifests.** `outputs/report_paper/manifests/aggregate_manifest.json`
+  contains hashes for every diagnostics CSV included in the report. Archive this
+  manifest with the final paper submission.
+- **Hardware notes.** Include CPU model, RAM, and whether a GPU was available in
+  any reproduction log. The official snapshot is CPU-only, but documenting
+  accelerators helps others interpret runtime differences.
+
+By following the sequence above and storing the generated manifests, another
+researcher can audit the pipeline and regenerate the same tables and figures
+without additional assumptions.
