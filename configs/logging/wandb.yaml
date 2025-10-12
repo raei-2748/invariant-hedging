@@ -1,6 +1,11 @@
-enabled: true
-mode: offline
-entity: null
-project: ${project.name}
-group: default
-tags: []
+defaults:
+  - default
+  - _self_
+
+wandb:
+  enabled: ${logger.use_wandb}
+  mode: ${oc.env:WANDB_MODE, null}
+  entity: null
+  project: ${project.name}
+  group: default
+  tags: []

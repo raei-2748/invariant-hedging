@@ -1,0 +1,4 @@
+# @package _global_
+
+logger:
+  use_wandb: false

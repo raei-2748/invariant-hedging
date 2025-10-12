@@ -2,6 +2,7 @@ defaults:
   - model: hedger
   - data: regimes
   - evaluation: default
+  - logger: wandb
   - logging: wandb
   - _self_
 
