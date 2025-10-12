@@ -1,12 +1,14 @@
-"""Schema validation for diagnostics exports."""
-
-import csv
 import json
 from pathlib import Path
 
+import pandas as pd
+import pytest
 import torch
 
+pytest.importorskip("pyarrow")
+
 from src.diagnostics.export import DiagnosticsRunContext, gather_and_export
+from src.diagnostics.schema import CANONICAL_COLUMNS, SCHEMA_VERSION, validate_diagnostics_table
 
 
 def _make_batch(risk, outcome, positions, grad, representation):
@@ -19,7 +21,7 @@ def _make_batch(risk, outcome, positions, grad, representation):
     }
 
 
-def test_export_csv_schema_and_manifest(tmp_path):
+def test_export_parquet_schema_and_manifest(tmp_path):
     run_ctx = DiagnosticsRunContext(
         output_dir=tmp_path,
         seed=7,
@@ -51,7 +53,7 @@ def test_export_csv_schema_and_manifest(tmp_path):
         "c3_max_distance": 2.0,
     }
 
-    csv_path = gather_and_export(
+    parquet_path = gather_and_export(
         run_ctx,
         model=None,
         probe_cfg=probe_cfg,
@@ -63,36 +65,29 @@ def test_export_csv_schema_and_manifest(tmp_path):
         representation_fn=lambda _m, batch: batch["representation"],
     )
 
-    assert csv_path.exists()
+    assert parquet_path.exists()
 
-    with csv_path.open("r", encoding="utf-8") as handle:
-        reader = csv.DictReader(handle)
-        expected_columns = [
-            "seed",
-            "git_hash",
-            "exp_id",
-            "split_name",
-            "regime_tag",
-            "env_id",
-            "is_eval_split",
-            "n_obs",
-            "C1_global_stability",
-            "C2_mechanistic_stability",
-            "C3_structural_stability",
-            "ISI",
-            "IG",
-            "WG_risk",
-            "VR_risk",
-            "ER_mean_pnl",
-            "TR_turnover",
-        ]
-        assert reader.fieldnames == expected_columns
-        rows = list(reader)
-        env_ids = {row["env_id"] for row in rows}
-        assert "env_a" in env_ids and "env_b" in env_ids and "__overall__" in env_ids
+    frame = pd.read_parquet(parquet_path)
+    assert tuple(frame.columns) == CANONICAL_COLUMNS
+    validate_diagnostics_table(frame)
+    envs = set(frame[frame["metric"] == "ISI"]["env"].tolist())
+    assert {"env_a", "env_b", "__overall__"}.issubset(envs)
 
     manifest_path = Path(run_ctx.output_dir) / "diagnostics_manifest.json"
     assert manifest_path.exists()
     manifest = json.loads(manifest_path.read_text())
-    for key in ["seed", "git_hash", "config_hash", "instrument", "metric_basis", "isi_weights", "units", "created_utc"]:
+    for key in [
+        "seed",
+        "git_hash",
+        "config_hash",
+        "instrument",
+        "metric_basis",
+        "isi_weights",
+        "units",
+        "created_utc",
+        "schema_version",
+        "diagnostics_table",
+    ]:
         assert key in manifest
+    assert manifest["schema_version"] == SCHEMA_VERSION
+    assert manifest["diagnostics_table"] == parquet_path.name

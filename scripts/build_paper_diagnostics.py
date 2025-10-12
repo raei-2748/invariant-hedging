@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
-"""Synthesize diagnostics CSVs for the lightweight paper reproduction run."""
+"""Synthesize a canonical diagnostics parquet for the paper reproduction run."""
 from __future__ import annotations
 
-import csv
 import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict
+
+import pandas as pd
+
+from src.diagnostics.schema import CANONICAL_COLUMNS, SCHEMA_VERSION, normalize_diagnostics_frame, validate_diagnostics_table
 
 
 def _load_json(path: Path) -> Dict:
@@ -22,7 +25,7 @@ def _load_json(path: Path) -> Dict:
     return {}
 
 
-def build_rows(run_dir: Path) -> list[Dict[str, object]]:
+def build_rows(run_dir: Path) -> tuple[list[Dict[str, object]], str, int]:
     metrics = _load_json(run_dir / "final_metrics.json")
     metadata = _load_json(run_dir / "metadata.json")
     git_hash = metadata.get("git_commit", "unknown")
@@ -33,49 +36,66 @@ def build_rows(run_dir: Path) -> list[Dict[str, object]]:
     ig = float(metrics.get("diagnostics/IG/ES95", 0.0))
     rows: list[Dict[str, object]] = []
     for env_id in ("smoke", "__overall__"):
-        rows.append(
-            {
-                "seed": seed,
-                "git_hash": git_hash,
-                "exp_id": "paper", 
-                "split_name": "paper",
-                "regime_tag": env_id,
-                "regime": env_id,
-                "env_id": env_id,
-                "is_eval_split": True,
-                "n_obs": 0,
-                "C1_global_stability": 0.0,
-                "C2_mechanistic_stability": 0.0,
-                "C3_structural_stability": 0.0,
-                "ISI": 0.0,
-                "IG": ig,
-                "WG_risk": wg,
-                "VR_risk": 0.0,
-                "ER_mean_pnl": mean_pnl,
-                "TR_turnover": turnover,
-            }
+        rows.extend(
+            [
+                {
+                    "env": env_id,
+                    "split": "paper",
+                    "seed": seed,
+                    "algo": "paper",
+                    "metric": "IG",
+                    "value": float(ig),
+                },
+                {
+                    "env": env_id,
+                    "split": "paper",
+                    "seed": seed,
+                    "algo": "paper",
+                    "metric": "WG_risk",
+                    "value": float(wg),
+                },
+                {
+                    "env": env_id,
+                    "split": "paper",
+                    "seed": seed,
+                    "algo": "paper",
+                    "metric": "ER_mean_pnl",
+                    "value": float(mean_pnl),
+                },
+                {
+                    "env": env_id,
+                    "split": "paper",
+                    "seed": seed,
+                    "algo": "paper",
+                    "metric": "TR_turnover",
+                    "value": float(turnover),
+                },
+            ]
         )
-    return rows
+    return rows, git_hash, seed
 
 
 def write_outputs(run_dir: Path) -> None:
-    rows = build_rows(run_dir)
+    rows, git_hash, seed = build_rows(run_dir)
     if not rows:
         return
-    csv_path = run_dir / "diagnostics_seed_0.csv"
-    with csv_path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(rows[0].keys()))
-        writer.writeheader()
-        writer.writerows(rows)
+    frame = pd.DataFrame(rows, columns=CANONICAL_COLUMNS)
+    frame = normalize_diagnostics_frame(frame)
+    validate_diagnostics_table(frame)
+    parquet_path = run_dir / "diagnostics.parquet"
+    frame.to_parquet(parquet_path, index=False)
 
     manifest = {
-        "seed": rows[0]["seed"],
-        "git_hash": rows[0]["git_hash"],
-        "config_hash": rows[0]["git_hash"],
+        "seed": seed,
+        "git_hash": git_hash,
+        "config_hash": git_hash,
         "instrument": "SPY",
         "metric_basis": "ES95",
         "units": {"risk": "cvar_surrogate", "return": "per_step"},
         "created_utc": datetime.now(timezone.utc).isoformat(),
+        "schema_version": SCHEMA_VERSION,
+        "diagnostics_table": parquet_path.name,
+        "columns": list(CANONICAL_COLUMNS),
     }
     manifest_path = run_dir / "diagnostics_manifest.json"
     with manifest_path.open("w", encoding="utf-8") as handle:

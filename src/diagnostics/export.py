@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import csv
 import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Mapping
 
+import pandas as pd
 import torch
 
 from .efficiency import compute_ER, compute_TR
@@ -21,6 +21,12 @@ from .isi import (
     compute_ISI,
 )
 from .probe import ProbeConfig, get_diagnostic_batches
+from .schema import (
+    CANONICAL_COLUMNS,
+    SCHEMA_VERSION,
+    normalize_diagnostics_frame,
+    validate_diagnostics_table,
+)
 
 ProbeBatch = Mapping[str, torch.Tensor]
 
@@ -59,7 +65,7 @@ def gather_and_export(
     head_gradient_fn: Callable[[object, ProbeBatch], torch.Tensor] | None = None,
     representation_fn: Callable[[object, ProbeBatch], torch.Tensor] | None = None,
 ) -> Path:
-    """Run the diagnostics pipeline and export tidy CSV + manifest."""
+    """Run the diagnostics pipeline and export a canonical parquet + manifest."""
 
     output_dir = Path(run_ctx.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -160,29 +166,25 @@ def gather_and_export(
     WG = compute_WG(env_risk_means)
     VR = compute_VR(env_risk_means)
 
-    csv_rows: List[Dict[str, object]] = []
-    columns = [
-        "seed",
-        "git_hash",
-        "exp_id",
-        "split_name",
-        "regime_tag",
-        "env_id",
-        "is_eval_split",
-        "n_obs",
-        "C1_global_stability",
-        "C2_mechanistic_stability",
-        "C3_structural_stability",
-        "ISI",
-        "IG",
-        "WG_risk",
-        "VR_risk",
-        "ER_mean_pnl",
-        "TR_turnover",
-    ]
-
+    records: List[Dict[str, object]] = []
     all_positions: List[torch.Tensor] = []
     all_outcomes: List[torch.Tensor] = []
+
+    def _append_records(env_id: str, metrics: Mapping[str, float]) -> None:
+        base = {
+            "env": env_id,
+            "split": run_ctx.split_name,
+            "seed": run_ctx.seed,
+            "algo": run_ctx.exp_id,
+        }
+        for metric_name, metric_value in metrics.items():
+            records.append(
+                {
+                    **base,
+                    "metric": metric_name,
+                    "value": float(metric_value),
+                }
+            )
 
     for env_id, risks in env_risk_means.items():
         er = compute_ER(env_outcomes.get(env_id, torch.tensor([])))
@@ -192,59 +194,51 @@ def gather_and_export(
             tr = compute_TR(stacked_positions)
         else:
             tr = 0.0
-        row = {
-            "seed": run_ctx.seed,
-            "git_hash": run_ctx.git_hash,
-            "exp_id": run_ctx.exp_id,
-            "split_name": run_ctx.split_name,
-            "regime_tag": run_ctx.regime_tag,
-            "env_id": env_id,
-            "is_eval_split": bool(run_ctx.is_eval_split),
-            "n_obs": n_obs_by_env.get(env_id, 0),
-            "C1_global_stability": C1,
-            "C2_mechanistic_stability": C2,
-            "C3_structural_stability": C3,
-            "ISI": ISI_value,
-            "IG": IG,
-            "WG_risk": WG,
-            "VR_risk": VR,
-            "ER_mean_pnl": er,
-            "TR_turnover": tr,
+        metrics = {
+            "C1_global_stability": float(C1),
+            "C2_mechanistic_stability": float(C2),
+            "C3_structural_stability": float(C3),
+            "ISI": float(ISI_value),
+            "IG": float(IG),
+            "WG_risk": float(WG),
+            "VR_risk": float(VR),
+            "ER_mean_pnl": float(er),
+            "TR_turnover": float(tr),
+            "n_obs": float(n_obs_by_env.get(env_id, 0)),
         }
-        csv_rows.append(row)
+        _append_records(env_id, metrics)
         if env_outcomes.get(env_id) is not None:
             all_outcomes.append(env_outcomes[env_id])
         env_positions = positions_by_env.get(env_id, [])
         if env_positions:
             all_positions.extend(env_positions)
 
-    overall_row = {
-        "seed": run_ctx.seed,
-        "git_hash": run_ctx.git_hash,
-        "exp_id": run_ctx.exp_id,
-        "split_name": run_ctx.split_name,
-        "regime_tag": run_ctx.regime_tag,
-        "env_id": "__overall__",
-        "is_eval_split": bool(run_ctx.is_eval_split),
-        "n_obs": sum(n_obs_by_env.values()),
-        "C1_global_stability": C1,
-        "C2_mechanistic_stability": C2,
-        "C3_structural_stability": C3,
-        "ISI": ISI_value,
-        "IG": IG,
-        "WG_risk": WG,
-        "VR_risk": VR,
-        "ER_mean_pnl": compute_ER(_stack(all_outcomes)) if all_outcomes else 0.0,
-        "TR_turnover": compute_TR(torch.cat(all_positions, dim=0)) if all_positions else 0.0,
+    overall_metrics = {
+        "C1_global_stability": float(C1),
+        "C2_mechanistic_stability": float(C2),
+        "C3_structural_stability": float(C3),
+        "ISI": float(ISI_value),
+        "IG": float(IG),
+        "WG_risk": float(WG),
+        "VR_risk": float(VR),
+        "ER_mean_pnl": float(compute_ER(_stack(all_outcomes)) if all_outcomes else 0.0),
+        "TR_turnover": float(
+            compute_TR(torch.cat(all_positions, dim=0)) if all_positions else 0.0
+        ),
+        "n_obs": float(sum(n_obs_by_env.values())),
     }
-    csv_rows.append(overall_row)
+    _append_records("__overall__", overall_metrics)
 
-    csv_path = output_dir / f"diagnostics_seed_{run_ctx.seed}.csv"
-    with csv_path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=columns)
-        writer.writeheader()
-        for row in csv_rows:
-            writer.writerow(row)
+    table = pd.DataFrame.from_records(records, columns=CANONICAL_COLUMNS)
+    table = normalize_diagnostics_frame(table)
+    validate_diagnostics_table(table)
+    parquet_path = output_dir / "diagnostics.parquet"
+    try:
+        table.to_parquet(parquet_path, index=False)
+    except ImportError as exc:  # pragma: no cover - optional dependency
+        raise RuntimeError(
+            "Writing diagnostics parquet requires 'pyarrow' or 'fastparquet' to be installed"
+        ) from exc
 
     manifest = {
         "seed": run_ctx.seed,
@@ -255,13 +249,20 @@ def gather_and_export(
         "isi_weights": list(weights) if weights is not None else [1 / 3, 1 / 3, 1 / 3],
         "units": run_ctx.units or {},
         "created_utc": datetime.now(timezone.utc).isoformat(),
+        "schema_version": SCHEMA_VERSION,
+        "diagnostics_table": parquet_path.name,
+        "columns": list(CANONICAL_COLUMNS),
+        "split": run_ctx.split_name,
+        "algo": run_ctx.exp_id,
+        "regime_tag": run_ctx.regime_tag,
+        "rows": int(len(table)),
     }
 
     manifest_path = output_dir / "diagnostics_manifest.json"
     with manifest_path.open("w", encoding="utf-8") as handle:
         json.dump(manifest, handle, indent=2)
 
-    return csv_path
+    return parquet_path
 
 
 __all__ = ["DiagnosticsRunContext", "gather_and_export"]

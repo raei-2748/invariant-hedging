@@ -39,10 +39,34 @@ def _make_raw() -> pd.DataFrame:
         for regime in ["train_main", "crisis_2020"]:
             records.extend(
                 [
-                    {"run_path": "run", "seed": seed, "regime": regime, "metric": "ISI", "value": 0.7 + 0.01 * seed},
-                    {"run_path": "run", "seed": seed, "regime": regime, "metric": "CVaR_95", "value": -0.2 - 0.01 * seed},
-                    {"run_path": "run", "seed": seed, "regime": regime, "metric": "ER_mean_pnl", "value": 0.1 - 0.005 * seed},
-                    {"run_path": "run", "seed": seed, "regime": regime, "metric": "TR_turnover", "value": 1.0 + 0.02 * seed},
+                    {
+                        "algo": "erm",
+                        "seed": seed,
+                        "regime": regime,
+                        "metric": "ISI",
+                        "value": 0.7 + 0.01 * seed,
+                    },
+                    {
+                        "algo": "erm",
+                        "seed": seed,
+                        "regime": regime,
+                        "metric": "CVaR_95",
+                        "value": -0.2 - 0.01 * seed,
+                    },
+                    {
+                        "algo": "erm",
+                        "seed": seed,
+                        "regime": regime,
+                        "metric": "ER_mean_pnl",
+                        "value": 0.1 - 0.005 * seed,
+                    },
+                    {
+                        "algo": "erm",
+                        "seed": seed,
+                        "regime": regime,
+                        "metric": "TR_turnover",
+                        "value": 1.0 + 0.02 * seed,
+                    },
                 ]
             )
     return pd.DataFrame(records)

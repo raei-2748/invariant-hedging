@@ -83,7 +83,9 @@ def _write_placeholder_figure(path: Path, title: str) -> None:
 
 
 def _placeholder_result(config: Mapping[str, object]) -> AggregateResult:
-    empty_raw = pd.DataFrame(columns=["regime", "metric", "value", "seed", "run_path"])
+    empty_raw = pd.DataFrame(
+        columns=["env", "split", "seed", "algo", "metric", "value", "regime"]
+    )
     empty_summary = pd.DataFrame(
         columns=[
             "metric",
@@ -103,7 +105,9 @@ def _placeholder_result(config: Mapping[str, object]) -> AggregateResult:
         raw=empty_raw,
         summary=empty_summary,
         regimes=[],
-        selected_seeds=[],
+        diagnostics_path=Path(),
+        seeds=[],
+        algo=None,
         config=dict(config),
     )
 
@@ -290,20 +294,16 @@ def main(argv: Iterable[str] | None = None) -> int:
         result = _placeholder_result(config)
 
     tables = _generate_tables(result, directories["tables"], smoke=args.smoke)
-    per_seed_paths = [sel.diagnostics_path for sel in getattr(result, "selected_seeds", []) if Path(sel.diagnostics_path).exists()]
-    figures = _generate_figures(per_seed_paths or None, directories["figures"], smoke=args.smoke, dpi=args.dpi)
+    figures = _generate_figures(None, directories["figures"], smoke=args.smoke, dpi=args.dpi)
 
-    if result.selected_seeds:
-        final_metrics_paths = [sel.run_dir / "final_metrics.json" for sel in result.selected_seeds]
+    seed_dirs_raw = report_cfg.get("seed_dirs", ["runs/*"])
+    if isinstance(seed_dirs_raw, str):
+        seed_patterns = [seed_dirs_raw]
+    elif isinstance(seed_dirs_raw, Iterable):
+        seed_patterns = list(seed_dirs_raw)
     else:
-        seed_dirs_raw = report_cfg.get("seed_dirs", ["runs/*"])
-        if isinstance(seed_dirs_raw, str):
-            seed_patterns = [seed_dirs_raw]
-        elif isinstance(seed_dirs_raw, Iterable):
-            seed_patterns = list(seed_dirs_raw)
-        else:
-            seed_patterns = []
-        final_metrics_paths = _discover_final_metrics(seed_patterns)
+        seed_patterns = []
+    final_metrics_paths = _discover_final_metrics(seed_patterns)
     validations = _validate_final_metrics(final_metrics_paths, smoke=args.smoke)
 
     manifest_extra: dict[str, object] = {

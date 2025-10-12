@@ -1015,7 +1015,7 @@ def main(cfg: DictConfig) -> None:
             representation_fn = _repr_fn
 
         try:
-            csv_path = gather_and_export(
+            table_path = gather_and_export(
                 diagnostics_run_ctx,
                 policy,
                 probe_cfg,
@@ -1026,7 +1026,7 @@ def main(cfg: DictConfig) -> None:
                 head_gradient_fn=head_grad_fn,
                 representation_fn=representation_fn,
             )
-            run_logger.log_metrics({"diagnostics/csv_path": str(csv_path)})
+            run_logger.log_metrics({"diagnostics/parquet_path": str(table_path)})
         except Exception as exc:  # pragma: no cover - defensive logging
             LOGGER.warning("Diagnostics export failed: %s", exc)
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
@@ -12,18 +11,10 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
 import pandas as pd
 import yaml
 
+from src.diagnostics.schema import normalize_diagnostics_frame, validate_diagnostics_table
+
 # Public constants
 DEFAULT_CONFIDENCE_LEVEL = 0.95
-
-
-@dataclass(frozen=True)
-class SeedSelection:
-    """Metadata describing a selected seed run."""
-
-    run_dir: Path
-    diagnostics_path: Path
-    seed: int
-    timestamp: float
 
 
 @dataclass
@@ -33,7 +24,9 @@ class AggregateResult:
     raw: pd.DataFrame
     summary: pd.DataFrame
     regimes: List[str]
-    selected_seeds: List[SeedSelection]
+    diagnostics_path: Path
+    seeds: List[int]
+    algo: Optional[str]
     config: Dict[str, Any]
 
 
@@ -46,155 +39,23 @@ def load_report_config(config_path: Path) -> Dict[str, Any]:
     return config
 
 
-def resolve_seed_directories(patterns: Sequence[str]) -> List[Path]:
-    """Return directories that contain diagnostics for seeds."""
-    paths: List[Path] = []
-    import glob
-
-    for pattern in patterns:
-        for raw in sorted(glob.glob(pattern)):
-            path = Path(raw)
-            if path.is_dir() and (path / "diagnostics_manifest.json").exists():
-                paths.append(path)
-    return sorted(set(paths))
-
-
-def _load_metadata_timestamp(metadata_path: Path) -> float:
+def load_diagnostics_table(path: Path) -> pd.DataFrame:
+    """Load and validate the canonical diagnostics parquet."""
+    if not path.exists():
+        raise FileNotFoundError(path)
     try:
-        with open(metadata_path, "r", encoding="utf-8") as handle:
-            data = json.load(handle)
-        timestamp = data.get("timestamp") or data.get("created_at")
-        if isinstance(timestamp, (int, float)):
-            return float(timestamp)
-    except FileNotFoundError:
-        return 0.0
-    except json.JSONDecodeError:
-        return 0.0
-    return 0.0
-
-
-def discover_seed_files(run_dir: Path) -> List[SeedSelection]:
-    """Discover per-seed diagnostic CSV files for a run directory."""
-    metadata_path = run_dir / "metadata.json"
-    timestamp = _load_metadata_timestamp(metadata_path)
-    selections: List[SeedSelection] = []
-    for diag_path in sorted(run_dir.glob("diagnostics_seed_*.csv")):
-        match = re.search(r"diagnostics_seed_(\d+)", diag_path.name)
-        if not match:
-            continue
-        seed = int(match.group(1))
-        stat_timestamp = diag_path.stat().st_mtime
-        effective_ts = timestamp or stat_timestamp
-        selections.append(
-            SeedSelection(
-                run_dir=run_dir,
-                diagnostics_path=diag_path,
-                seed=seed,
-                timestamp=effective_ts,
-            )
-        )
-    return selections
-
-
-def select_seeds(
-    run_dirs: Sequence[Path],
-    max_seeds: Optional[int],
-) -> List[SeedSelection]:
-    """Select up to ``max_seeds`` seeds deterministically."""
-    all_seeds: List[SeedSelection] = []
-    for run_dir in run_dirs:
-        all_seeds.extend(discover_seed_files(run_dir))
-    all_seeds.sort(key=lambda s: (s.timestamp, s.seed, str(s.diagnostics_path)))
-    if max_seeds is None:
-        return all_seeds
-    return all_seeds[: max_seeds]
-
-
-def _melt_if_wide(df: pd.DataFrame) -> pd.DataFrame:
-    lower_cols = {c.lower() for c in df.columns}
-    if "metric" in lower_cols and "value" in lower_cols:
-        # Already tidy.
-        return df.rename(columns={c: c.lower() for c in df.columns})
-    if "regime" not in df.columns:
-        raise ValueError("Diagnostics CSV must contain a 'regime' column")
-    id_cols = [c for c in df.columns if c.lower() == "regime"]
-    tidy = df.melt(id_vars=id_cols, var_name="metric", value_name="value")
-    tidy.columns = [col.lower() for col in tidy.columns]
-    return tidy
-
-
-def _flatten_metrics_dict(mapping: Mapping[str, Any]) -> List[Dict[str, Any]]:
-    records: List[Dict[str, Any]] = []
-    for key, value in mapping.items():
-        if isinstance(value, Mapping):
-            for sub_key, sub_value in value.items():
-                if isinstance(sub_value, Mapping):
-                    for regime, metric_value in sub_value.items():
-                        records.append({"metric": sub_key, "regime": regime, "value": metric_value})
-                else:
-                    records.append({"metric": key, "regime": sub_key, "value": sub_value})
-        else:
-            # scalar metric without regime context
-            records.append({"metric": key, "regime": "global", "value": value})
-    return records
-
-
-def load_seed_dataframe(selection: SeedSelection) -> pd.DataFrame:
-    """Load diagnostics and metrics for a seed selection."""
-    diag_df = pd.read_csv(selection.diagnostics_path)
-    diag_df = _melt_if_wide(diag_df)
-    diag_df["metric"] = diag_df["metric"].astype(str)
-    diag_df["regime"] = diag_df["regime"].astype(str)
-
-    final_metrics_path = selection.run_dir / "final_metrics.json"
-    records: List[Dict[str, Any]] = []
-    if final_metrics_path.exists():
-        with open(final_metrics_path, "r", encoding="utf-8") as handle:
-            try:
-                data = json.load(handle)
-            except json.JSONDecodeError:
-                data = {}
-        if isinstance(data, Mapping):
-            if "metrics" in data and isinstance(data["metrics"], Mapping):
-                records.extend(_flatten_metrics_dict(data["metrics"]))
-            else:
-                records.extend(_flatten_metrics_dict(data))
-    if records:
-        metrics_df = pd.DataFrame(records)
-        metrics_df = metrics_df.dropna(subset=["value"]) if not metrics_df.empty else metrics_df
-        if not metrics_df.empty:
-            diag_df = pd.concat([diag_df, metrics_df], ignore_index=True)
-
-    diag_df = diag_df.drop_duplicates(subset=["regime", "metric", "value"])
-    diag_df["value"] = pd.to_numeric(diag_df["value"], errors="coerce")
-    diag_df = diag_df.dropna(subset=["value"])
-    diag_df["seed"] = selection.seed
-    diag_df["run_path"] = str(selection.run_dir)
-
-    metadata_path = selection.run_dir / "metadata.json"
-    if metadata_path.exists():
-        with open(metadata_path, "r", encoding="utf-8") as handle:
-            try:
-                metadata = json.load(handle)
-            except json.JSONDecodeError:
-                metadata = {}
-        for key, value in metadata.items():
-            diag_df[f"metadata_{key}"] = value
-
-    manifest_path = selection.run_dir / "diagnostics_manifest.json"
-    if manifest_path.exists():
-        with open(manifest_path, "r", encoding="utf-8") as handle:
-            try:
-                manifest = json.load(handle)
-            except json.JSONDecodeError:
-                manifest = {}
-        diag_df["manifest_regimes"] = json.dumps(manifest.get("regimes", []))
-        diag_df["manifest_seed"] = manifest.get("seed")
-    return diag_df
+        frame = pd.read_parquet(path)
+    except ImportError as exc:  # pragma: no cover - optional dependency
+        raise RuntimeError(
+            "Reading diagnostics parquet requires 'pyarrow' or 'fastparquet' to be installed"
+        ) from exc
+    frame = normalize_diagnostics_frame(frame)
+    validate_diagnostics_table(frame)
+    return frame
 
 
 def ensure_metrics_exist(raw: pd.DataFrame, metrics: Iterable[str]) -> None:
-    missing = sorted(set(metrics) - set(raw["metric"].unique()))
+    missing = sorted(set(metrics) - set(raw["metric"].astype(str).unique()))
     if missing:
         raise KeyError(f"Missing metrics in diagnostics: {missing}")
 
@@ -216,7 +77,6 @@ def compute_summary_statistics(
 
             return float(stats.t.ppf(1 - alpha / 2, df))
         except Exception:  # pragma: no cover - fallback path
-            # Normal approximation fallback
             from statistics import NormalDist
 
             return float(NormalDist().inv_cdf(1 - alpha / 2))
@@ -241,9 +101,9 @@ def compute_summary_statistics(
             ci_half = t_val * sem
             rows.append(
                 {
-                    "metric": metric,
-                    "regime": regime,
-                    "block": blocks.get(metric, "other"),
+                    "metric": str(metric),
+                    "regime": str(regime),
+                    "block": blocks.get(str(metric), "other"),
                     "mean": mean,
                     "std": std,
                     "ci_half_width": ci_half,
@@ -266,23 +126,65 @@ def aggregate_runs(
     lite: bool = False,
 ) -> AggregateResult:
     report_cfg = config.get("report", {})
-    seeds_limit = int(report_cfg.get("seeds", 0) or 0) or None
+    table_value = report_cfg.get("diagnostics_table")
+    if table_value is None or str(table_value).strip() in {"", "<required>"}:
+        raise KeyError("report.diagnostics_table must be provided")
+    diagnostics_path = Path(str(table_value))
+    raw_table = load_diagnostics_table(diagnostics_path)
+
+    split_filter = report_cfg.get("split")
+    if split_filter is not None:
+        raw_table = raw_table[raw_table["split"].astype(str) == str(split_filter)].copy()
+    else:
+        unique_splits = sorted(raw_table["split"].dropna().astype(str).unique())
+        if len(unique_splits) > 1:
+            raise ValueError(
+                "Multiple splits present in diagnostics table; specify report.split to disambiguate"
+            )
+
+    algo_filter = report_cfg.get("algo")
+    algo_values = raw_table["algo"].dropna().astype(str)
+    selected_algo: Optional[str] = None
+    if algo_filter is not None:
+        raw_table = raw_table[algo_values == str(algo_filter)].copy()
+        selected_algo = str(algo_filter)
+    else:
+        unique_algos = sorted(set(algo_values.tolist()))
+        if len(unique_algos) > 1:
+            raise ValueError("Multiple algos present in diagnostics table; specify report.algo")
+        if unique_algos:
+            selected_algo = unique_algos[0]
+
+    if raw_table.empty:
+        raise RuntimeError("No diagnostics rows remain after filtering")
+
+    raw = raw_table.copy()
+    raw["regime"] = raw["env"].astype(str)
+    raw["metric"] = raw["metric"].astype(str)
+    raw["seed"] = raw["seed"].astype(int)
+    raw["value"] = raw["value"].astype(float)
+    raw = raw.drop_duplicates(subset=["algo", "seed", "regime", "metric"]).reset_index(drop=True)
+
+    seeds_available = sorted(int(seed) for seed in pd.unique(raw["seed"]))
+    seeds_limit = report_cfg.get("seeds")
+    if seeds_limit is not None:
+        seeds_limit = int(seeds_limit)
     if lite:
-        seeds_limit = min(seeds_limit or 5, 5)
-    seed_dirs = report_cfg.get("seed_dirs", ["runs/*"])
-    run_dirs = resolve_seed_directories(seed_dirs)
-    selected_seeds = select_seeds(run_dirs, seeds_limit)
-    if not selected_seeds:
-        raise RuntimeError("No seed runs discovered for aggregation")
+        seeds_limit = min(seeds_limit or len(seeds_available), 5)
+    if seeds_limit is not None:
+        selected_seeds = seeds_available[: seeds_limit]
+    else:
+        selected_seeds = seeds_available
+    raw = raw[raw["seed"].isin(selected_seeds)].copy()
+    if raw.empty:
+        raise RuntimeError("No diagnostics rows remain after applying seed filters")
 
-    frames: List[pd.DataFrame] = []
-    for selection in selected_seeds:
-        frames.append(load_seed_dataframe(selection))
-    raw = pd.concat(frames, ignore_index=True)
-    raw = raw.drop_duplicates(subset=["run_path", "seed", "regime", "metric"])
-
-    regimes_order = report_cfg.get("regimes_order", sorted(raw["regime"].unique()))
-    missing_regimes = [reg for reg in regimes_order if reg not in set(raw["regime"].unique())]
+    regimes_order = report_cfg.get("regimes_order")
+    if regimes_order:
+        regimes = [str(reg) for reg in regimes_order]
+    else:
+        regimes = sorted(raw["regime"].astype(str).unique())
+    missing_regimes = [reg for reg in regimes if reg not in set(raw["regime"].unique())]
     if missing_regimes:
         raise KeyError(f"Missing regimes in data: {missing_regimes}")
 
@@ -292,15 +194,17 @@ def aggregate_runs(
         ensure_metrics_exist(raw, desired_metrics)
     summary = compute_summary_statistics(
         raw,
-        regimes_order=regimes_order,
+        regimes_order=regimes,
         metrics_config=metrics_config,
         confidence_level=float(report_cfg.get("confidence_level", DEFAULT_CONFIDENCE_LEVEL)),
     )
     return AggregateResult(
         raw=raw,
         summary=summary,
-        regimes=list(regimes_order),
-        selected_seeds=selected_seeds,
+        regimes=list(regimes),
+        diagnostics_path=diagnostics_path,
+        seeds=selected_seeds,
+        algo=selected_algo,
         config=dict(config),
     )
 
@@ -329,7 +233,6 @@ __all__ = [
     "build_table_dataframe",
     "compute_summary_statistics",
     "hash_config_section",
+    "load_diagnostics_table",
     "load_report_config",
-    "resolve_seed_directories",
-    "select_seeds",
 ]

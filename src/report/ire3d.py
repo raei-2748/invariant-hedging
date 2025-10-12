@@ -76,15 +76,8 @@ def build_ire_coordinates(
     lower_pct, upper_pct = float(winsor_pct[0]), float(winsor_pct[1])
     regimes = report_cfg.get("regimes_order", sorted(raw["regime"].unique()))
 
-    pivot = (
-        raw.pivot_table(
-            index=["run_path", "seed", "regime"],
-            columns="metric",
-            values="value",
-            aggfunc="mean",
-        )
-        .reset_index()
-    )
+    index_cols = [col for col in ("algo", "seed", "regime") if col in raw.columns]
+    pivot = raw.pivot_table(index=index_cols, columns="metric", values="value", aggfunc="mean").reset_index()
     if pivot.empty:
         raise RuntimeError("Cannot build IRE coordinates without data")
 

@@ -106,6 +106,8 @@ def run_pipeline(args: argparse.Namespace) -> None:
     if args.out:
         report_cfg["outputs_dir"] = args.out
         config["report"] = report_cfg
+    if args.table:
+        report_cfg["diagnostics_table"] = args.table
     if args.lite:
         report_cfg["seeds"] = min(int(report_cfg.get("seeds", 5)), 5)
     config["report"] = report_cfg
@@ -141,6 +143,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
 def parse_args(argv: List[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Aggregate 30-seed diagnostics into report assets")
     parser.add_argument("--config", required=True, help="Path to YAML configuration")
+    parser.add_argument("--table", help="Path to diagnostics parquet overriding config")
     parser.add_argument("--lite", action="store_true", help="Run in lite mode (≤5 seeds, lighter plots)")
     parser.add_argument("--out", help="Override outputs directory")
     parser.add_argument("--skip-3d", action="store_true", help="Skip IRE 3D rendering")

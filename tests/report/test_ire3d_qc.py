@@ -16,10 +16,34 @@ def _make_raw() -> pd.DataFrame:
             base = seed if regime == "train_main" else seed + 0.5
             records.extend(
                 [
-                    {"run_path": "run", "seed": seed, "regime": regime, "metric": "IG", "value": 0.3 + 0.02 * base},
-                    {"run_path": "run", "seed": seed, "regime": regime, "metric": "CVaR_95", "value": -0.1 - 0.03 * base},
-                    {"run_path": "run", "seed": seed, "regime": regime, "metric": "ER_mean_pnl", "value": 0.2 - 0.01 * base},
-                    {"run_path": "run", "seed": seed, "regime": regime, "metric": "TR_turnover", "value": 1.0 + 0.02 * base},
+                    {
+                        "algo": "erm",
+                        "seed": seed,
+                        "regime": regime,
+                        "metric": "IG",
+                        "value": 0.3 + 0.02 * base,
+                    },
+                    {
+                        "algo": "erm",
+                        "seed": seed,
+                        "regime": regime,
+                        "metric": "CVaR_95",
+                        "value": -0.1 - 0.03 * base,
+                    },
+                    {
+                        "algo": "erm",
+                        "seed": seed,
+                        "regime": regime,
+                        "metric": "ER_mean_pnl",
+                        "value": 0.2 - 0.01 * base,
+                    },
+                    {
+                        "algo": "erm",
+                        "seed": seed,
+                        "regime": regime,
+                        "metric": "TR_turnover",
+                        "value": 1.0 + 0.02 * base,
+                    },
                 ]
             )
     return pd.DataFrame(records)

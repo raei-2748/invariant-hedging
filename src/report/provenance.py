@@ -28,7 +28,9 @@ def build_manifest(
         "config_hash": hash_config_section(report_config),
         "regimes": result.regimes,
         "ci_level": report_config.get("confidence_level"),
-        "seed_files": [str(sel.diagnostics_path) for sel in result.selected_seeds],
+        "diagnostics_table": str(result.diagnostics_path),
+        "algo": result.algo,
+        "seeds": result.seeds,
     }
     if extra:
         manifest.update(extra)

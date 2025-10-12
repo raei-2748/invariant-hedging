@@ -1,4 +1,7 @@
 report:
+  diagnostics_table: "<required>"
+  split: "eval"
+  algo: "baseline_erm"
   seeds: 30
   seed_dirs: ["runs/*"]
   outputs_dir: "outputs/report_assets"

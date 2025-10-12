@@ -211,14 +211,10 @@ def plot_efficiency_frontier(
     _apply_style(fig_cfg)
     _ensure_dir(output_dir)
 
+    index_cols = [col for col in ("algo", "seed", "regime") if col in raw.columns]
     pivot = (
         raw[raw["metric"].isin([efficiency_metric, turnover_metric])]
-        .pivot_table(
-            index=["run_path", "seed", "regime"],
-            columns="metric",
-            values="value",
-            aggfunc="mean",
-        )
+        .pivot_table(index=index_cols, columns="metric", values="value", aggfunc="mean")
         .reset_index()
     )
     if pivot.empty:

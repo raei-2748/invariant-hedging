@@ -40,7 +40,11 @@ report:
 	PYTHONPATH=. $(PYTHON) scripts/aggregate.py --config configs/report/default.yaml
 
 report-lite:
-	PYTHONPATH=. $(PYTHON) scripts/aggregate.py --config configs/report/default.yaml --lite
+        @if [ -z "$(DIAGNOSTICS)" ]; then \
+                echo "DIAGNOSTICS path required, e.g. make report-lite DIAGNOSTICS=artifacts/run/diagnostics.parquet"; \
+                exit 1; \
+        fi
+        PYTHONPATH=. $(PYTHON) scripts/aggregate.py --config configs/report/default.yaml --table $(DIAGNOSTICS) --lite
 
 report-paper:
 	PYTHONPATH=. $(PYTHON) scripts/aggregate.py --config configs/report/paper.yaml
