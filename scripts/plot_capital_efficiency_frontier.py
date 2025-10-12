@@ -48,7 +48,15 @@ def create_figure(
         LOGGER.warning("Missing capital-efficiency frontier at %s; skipping figure", csv_path)
         return False
 
-    frame = read_capital_efficiency_frontier(csv_path)
+    try:
+        frame = read_capital_efficiency_frontier(csv_path)
+    except ValueError as exc:
+        LOGGER.warning(
+            "Invalid capital-efficiency frontier schema at %s: %s; skipping figure",
+            csv_path,
+            exc,
+        )
+        return False
     frame = maybe_filter_seeds(frame, seed_filter)
     frame = maybe_filter_regimes(frame, regime_filter)
     if frame.empty:

@@ -86,7 +86,15 @@ def create_figure(
         LOGGER.warning("Missing diagnostics summary at %s; skipping I-R-E figure", csv_path)
         return False
 
-    frame = read_diagnostics_summary(csv_path)
+    try:
+        frame = read_diagnostics_summary(csv_path)
+    except ValueError as exc:
+        LOGGER.warning(
+            "Invalid diagnostics summary schema at %s: %s; skipping I-R-E figure",
+            csv_path,
+            exc,
+        )
+        return False
     frame = maybe_filter_seeds(frame, seed_filter)
     frame = maybe_filter_regimes(frame, regime_filter)
     if frame.empty:

@@ -66,7 +66,15 @@ def create_figure(
         LOGGER.warning("Missing invariance diagnostics at %s; skipping figure", csv_path)
         return False
 
-    frame = read_invariance_diagnostics(csv_path)
+    try:
+        frame = read_invariance_diagnostics(csv_path)
+    except ValueError as exc:
+        LOGGER.warning(
+            "Invalid invariance diagnostics schema at %s: %s; skipping figure",
+            csv_path,
+            exc,
+        )
+        return False
     frame = maybe_filter_seeds(frame, seed_filter)
     frame = maybe_filter_regimes(frame, regime_filter)
     if frame.empty:

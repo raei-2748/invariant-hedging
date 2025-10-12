@@ -36,7 +36,15 @@ def create_figure(
         LOGGER.warning("Missing alignment diagnostics at %s; skipping alignment curves", csv_path)
         return False
 
-    frame = read_alignment_head(csv_path)
+    try:
+        frame = read_alignment_head(csv_path)
+    except ValueError as exc:
+        LOGGER.warning(
+            "Invalid alignment diagnostics schema at %s: %s; skipping alignment curves",
+            csv_path,
+            exc,
+        )
+        return False
     if "seed" in frame.columns:
         frame = maybe_filter_seeds(frame, seed_filter)
     elif seed_filter is not None:

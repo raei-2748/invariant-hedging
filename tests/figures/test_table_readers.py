@@ -82,6 +82,25 @@ def test_read_capital_efficiency_frontier(tmp_path: Path) -> None:
     assert pytest.approx(frame.loc[0, "ER"], rel=1e-6) == 0.25
 
 
+def test_capital_efficiency_alias_columns(tmp_path: Path) -> None:
+    csv_path = tmp_path / "capital_efficiency_frontier.csv"
+    _write_csv(
+        csv_path,
+        {
+            "method": ["GroupDRO"],
+            "seed": [3],
+            "regime": ["stress"],
+            "meanpnl_crisis": [0.12],
+            "es95_crisis": [0.45],
+            "expected_return": [0.18],
+            "turnover_crisis": [0.32],
+        },
+    )
+
+    frame = read_capital_efficiency_frontier(csv_path)
+    assert list(frame.columns)[:4] == ["model", "seed", "regime_name", "mean_pnl"]
+
+
 def test_read_diagnostics_summary_filters(tmp_path: Path) -> None:
     csv_path = tmp_path / "diagnostics_summary.csv"
     _write_csv(
@@ -109,6 +128,29 @@ def test_read_diagnostics_summary_filters(tmp_path: Path) -> None:
     assert filtered_regime["regime_name"].unique().tolist() == ["crisis_b"]
 
 
+def test_diagnostics_summary_alias_columns(tmp_path: Path) -> None:
+    csv_path = tmp_path / "diagnostics_summary.csv"
+    _write_csv(
+        csv_path,
+        {
+            "method": ["ERM"],
+            "seed": [5],
+            "regime": ["crisis"],
+            "split": ["test"],
+            "isi": [0.4],
+            "ig": [0.12],
+            "ig_norm": [1.5],
+            "es95_crisis": [0.8],
+            "meanpnl_crisis": [0.05],
+            "turnover_crisis": [0.2],
+            "expected_return": [0.11],
+        },
+    )
+
+    frame = read_diagnostics_summary(csv_path)
+    assert set(["model", "CVaR95", "mean_pnl", "TR", "ER"]).issubset(frame.columns)
+
+
 def test_read_alignment_head(tmp_path: Path) -> None:
     csv_path = tmp_path / "alignment_head.csv"
     _write_csv(
@@ -125,4 +167,20 @@ def test_read_alignment_head(tmp_path: Path) -> None:
 
     frame = read_alignment_head(csv_path)
     assert list(frame.columns)[-2:] == ["avg_risk", "cosine_alignment"]
+
+
+def test_alignment_head_alias_columns(tmp_path: Path) -> None:
+    csv_path = tmp_path / "alignment_head.csv"
+    _write_csv(
+        csv_path,
+        {
+            "step": [1, 2],
+            "pair_index": [0, 0],
+            "penalty": [0.1, 0.1],
+            "alignment": [0.7, 0.65],
+        },
+    )
+
+    frame = read_alignment_head(csv_path)
+    assert list(frame.columns) == ["step", "pair", "penalty_value", "cosine_alignment"]
 

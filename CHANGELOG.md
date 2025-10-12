@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 - Added figure-generation pipeline converting Track 4 tables into publication-ready plots, CLI entrypoints, and manifest logging.
 - Documented plotting workflow and added CI coverage plus artifact export.
+- Hardened the figure pipeline against schema drift with table-column aliases and defensive skipping for missing diagnostics.
 
 ## v0.1.0 - 2025-10-04
 

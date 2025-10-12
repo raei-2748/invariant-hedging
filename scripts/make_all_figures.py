@@ -61,7 +61,17 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     LOGGER.info("Generating figures into %s", out_dir)
 
-    plot_invariance_vs_ig.create_figure(
+    def _safe_generate(label: str, func, **kwargs) -> None:
+        try:
+            created = func(**kwargs)
+            if not created:
+                LOGGER.info("Figure '%s' skipped", label)
+        except Exception as exc:  # pragma: no cover - defensive guard
+            LOGGER.warning("Failed to generate '%s': %s", label, exc)
+
+    _safe_generate(
+        "fig_invariance_vs_ig",
+        plot_invariance_vs_ig.create_figure,
         run_dir=run_dir,
         out_dir=out_dir,
         dpi=args.dpi,
@@ -71,7 +81,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         regime_filter=regimes,
     )
 
-    plot_capital_efficiency_frontier.create_figure(
+    _safe_generate(
+        "fig_capital_efficiency_frontier",
+        plot_capital_efficiency_frontier.create_figure,
         run_dir=run_dir,
         out_dir=out_dir,
         dpi=args.dpi,
@@ -81,7 +93,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         regime_filter=regimes,
     )
 
-    plot_ire_scatter_3d.create_figure(
+    _safe_generate(
+        "fig_ire_scatter_3d",
+        plot_ire_scatter_3d.create_figure,
         run_dir=run_dir,
         out_dir=out_dir,
         dpi=args.dpi,
@@ -94,7 +108,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         separate_by_regime=args.separate_by_regime,
     )
 
-    plot_regime_panels.create_figure(
+    _safe_generate(
+        "fig_regime_panels",
+        plot_regime_panels.create_figure,
         run_dir=run_dir,
         out_dir=out_dir,
         dpi=args.dpi,
@@ -104,7 +120,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         regime_filter=regimes,
     )
 
-    plot_alignment_curves.create_figure(
+    _safe_generate(
+        "fig_alignment_curves",
+        plot_alignment_curves.create_figure,
         run_dir=run_dir,
         out_dir=out_dir,
         dpi=args.dpi,
