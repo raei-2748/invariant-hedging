@@ -6,5 +6,5 @@ hourly:
   batch_size: 32
 
 baselines:
-  include: [no_hedge, delta]
+  include: [no_hedge, delta, delta_gamma]
   table_path: baseline_metrics.csv
