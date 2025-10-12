@@ -45,8 +45,21 @@ jobs:
           CKPT=$(python scripts/find_latest_checkpoint.py "$RUN_DIR")
           python -m src.eval --config-name=train/phase2 eval.report.checkpoint_path="$CKPT" logging.wandb.enabled=false
 
+      - name: Make Figures
+        run: |
+          RUN_DIR=$(readlink -f runs/latest)
+          python scripts/make_all_figures.py --run_dir "$RUN_DIR"
+
       - name: SPY data-loader checks
         run: pytest tests/test_spy_loader.py
+
+      - name: Upload Figures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: figures
+          path: runs/latest/figures
+          if-no-files-found: ignore
 
       - name: Prepare failure artifacts
         if: failure()
