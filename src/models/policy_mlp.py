@@ -7,9 +7,10 @@ import torch
 from torch import nn
 
 from .heads import RepresentationHead
+from .policy import Policy
 
 
-class PolicyMLP(nn.Module):
+class PolicyMLP(Policy):
     def __init__(
         self,
         feature_dim: int,
@@ -21,8 +22,10 @@ class PolicyMLP(nn.Module):
         representation_dim: int,
         adapter_hidden: int,
         max_position: float,
+        *,
+        head_name: str | None = None,
     ) -> None:
-        super().__init__()
+        super().__init__(head_name=head_name or "decision_head")
         layers = []
         input_dim = feature_dim
         for _ in range(hidden_depth):
@@ -35,7 +38,7 @@ class PolicyMLP(nn.Module):
             input_dim = hidden_width
         self.backbone = nn.Sequential(*layers)
         self.representation = RepresentationHead(hidden_width, hidden_width, representation_dim)
-        self.env_adapters = nn.ModuleList(
+        adapters = nn.ModuleList(
             [
                 nn.Sequential(
                     nn.Linear(representation_dim, adapter_hidden),
@@ -45,6 +48,9 @@ class PolicyMLP(nn.Module):
                 for _ in range(num_envs)
             ]
         )
+        self.env_adapters = adapters
+        # Provide a consistent head alias for psi-parameter selection.
+        self.decision_head = adapters
         self.max_position = max_position
 
     def forward(
@@ -55,6 +61,8 @@ class PolicyMLP(nn.Module):
     ) -> dict[str, torch.Tensor]:
         h = self.backbone(features)
         rep = self.representation(h)
+        if self.should_detach_features():
+            rep = rep.detach()
         scale = representation_scale if representation_scale is not None else 1.0
         scaled_rep = rep * scale
         adapter = self.env_adapters[env_index]

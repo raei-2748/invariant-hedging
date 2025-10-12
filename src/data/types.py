@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Union
+from typing import Any, Dict
 
 import torch
 
@@ -17,7 +17,7 @@ class EpisodeBatch:
     time_to_maturity: torch.Tensor
     rate: float
     env_name: str
-    meta: Dict[str, Union[float, str]]
+    meta: Dict[str, Any]
 
     def to(self, device: torch.device) -> "EpisodeBatch":
         return EpisodeBatch(
