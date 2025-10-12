@@ -162,11 +162,11 @@ def main() -> None:
                 episode_pnls: List[float] = []
                 aggregates: Dict[str, List[float]] = defaultdict(list)
                 jump_sizes_all: List[float] = []
-                total_steps = 0
+                episodes_processed = 0
                 for episode in range(episode_cfg["count"]):
                     episode_seed = seed + spec.seed_offset + episode
                     path = simulate_heston(heston_params, seed=episode_seed)
-                    total_steps += len(path) - 1
+                    episodes_processed += 1
                     stressed, _ = _apply_jump(path, jump_cfg, spec.stress_jump, episode_seed)
                     liquidity_cost = _apply_liquidity(
                         stressed,
@@ -200,7 +200,7 @@ def main() -> None:
                 mean_slip = float(np.mean(aggregates["mean_slippage"]) if aggregates["mean_slippage"] else 0.0)
                 turnover = float(np.mean(aggregates["turnover"]) if aggregates["turnover"] else 0.0)
                 jump_count = int(jump_sizes.size)
-                jump_freq = float(jump_count / max(total_steps, 1))
+                jump_freq = float(jump_count / max(episodes_processed, 1))
                 jump_mean = float(np.mean(jump_sizes)) if jump_sizes.size else 0.0
                 jump_std = float(np.std(jump_sizes)) if jump_sizes.size else 0.0
                 stress_summary = {
