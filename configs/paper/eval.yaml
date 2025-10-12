@@ -1,0 +1,24 @@
+# Baseline-only evaluation configuration used for regression tests.
+defaults:
+  - ../experiment
+  - _self_
+
+hydra:
+  config:
+    struct: false
+
+method: delta
+
+model:
+  name: delta
+  objective: delta
+  max_position: 5.0
+
+eval:
+  report:
+    checkpoint_path: null
+  baselines:
+    include: [delta, delta_gamma]
+
+runtime:
+  device: cpu

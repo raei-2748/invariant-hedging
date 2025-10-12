@@ -16,6 +16,7 @@ import pandas as pd
 import torch
 from omegaconf import DictConfig, OmegaConf
 
+from .baselines import DeltaBaselinePolicy, DeltaGammaBaselinePolicy
 from .data.features import FeatureEngineer, FeatureScaler
 from .diagnostics.export import DiagnosticsRunContext, gather_and_export
 from .data.types import EpisodeBatch
@@ -270,32 +271,19 @@ class _ZeroPolicy:
         return {"action": zeros, "raw_action": zeros}
 
 
-class _DeltaBaselinePolicy:
-    def __init__(self, scaler: FeatureScaler, max_position: float) -> None:
-        self.mean = scaler.mean.clone().detach()
-        self.std = torch.clamp(scaler.std.clone().detach(), min=1e-6)
-        self.max_position = max_position
-
-    def to(self, device: torch.device) -> "_DeltaBaselinePolicy":
-        self.mean = self.mean.to(device)
-        self.std = self.std.to(device)
-        return self
-
-    def eval(self) -> "_DeltaBaselinePolicy":  # pragma: no cover - trivial
-        return self
-
-    def __call__(self, features: torch.Tensor, env_index: int, representation_scale=None) -> Dict[str, torch.Tensor]:
-        delta = features[:, 0] * self.std[0] + self.mean[0]
-        action = delta.unsqueeze(-1).clamp(-self.max_position, self.max_position)
-        return {"action": action, "raw_action": action}
-
-
-def _baseline_policy(name: str, scaler: FeatureScaler, max_position: float):
+def _baseline_policy(
+    name: str,
+    scaler: FeatureScaler,
+    feature_names: Sequence[str],
+    max_position: float,
+):
     key = name.lower()
     if key == "no_hedge":
         return _ZeroPolicy()
     if key == "delta":
-        return _DeltaBaselinePolicy(scaler, max_position)
+        return DeltaBaselinePolicy(scaler, feature_names, max_position)
+    if key == "delta_gamma":
+        return DeltaGammaBaselinePolicy(scaler, feature_names, max_position)
     raise ValueError(f"Unsupported baseline '{name}'")
 
 
@@ -307,12 +295,16 @@ def _evaluate_baselines(
     primary_alpha: float,
     es_keys: Sequence[str],
     scaler: FeatureScaler,
+    feature_names: Sequence[str],
     max_position: float,
 ) -> List[Dict[str, float]]:
     records: List[Dict[str, float]] = []
     for name in names:
-        policy = _baseline_policy(name, scaler, max_position).to(device)
+        policy = _baseline_policy(name, scaler, feature_names, max_position).to(device)
         for env_name, env in envs.items():
+            reset_fn = getattr(policy, "reset", None)
+            if callable(reset_fn):
+                reset_fn(env.env_index)
             with torch.no_grad():
                 result = _evaluate_env(policy, env, device, alphas, primary_alpha, es_keys)
             summary = {
@@ -698,35 +690,59 @@ def main(cfg: DictConfig) -> None:
     device = _device(cfg.get("runtime", {}))
     data_ctx = prepare_data_module(cfg)
     feature_engineer = FeatureEngineer()
-
-    policy = _policy_from_cfg(
-        cfg,
-        feature_dim=len(feature_engineer.feature_names),
-        num_envs=len(data_ctx.env_order),
-    )
-    policy.to(device)
-
-    checkpoint_path = cfg.eval.report.get("checkpoint_path")
-    if checkpoint_path in (None, ""):
-        raise ValueError("evaluation.report.checkpoint_path must be provided")
-    state = torch.load(Path(checkpoint_path), map_location=device)
-    policy.load_state_dict(state["model"])
-    scaler_state = state.get("scaler")
-    if scaler_state is None:
-        raise ValueError("Checkpoint missing feature scaler state")
-    feature_engineer.scaler = FeatureScaler(
-        mean=torch.as_tensor(scaler_state["mean"], dtype=torch.float32),
-        std=torch.as_tensor(scaler_state["std"], dtype=torch.float32),
-    )
-
-    policy.eval()
-    run_logger = log_utils.RunLogger(OmegaConf.to_container(cfg.logging, resolve=True), resolved_cfg)
+    method_name = _method_from_cfg(cfg) or str(getattr(cfg.model, "name", "unknown"))
+    baseline_name = method_name.lower() if method_name else ""
+    model_cfg = cfg.get("model") if cfg is not None else None
+    max_position = float(getattr(model_cfg, "max_position", 5.0)) if model_cfg is not None else 5.0
+    supported_baselines = {"delta", "delta_gamma", "no_hedge"}
+    is_baseline_method = baseline_name in supported_baselines
 
     compute_per_env = bool(cfg.eval.get("compute_per_env_metrics", True))
+    train_batches: Dict[str, EpisodeBatch] = {}
+    if (is_baseline_method or compute_per_env) and cfg.envs.train:
+        train_batches = data_ctx.data_module.prepare("train", cfg.envs.train)
+
+    if is_baseline_method:
+        if not train_batches:
+            raise ValueError(
+                "Baseline evaluation requires training environments to fit feature statistics."
+            )
+        scaler = feature_engineer.fit(train_batches.values())
+        policy = _baseline_policy(
+            baseline_name,
+            scaler,
+            feature_engineer.feature_names,
+            max_position,
+        ).to(device)
+        policy.eval()
+    else:
+        policy = _policy_from_cfg(
+            cfg,
+            feature_dim=len(feature_engineer.feature_names),
+            num_envs=len(data_ctx.env_order),
+        )
+        policy.to(device)
+
+        checkpoint_path = cfg.eval.report.get("checkpoint_path")
+        if checkpoint_path in (None, ""):
+            raise ValueError("evaluation.report.checkpoint_path must be provided")
+        state = torch.load(Path(checkpoint_path), map_location=device)
+        policy.load_state_dict(state["model"])
+        scaler_state = state.get("scaler")
+        if scaler_state is None:
+            raise ValueError("Checkpoint missing feature scaler state")
+        feature_engineer.scaler = FeatureScaler(
+            mean=torch.as_tensor(scaler_state["mean"], dtype=torch.float32),
+            std=torch.as_tensor(scaler_state["std"], dtype=torch.float32),
+        )
+        policy.eval()
+
+    run_logger = log_utils.RunLogger(OmegaConf.to_container(cfg.logging, resolve=True), resolved_cfg)
+
     env_batches: Dict[str, Dict[str, EpisodeBatch]] = {}
     env_batches["test"] = data_ctx.data_module.prepare("test", cfg.envs.test)
     if compute_per_env and cfg.envs.train:
-        env_batches["train"] = data_ctx.data_module.prepare("train", cfg.envs.train)
+        env_batches["train"] = train_batches or data_ctx.data_module.prepare("train", cfg.envs.train)
     if compute_per_env and cfg.envs.get("val"):
         env_batches["val"] = data_ctx.data_module.prepare("val", cfg.envs.val)
 
@@ -756,7 +772,6 @@ def main(cfg: DictConfig) -> None:
     global _RISK_KEYS
     _RISK_KEYS = tuple([*es_keys, "Mean", "SharpeRisk", "Turnover"])
 
-    method_name = _method_from_cfg(cfg) or str(getattr(cfg.model, "name", "unknown"))
     config_tag = _config_tag_from_cfg(cfg)
     seed_value = int(cfg.get("runtime", {}).get("seed", 0))
     commit_full = log_utils._get_git_commit()
@@ -766,6 +781,7 @@ def main(cfg: DictConfig) -> None:
     env_metric_payload: Dict[str, Dict[str, object]] = {}
     train_metrics: Dict[str, Dict[str, float]] = {}
     test_metrics: Dict[str, Dict[str, float]] = {}
+    baseline_records: List[Dict[str, float]] = []
 
     for split, split_envs in env_splits.items():
         for env_name, env in split_envs.items():
@@ -866,7 +882,8 @@ def main(cfg: DictConfig) -> None:
                 primary_alpha,
                 es_keys,
                 feature_engineer.scaler,
-                float(cfg.model.max_position),
+                feature_engineer.feature_names,
+                max_position,
             )
             baseline_df = pd.DataFrame(baseline_records)
             baseline_path = Path(run_logger.artifacts_dir) / baseline_cfg.get(
@@ -1045,6 +1062,29 @@ def main(cfg: DictConfig) -> None:
     for comp_key, comp_value in diagnostics_record["MSI"].items():
         if isinstance(comp_value, (int, float)) and comp_value is not None and not math.isnan(comp_value):
             final_metrics[f"diagnostics/MSI/{comp_key}"] = float(comp_value)
+
+    if baseline_records:
+        metric_keys = [*es_keys, "Mean", "SharpeRisk", "Turnover", "mean_pnl", "sharpe", "turnover", "cvar"]
+        interval_keys = ["cvar_lower", "cvar_upper"]
+        for record in baseline_records:
+            baseline_name = record.get("baseline")
+            env_name = record.get("env")
+            if not baseline_name or not env_name:
+                continue
+            for key in metric_keys:
+                value = record.get(key)
+                if value is None:
+                    continue
+                if isinstance(value, float) and math.isnan(value):
+                    continue
+                final_metrics[f"baseline/{baseline_name}/{env_name}/{key}"] = float(value)
+            for key in interval_keys:
+                value = record.get(key)
+                if value is None:
+                    continue
+                if isinstance(value, float) and math.isnan(value):
+                    continue
+                final_metrics[f"baseline/{baseline_name}/{env_name}/{key}"] = float(value)
 
     run_logger.log_final(final_metrics)
     run_logger.close()
