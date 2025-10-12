@@ -128,3 +128,6 @@ Miniforge3-MacOSX-arm64.sh
 
 # W&B
 wandb/
+# Data artefacts
+data/external/
+data/raw/
