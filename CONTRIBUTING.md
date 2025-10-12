@@ -38,4 +38,9 @@ expected workflow and conventions.
 
 - Reference the GitHub issue when applicable.
 - Summarise user-facing changes and include relevant metrics or screenshots.
-- CI must pass before requesting review.
+- CI must pass before requesting review. Branch protection requires the following
+  workflows to succeed on every pull request:
+  - **CI Smoke** — linting, unit tests, paper-config smoke train/eval, and the SPY
+    data-loader checks.
+  - **CI Dependencies** — captures the package environment, CUDA metadata, and the
+    `paper_provenance.py` manifest used for reproducibility verification.

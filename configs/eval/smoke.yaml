@@ -24,5 +24,5 @@ eval:
     include_hourly: false
     checkpoint_path: null
   baselines:
-    include: [no_hedge, delta]
+    include: [no_hedge, delta, delta_gamma]
     table_path: smoke_baselines.csv
