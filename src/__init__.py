@@ -21,5 +21,9 @@ _OPENMP_DEFAULTS = {
 for _key, _value in _OPENMP_DEFAULTS.items():
     os.environ.setdefault(_key, _value)
 
+# Allow OmegaConf to load configuration files that intentionally reuse keys
+# for separate Hydra packages (e.g. ``train`` at the runtime and dataset level).
+os.environ.setdefault("OMEGACONF_ALLOW_DUPLICATE_KEYS", "true")
+
 
 __all__: list[str] = []

@@ -8,6 +8,7 @@ from hydra.utils import to_absolute_path
 from omegaconf import DictConfig, OmegaConf
 
 from ..data.features import FeatureEngineer
+from ..data.real.loader import RealAnchorDataModule
 from ..data.real.spy_emini import SpyEminiDataModule
 from ..data.real_spy_loader import RealSpyDataModule
 from ..data.synthetic import SyntheticDataModule
@@ -83,6 +84,18 @@ def prepare_data_module(cfg: DictConfig, seed: Optional[int] = None) -> DataModu
             name_to_index=name_to_index,
             env_configs=env_cfgs,
             cost_configs=cost_cfgs,
+        )
+    source = str(data_cfg.get("source", "")).lower()
+    if source == "real":
+        data_module = RealAnchorDataModule(data_cfg)
+        env_order = data_module.env_order
+        name_to_index = {name: idx for idx, name in enumerate(env_order)}
+        return DataModuleContext(
+            data_module=data_module,
+            env_order=env_order,
+            name_to_index=name_to_index,
+            env_configs={},
+            cost_configs={},
         )
     if dataset_name in {"real", "real_spy"}:
         data_module = SpyEminiDataModule(data_cfg.get("real", data_cfg))
