@@ -3,7 +3,7 @@ defaults:
   - _self_
 
 wandb:
-  enabled: ${oc.get:logger.use_wandb,false}
+  enabled: ${logger.use_wandb}
   mode: ${oc.env:WANDB_MODE, null}
   entity: null
   project: ${project.name}
