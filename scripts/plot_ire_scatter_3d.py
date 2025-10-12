@@ -1,4 +1,4 @@
-"""3D scatter plot for I-R-E geometry."""
+"""CLI for the invariance-robustness-efficiency scatter figure."""
 
 from __future__ import annotations
 
@@ -7,6 +7,23 @@ import logging
 import math
 from pathlib import Path
 from typing import Iterable, Sequence
+
+try:  # pragma: no cover
+    from ._cli import (
+        bootstrap_cli_environment,
+        env_override,
+        parse_regime_filter,
+        parse_seed_filter,
+    )
+except ImportError:  # pragma: no cover
+    from _cli import (  # type: ignore
+        bootstrap_cli_environment,
+        env_override,
+        parse_regime_filter,
+        parse_seed_filter,
+    )
+
+bootstrap_cli_environment()
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -21,19 +38,6 @@ from infra.tables import (
 )
 
 LOGGER = logging.getLogger(__name__)
-
-
-def _parse_seed_filter(value: str | None) -> list[int] | None:
-    if value is None or value.lower() == "all":
-        return None
-    tokens = [token.strip() for token in value.split(",") if token.strip()]
-    return [int(token) for token in tokens]
-
-
-def _parse_regime_filter(value: str | None) -> list[str] | None:
-    if value is None or value.lower() == "all":
-        return None
-    return [token.strip() for token in value.split(",") if token.strip()]
 
 
 def _resolve_robustness(frame: pd.DataFrame) -> np.ndarray:
@@ -243,16 +247,21 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
-    formats = parse_formats(args.format)
-    seeds = _parse_seed_filter(args.seed_filter)
-    regimes = _parse_regime_filter(args.regime_filter)
+    format_spec = env_override(args.format, "FIGURE_FORMATS")
+    style = env_override(args.style, "FIGURE_STYLE")
+    seed_spec = env_override(args.seed_filter, "FIGURE_SEED_FILTER")
+    regime_spec = env_override(args.regime_filter, "FIGURE_REGIME_FILTER")
+
+    formats = parse_formats(format_spec)
+    seeds = parse_seed_filter(seed_spec)
+    regimes = parse_regime_filter(regime_spec)
 
     create_figure(
         run_dir=args.run_dir,
         out_dir=args.out_dir,
         dpi=args.dpi,
         formats=formats,
-        style=args.style,
+        style=style,
         seed_filter=seeds,
         regime_filter=regimes,
         eff_axis=args.eff_axis,

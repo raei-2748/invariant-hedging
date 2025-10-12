@@ -7,6 +7,23 @@ import logging
 from pathlib import Path
 from typing import Iterable, Sequence
 
+try:  # pragma: no cover - prefer package-relative import
+    from ._cli import (
+        bootstrap_cli_environment,
+        env_override,
+        parse_regime_filter,
+        parse_seed_filter,
+    )
+except ImportError:  # pragma: no cover - fall back when executed as script
+    from _cli import (  # type: ignore
+        bootstrap_cli_environment,
+        env_override,
+        parse_regime_filter,
+        parse_seed_filter,
+    )
+
+bootstrap_cli_environment()
+
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats
@@ -27,27 +44,6 @@ MARKERS = {
     "validation": "s",
     "test": "^",
 }
-
-
-def _parse_seed_filter(value: str | None) -> list[int] | None:
-    if value is None or value.lower() == "all":
-        return None
-    seeds: list[int] = []
-    for token in value.split(","):
-        stripped = token.strip()
-        if not stripped:
-            continue
-        seeds.append(int(stripped))
-    return seeds or None
-
-
-def _parse_regime_filter(value: str | None) -> list[str] | None:
-    if value is None or value.lower() == "all":
-        return None
-    regimes = [token.strip() for token in value.split(",") if token.strip()]
-    return regimes or None
-
-
 def create_figure(
     *,
     run_dir: Path,
@@ -174,16 +170,21 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
-    formats = parse_formats(args.format)
-    seeds = _parse_seed_filter(args.seed_filter)
-    regimes = _parse_regime_filter(args.regime_filter)
+    format_spec = env_override(args.format, "FIGURE_FORMATS")
+    style = env_override(args.style, "FIGURE_STYLE")
+    seed_spec = env_override(args.seed_filter, "FIGURE_SEED_FILTER")
+    regime_spec = env_override(args.regime_filter, "FIGURE_REGIME_FILTER")
+
+    formats = parse_formats(format_spec)
+    seeds = parse_seed_filter(seed_spec)
+    regimes = parse_regime_filter(regime_spec)
 
     created = create_figure(
         run_dir=args.run_dir,
         out_dir=args.out_dir,
         dpi=args.dpi,
         formats=formats,
-        style=args.style,
+        style=style,
         seed_filter=seeds,
         regime_filter=regimes,
     )

@@ -7,6 +7,23 @@ import logging
 from pathlib import Path
 from typing import Sequence
 
+try:  # pragma: no cover - import fallback for direct execution
+    from ._cli import (
+        bootstrap_cli_environment,
+        env_override,
+        parse_regime_filter,
+        parse_seed_filter,
+    )
+except ImportError:  # pragma: no cover - executed when run as a script
+    from _cli import (  # type: ignore
+        bootstrap_cli_environment,
+        env_override,
+        parse_regime_filter,
+        parse_seed_filter,
+    )
+
+bootstrap_cli_environment()
+
 from infra.plot_io import ensure_out_dir, parse_formats
 from scripts import (
     plot_alignment_curves,
@@ -17,20 +34,6 @@ from scripts import (
 )
 
 LOGGER = logging.getLogger(__name__)
-
-
-def _parse_seed_filter(value: str | None) -> list[int] | None:
-    if value is None or value.lower() == "all":
-        return None
-    return [int(token.strip()) for token in value.split(",") if token.strip()]
-
-
-def _parse_regime_filter(value: str | None) -> list[str] | None:
-    if value is None or value.lower() == "all":
-        return None
-    return [token.strip() for token in value.split(",") if token.strip()]
-
-
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run_dir", type=Path, required=True)
@@ -52,9 +55,14 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
-    formats = parse_formats(args.format)
-    seeds = _parse_seed_filter(args.seed_filter)
-    regimes = _parse_regime_filter(args.regime_filter)
+    format_spec = env_override(args.format, "FIGURE_FORMATS")
+    style = env_override(args.style, "FIGURE_STYLE")
+    seed_spec = env_override(args.seed_filter, "FIGURE_SEED_FILTER")
+    regime_spec = env_override(args.regime_filter, "FIGURE_REGIME_FILTER")
+
+    formats = parse_formats(format_spec)
+    seeds = parse_seed_filter(seed_spec)
+    regimes = parse_regime_filter(regime_spec)
 
     run_dir = args.run_dir
     out_dir = ensure_out_dir(run_dir, args.out_dir)
@@ -76,7 +84,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         out_dir=out_dir,
         dpi=args.dpi,
         formats=formats,
-        style=args.style,
+        style=style,
         seed_filter=seeds,
         regime_filter=regimes,
     )
@@ -88,7 +96,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         out_dir=out_dir,
         dpi=args.dpi,
         formats=formats,
-        style=args.style,
+        style=style,
         seed_filter=seeds,
         regime_filter=regimes,
     )
@@ -100,7 +108,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         out_dir=out_dir,
         dpi=args.dpi,
         formats=formats,
-        style=args.style,
+        style=style,
         seed_filter=seeds,
         regime_filter=regimes,
         eff_axis=args.eff_axis,
@@ -115,7 +123,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         out_dir=out_dir,
         dpi=args.dpi,
         formats=formats,
-        style=args.style,
+        style=style,
         seed_filter=seeds,
         regime_filter=regimes,
     )
@@ -127,7 +135,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         out_dir=out_dir,
         dpi=args.dpi,
         formats=formats,
-        style=args.style,
+        style=style,
         seed_filter=seeds,
     )
 
