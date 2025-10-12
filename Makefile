@@ -7,6 +7,7 @@ SMOKE ?= 0
 DATA_ROOT ?= data
 .PHONY: setup train evaluate reproduce lint tests smoke phase2 report report-lite phase2_scorecard paper
 .PHONY: setup train evaluate reproduce lint tests smoke phase2 report report-lite report-paper phase2_scorecard
+.PHONY: ci-smoke ci-unit ci-train-lite ci-report-lite
 setup:
 	$(PYTHON) -m pip install -r requirements.txt
 train:
@@ -24,6 +25,22 @@ lint:
 tests:
 	$(PYTHON) -m pytest
 .PHONY: data data-mini
+
+ci-unit:
+	python -m pip install -e .[dev]
+	pytest -q tests/smoke tests/unit
+
+ci-train-lite:
+	python -m src.train \
+	  training.max_steps=150 \
+	  data.loader=smoke \
+	  logging.wandb.enabled=false \
+	  outputs.dir="runs/ci_smoke"
+
+ci-report-lite:
+	python -m src.report.lite --runs "runs/ci_smoke" --no_figures
+
+ci-smoke: ci-unit ci-train-lite ci-report-lite
 data:
 	DATA_DIR=$(DATA_ROOT) tools/fetch_data.sh
 	DATA_DIR=$(DATA_ROOT) $(PYTHON) tools/make_data_snapshot.py --mode both
