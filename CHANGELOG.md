@@ -8,3 +8,9 @@ All notable changes to this project will be documented in this file.
 - Added reproducibility harness (locked requirements, metadata, smoke configs).
 - Introduced CI pipeline with smoke training and reproducibility diff checks.
 - Documented configs, contribution workflow, and Phase 1 metrics.
+
+## Unreleased
+
+- Implemented full diagnostic suite (ISI, IG, WG, VR, ER, TR) with unit tests.
+- Added aggregation script to build consolidated tables for Track 5 figures.
+- Documented diagnostic formulas and outputs in `docs/diagnostics.md`.

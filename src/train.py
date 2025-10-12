@@ -5,7 +5,7 @@ import math
 import os
 import warnings
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, TYPE_CHECKING
 
 import hydra
 import torch
@@ -22,6 +22,9 @@ from .irm.head_grads import compute_env_head_grads, freeze_backbone
 from .irm.penalties import cosine_alignment_penalty, varnorm_penalty
 from .utils import checkpoints, logging as log_utils, seed as seed_utils, stats
 from .utils.configs import build_envs, prepare_data_module, unwrap_experiment_config
+
+if TYPE_CHECKING:  # pragma: no cover - import for type checking only
+    from .envs.single_asset import SingleAssetHedgingEnv
 
 
 
