@@ -1,0 +1,24 @@
+name: real_spy_paper
+cache_dir: data/cache/real_spy
+raw:
+  spy_ohlcv: data/raw/spy_ohlcv.csv
+  optionmetrics: data/raw/optionmetrics
+  cboe: data/raw/cboe
+splits:
+  directory: configs/splits
+  train:
+    - spy_train
+  val:
+    - spy_val
+  test:
+    - spy_test_2018
+    - spy_test_2020
+    - spy_test_2022
+  extra:
+    - spy_test_2008
+rate: 0.01
+base_linear_bps: 5.0
+base_quadratic: 0.0
+base_slippage_multiplier: 1.0
+require_fresh_cache: false
+prefer_parquet: true

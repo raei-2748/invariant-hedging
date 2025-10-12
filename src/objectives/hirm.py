@@ -6,6 +6,7 @@ from typing import Mapping, MutableMapping, Sequence, Tuple
 import torch
 
 from .grad_align import env_variance, normalized_head_grads, pairwise_cosine
+from ..diagnostics import detach_diagnostics
 
 
 def compute_hirm_penalty(
@@ -14,7 +15,7 @@ def compute_hirm_penalty(
     *,
     alignment_weight: float = 1.0,
     variance_weight: float = 0.0,
-) -> Tuple[torch.Tensor, Mapping[str, torch.Tensor]]:
+) -> Tuple[torch.Tensor, Mapping[str, float]]:
     """Return the combined HIRM penalty and diagnostic terms."""
 
     norm_grads = normalized_head_grads(head_grads)
@@ -35,7 +36,7 @@ def compute_hirm_penalty(
         "cosine": mean_cosine,
         "variance_raw": variance_raw,
     }
-    return penalty, diagnostics
+    return penalty, detach_diagnostics(diagnostics)
 
 
 def hirm_loss(
@@ -45,7 +46,7 @@ def hirm_loss(
     lambda_weight: float,
     alignment_weight: float = 1.0,
     variance_weight: float = 0.0,
-) -> Tuple[torch.Tensor, Mapping[str, torch.Tensor]]:
+) -> Tuple[torch.Tensor, Mapping[str, float]]:
     """Compose the per-environment losses with the HIRM penalty."""
 
     if not env_losses:
@@ -62,12 +63,14 @@ def hirm_loss(
     )
     total_loss = base_loss + lambda_weight * penalty
 
-    diagnostics = {
-        **diagnostics,
-        "base": base_loss,
-        "penalty": penalty,
-        "lambda": base_loss.new_tensor(lambda_weight),
-    }
+    diagnostics = detach_diagnostics(
+        {
+            **diagnostics,
+            "base": base_loss,
+            "penalty": penalty,
+            "lambda": base_loss.new_tensor(lambda_weight),
+        }
+    )
     return total_loss, diagnostics
 
 
