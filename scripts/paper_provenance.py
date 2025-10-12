@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""Record provenance for the paper reproduction harness."""
-"""CLI entry-point to capture paper reproducibility metadata."""
+"""Record provenance for the paper reproduction harness.
+
+CLI entry-point to capture paper reproducibility metadata.
+"""
 from __future__ import annotations
 
 import argparse
