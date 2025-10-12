@@ -15,3 +15,6 @@ def test_seed_everything_deterministic():
     np_gen = seed.numpy_generator()
     assert np_gen.integers(0, 10, size=5).shape == (5,)
     assert os.environ["PYTHONHASHSEED"] == "1234"
+    state = seed.last_state()
+    assert state.seed == 1234
+    assert state.torch_generator is gen2

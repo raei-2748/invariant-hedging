@@ -33,6 +33,9 @@ smoke:
 	python3 -m src.eval --config-name=eval/smoke eval.report.checkpoint_path=$$CHECKPOINT
 paper:
 	scripts/run_of_record.sh
+
+paper-lite:
+	$(MAKE) paper SMOKE=1
 phase2:
 	@echo "See experiments/phase2_plan.md for details."
 .PHONY: report

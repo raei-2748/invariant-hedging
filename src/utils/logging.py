@@ -5,12 +5,17 @@ import json
 import os
 import platform
 import subprocess
+import sys
 import time
 import warnings
 from pathlib import Path
 from typing import Dict, List, Optional
 
 import yaml
+
+from . import seed as seed_utils
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 try:
     import torch
@@ -48,6 +53,9 @@ class RunLogger:
         self.metadata_path = self.base_dir / "metadata.json"
         with open(self.metadata_path, "w", encoding="utf-8") as f:
             json.dump(self._system_info(), f, indent=2)
+        self.provenance_path = self.base_dir / "run_provenance.json"
+        with open(self.provenance_path, "w", encoding="utf-8") as f:
+            json.dump(_build_run_provenance(timestamp, resolved_config), f, indent=2)
         self.wandb_run = None
         wandb_cfg = config.get("wandb", {})
         if wandb_cfg.get("enabled", False) and wandb is not None:
@@ -119,7 +127,88 @@ class RunLogger:
         if torch is not None:
             info["torch_version"] = torch.__version__
             info["cuda_available"] = bool(torch.cuda.is_available())
+            if hasattr(torch.version, "cuda"):
+                info["cuda_version"] = getattr(torch.version, "cuda")
         return info
+
+
+def _build_run_provenance(timestamp: str, resolved_config: Dict) -> Dict[str, object]:
+    provenance: Dict[str, object] = {
+        "timestamp": timestamp,
+        "git": {
+            "commit": _get_git_commit(),
+            "clean": _get_git_status_clean(),
+        },
+        "environment": _environment_snapshot(),
+        "python_packages": _pip_freeze(),
+        "config": resolved_config,
+        "inputs": {
+            "environment_yml": _read_optional(REPO_ROOT / "environment.yml"),
+            "requirements_txt": _read_optional(REPO_ROOT / "requirements.txt"),
+        },
+    }
+    conda_export = _conda_export()
+    if conda_export is not None:
+        provenance["conda_environment"] = conda_export
+    determinism_state = _determinism_state()
+    if determinism_state is not None:
+        provenance["determinism"] = determinism_state
+    return provenance
+
+
+
+
+def _environment_snapshot() -> Dict[str, object]:
+    info: Dict[str, object] = {
+        "python": sys.version,
+        "platform": platform.platform(),
+    }
+    if torch is not None:
+        info["torch_version"] = torch.__version__
+        if hasattr(torch.version, "cuda"):
+            info["torch_cuda"] = getattr(torch.version, "cuda")
+        info["cuda_available"] = bool(torch.cuda.is_available())
+    return info
+
+
+def _pip_freeze() -> List[str]:
+    try:
+        output = subprocess.check_output([sys.executable, "-m", "pip", "freeze"], text=True)
+    except Exception as exc:  # pragma: no cover - depends on external tooling
+        return [f"<unavailable: {exc}>"]
+    packages = [line.strip() for line in output.splitlines() if line.strip()]
+    return sorted(packages)
+
+
+def _conda_export() -> Optional[Dict[str, str]]:
+    commands = []
+    env_name = os.environ.get("CONDA_DEFAULT_ENV")
+    if env_name:
+        commands.append((["micromamba", "env", "export", "-n", env_name], "micromamba"))
+        commands.append((["conda", "env", "export", "-n", env_name, "--no-builds"], "conda"))
+    commands.append((["conda", "env", "export", "--no-builds"], "conda"))
+    commands.append((["micromamba", "env", "export"], "micromamba"))
+    for cmd, name in commands:
+        try:
+            output = subprocess.check_output(cmd, text=True, stderr=subprocess.STDOUT)
+            return {"tool": name, "command": " ".join(cmd), "spec": output}
+        except Exception:
+            continue
+    return None
+
+
+def _determinism_state() -> Optional[Dict[str, int]]:
+    try:
+        state = seed_utils.last_state()
+    except Exception:
+        return None
+    return state.to_dict()
+
+
+def _read_optional(path: Path) -> Optional[str]:
+    if path.exists():
+        return path.read_text(encoding="utf-8")
+    return None
 
 
 def _get_git_commit() -> str:

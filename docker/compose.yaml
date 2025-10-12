@@ -1,0 +1,34 @@
+version: "3.9"
+
+x-common: &common
+  build:
+    context: ..
+    dockerfile: docker/Dockerfile
+  image: invariant-hedging:latest
+  volumes:
+    - ..:/workspace/invariant-hedging
+  working_dir: /workspace/invariant-hedging
+  tty: true
+
+services:
+  smoke:
+    <<: *common
+    profiles: ["cpu"]
+    environment:
+      CUDA_VISIBLE_DEVICES: ""
+      NVIDIA_VISIBLE_DEVICES: ""
+    command: ["make", "paper-lite"]
+
+  full:
+    <<: *common
+    profiles: ["gpu"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: ["gpu"]
+    environment:
+      CUDA_VISIBLE_DEVICES: "all"
+      NVIDIA_VISIBLE_DEVICES: "all"
+    command: ["make", "paper"]
