@@ -1,0 +1,5 @@
+{
+  "dataset_snapshot": "REPLACE_WITH_DATA_VERSION",
+  "training_commit": "REPLACE_WITH_COMMIT_SHA",
+  "notes": "Update these fields before cutting a tagged release to document the provenance of the paper results."
+}

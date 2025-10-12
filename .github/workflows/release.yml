@@ -1,0 +1,99 @@
+name: Prepare Paper Release
+
+on:
+  push:
+    tags:
+      - 'v*-paper-*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run without publishing (artifact upload only).'
+        type: boolean
+        default: true
+      release_tag:
+        description: 'Override the artifact tag name when running manually.'
+        required: false
+        type: string
+
+jobs:
+  package:
+    name: Package paper assets
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine release metadata
+        id: meta
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_DRY_RUN: ${{ github.event.inputs.dry_run }}
+          INPUT_RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+        run: |
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
+            DRY_RUN="${INPUT_DRY_RUN}"
+            if [[ -z "${DRY_RUN}" ]]; then
+              DRY_RUN="true"
+            fi
+            TAG="${INPUT_RELEASE_TAG}"
+            if [[ -z "${TAG}" ]]; then
+              TAG="dry-run"
+            fi
+          else
+            DRY_RUN="false"
+            TAG="${GITHUB_REF##*/}"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "dry_run=${DRY_RUN}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate required assets
+        run: |
+          set -euo pipefail
+          if [[ ! -d configs/paper ]]; then
+            echo "::error::configs/paper directory is missing" >&2
+            exit 1
+          fi
+          if [[ ! -f paper_provenance.json ]]; then
+            echo "::error::paper_provenance.json is missing" >&2
+            exit 1
+          fi
+          if [[ ! -f outputs/_phase1_snapshot/final_metrics.json ]]; then
+            echo "::error::outputs/_phase1_snapshot/final_metrics.json is missing" >&2
+            exit 1
+          fi
+          if [[ ! -f outputs/_phase1_snapshot/metrics.jsonl ]]; then
+            echo "::warning::outputs/_phase1_snapshot/metrics.jsonl is missing; it will be skipped" >&2
+          fi
+
+      - name: Create artifact bundle
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          artifact="dist/${{ steps.meta.outputs.tag }}-paper-artifacts.zip"
+          zip --recurse-paths "$artifact" configs/paper paper_provenance.json outputs/_phase1_snapshot/final_metrics.json
+          if [[ -f outputs/_phase1_snapshot/metrics.jsonl ]]; then
+            zip --recurse-paths "$artifact" outputs/_phase1_snapshot/metrics.jsonl
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper-release-${{ steps.meta.outputs.tag }}
+          path: dist/${{ steps.meta.outputs.tag }}-paper-artifacts.zip
+          if-no-files-found: error
+
+      - name: Summarize bundle
+        run: |
+          {
+            echo "## Paper release bundle"
+            echo "- Tag: ${{ steps.meta.outputs.tag }}"
+            echo "- Dry run: ${{ steps.meta.outputs.dry_run }}"
+            echo "- Files included:"
+            echo "  - configs/paper/"
+            echo "  - paper_provenance.json"
+            echo "  - outputs/_phase1_snapshot/final_metrics.json"
+            if [[ -f outputs/_phase1_snapshot/metrics.jsonl ]]; then
+              echo "  - outputs/_phase1_snapshot/metrics.jsonl"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
