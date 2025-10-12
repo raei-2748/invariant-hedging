@@ -12,6 +12,7 @@ import torch
 from omegaconf import DictConfig, OmegaConf
 
 from .data.features import FeatureEngineer
+from .envs.single_asset import SingleAssetHedgingEnv
 from .diagnostics import metrics as diag_metrics
 from .diagnostics import safe_eval_metric
 from .models import PolicyMLP
@@ -61,6 +62,7 @@ def _init_policy(cfg: DictConfig, feature_dim: int, num_envs: int):
         representation_dim=cfg.model.representation_dim,
         adapter_hidden=cfg.model.adapter_hidden,
         max_position=cfg.model.max_position,
+        head_name=cfg.model.get("head_name"),
     )
 
 

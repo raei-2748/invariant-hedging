@@ -39,6 +39,9 @@ scheduler:
 # @package paper.data
 
 # Paper-aligned SPY windows sourced from configs/splits/.
+windows:
+  instrument: SPY
+  source: configs/splits
 instrument: SPY
 source: configs/splits
 windows:

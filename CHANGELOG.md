@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+- Implemented head-only HIRM gradient alignment with ψ-only penalties and
+  optional φ freezing via `model.freeze_phi`.
+- Added lightweight training loop and CLI (`tools.quick_run`) powered by
+  `config/hirm.yaml` for rapid experiments and diagnostics.
+- Stream alignment diagnostics to `alignment_head.csv` and documented the
+  workflow in `docs/objectives.md` and `docs/devnotes/hirm_head.md`.
+
 ## v0.1.0 - 2025-10-04
 
 - Baseline ERM-v1 configuration frozen as Phase 1 snapshot.

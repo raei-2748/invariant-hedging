@@ -1,0 +1,26 @@
+objective: hirm_head
+hirm:
+  lambda_align: 1.0
+  normalize_grad: true
+  pairwise_mode: cosine
+  detach_features: false
+model:
+  freeze_phi: true
+  head_name: decision_head
+  hidden_width: 64
+  hidden_depth: 2
+  dropout: 0.0
+  layer_norm: false
+  representation_dim: 16
+  adapter_hidden: 8
+  max_position: 5.0
+train:
+  envs:
+    - train_low
+    - train_med
+  seed: 7
+  epochs: 2
+  log_interval: 1
+  batch_size: 64
+  steps_per_epoch: 5
+  feature_dim: 8
