@@ -1,0 +1,47 @@
+# @package paper.methods
+
+# Optimisers, seeds, and horizons quoted in the paper's experimental setup.
+seeds:
+  values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
+  description: "30 deterministic seeds reused across all objectives."
+train_horizon:
+  total_steps: 150000
+  pretrain_steps: 20000
+  irm_ramp_steps: 10000
+  eval_interval: 1000
+  checkpoint_topk: 3
+optimizer_defaults: &optimizer_defaults
+  name: adamw
+  lr: 1.0e-4
+  weight_decay: 1.0e-6
+scheduler_defaults: &scheduler_defaults
+  name: cosine
+  warmup_steps: 1000
+methods:
+  erm:
+    objective: erm
+    optimizer: *optimizer_defaults
+    scheduler: *scheduler_defaults
+  erm_reg:
+    objective: erm_reg
+    optimizer: *optimizer_defaults
+    scheduler: *scheduler_defaults
+  irm:
+    objective: irm
+    optimizer: *optimizer_defaults
+    scheduler: *scheduler_defaults
+    penalty:
+      lambda_target: 1.0
+      ramp_steps: 10000
+  groupdro:
+    objective: groupdro
+    optimizer: *optimizer_defaults
+    scheduler: *scheduler_defaults
+    groupdro:
+      step_size: 0.01
+  vrex:
+    objective: vrex
+    optimizer: *optimizer_defaults
+    scheduler: *scheduler_defaults
+    vrex:
+      penalty_weight: 10.0
