@@ -1,0 +1,48 @@
+# @package _global_
+
+defaults:
+  - /data: real_spy
+  - /envs: daily
+  - /model: irm
+  - /eval: daily
+  - /diagnostics: default
+  - /logging: default
+  - _self_
+
+runtime:
+  seed: 0
+  device: cpu
+
+envs:
+  train: [smoke]
+  val: [smoke]
+  test: [smoke]
+
+diagnostics:
+  outputs:
+    dir: runs/paper_eval
+
+eval:
+  name: paper
+  seeds: [0]
+  report:
+    alpha: 0.95
+    bootstrap_samples: 128
+    table_path: paper_results.csv
+    plot_dir: paper_plots
+    include_hourly: false
+    checkpoint_path: null
+  baselines:
+    include: [no_hedge, delta]
+    table_path: paper_baselines.csv
+
+logging:
+  log_interval: 200
+  eval_interval: 400
+  local_mirror:
+    base_dir: runs/paper_eval
+    metrics_file: metrics.jsonl
+    final_metrics_file: final_metrics.json
+    config_file: config.yaml
+    checkpoints_dir: checkpoints
+    artifacts_dir: artifacts

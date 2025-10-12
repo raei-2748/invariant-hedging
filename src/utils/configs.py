@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from hydra.utils import to_absolute_path
 from omegaconf import DictConfig, OmegaConf
@@ -61,8 +61,13 @@ def unwrap_experiment_config(cfg: DictConfig) -> DictConfig:
     return cfg
 
 
-def prepare_data_module(cfg: DictConfig) -> DataModuleContext:
-    data_cfg = OmegaConf.to_container(cfg.data, resolve=True)
+def prepare_data_module(cfg: DictConfig, seed: Optional[int] = None) -> DataModuleContext:
+    data_cfg_raw = OmegaConf.to_container(cfg.data, resolve=True)
+    if not isinstance(data_cfg_raw, dict):
+        raise TypeError("cfg.data must resolve to a mapping")
+    data_cfg: Dict[str, Any] = dict(data_cfg_raw)
+    if seed is not None and "seed" not in data_cfg:
+        data_cfg["seed"] = int(seed)
     dataset_name = str(data_cfg.get("name", "synthetic"))
     if dataset_name == "synthetic":
         env_cfgs, cost_cfgs, env_order = resolve_env_configs(cfg.envs)
