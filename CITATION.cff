@@ -1,0 +1,13 @@
+cff-version: 1.2.0
+title: "HIRM: Hedging with Invariant Risk Minimization"
+message: "If you use this project in your research, please cite it using the metadata below."
+authors:
+  - name: Ray
+repository-code: https://github.com/raei-2748/invariant-hedging
+preferred-citation:
+  type: software
+  title: "HIRM: Hedging with Invariant Risk Minimization"
+  authors:
+    - name: Ray
+  url: https://github.com/raei-2748/invariant-hedging
+  notes: "Research codebase for robust hedging under regime shifts."
