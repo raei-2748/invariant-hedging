@@ -17,6 +17,7 @@ from .diagnostics import safe_eval_metric
 from .models import PolicyMLP
 from .objectives import cvar as cvar_obj
 from .objectives import penalties
+from .envs.single_asset import SingleAssetHedgingEnv
 from .irm.configs import IRMConfig
 from .irm.head_grads import compute_env_head_grads, freeze_backbone
 from .irm.penalties import cosine_alignment_penalty, varnorm_penalty
