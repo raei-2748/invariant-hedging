@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+- Added deterministic real-market anchor loader with episode tagging and
+  canonical output paths.
+- Documented data expectations for real-market runs and shipped default
+  `config/real_anchors.yaml` reference configuration.
 - Implemented head-only HIRM gradient alignment with ψ-only penalties and
   optional φ freezing via `model.freeze_phi`.
 - Added lightweight training loop and CLI (`tools.quick_run`) powered by
