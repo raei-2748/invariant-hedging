@@ -1,0 +1,14 @@
+{
+  "entries": [
+    {
+      "path": "outputs/_baseline_erm_base/artifacts/runs_v1/20250927_231747/final_metrics.json",
+      "metrics": {
+        "test/crisis_cvar": 295.5664367675781,
+        "test/crisis_mean_pnl": -16.796539306640625,
+        "test/crisis_turnover": 10.0
+      },
+      "rtol": 1e-06,
+      "atol": 1e-06
+    }
+  ]
+}

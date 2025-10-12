@@ -4,8 +4,8 @@ PYTHON ?= python3
 CONFIG ?= configs/experiment.yaml
 DRY ?= 0
 SMOKE ?= 0
-.PHONY: setup train evaluate reproduce lint tests smoke phase2 report report-lite phase2_scorecard paper
-.PHONY: setup train evaluate reproduce lint tests smoke phase2 report report-lite report-paper phase2_scorecard
+.PHONY: setup train evaluate reproduce lint tests smoke phase2 report report-lite phase2_scorecard paper data-mini paper-lite
+.PHONY: setup train evaluate reproduce lint tests smoke phase2 report report-lite report-paper phase2_scorecard data-mini paper-lite
 setup:
 	$(PYTHON) -m pip install -r requirements.txt
 train:
@@ -24,6 +24,9 @@ tests:
 	$(PYTHON) -m pytest
 data:
 	$(PYTHON) scripts/prepare_data.py
+
+data-mini:
+	$(PYTHON) scripts/prepare_data.py --mini
 smoke:
 	@set -euo pipefail; \
 	python3 -m src.train --config-name=train/smoke; \
@@ -40,7 +43,7 @@ report:
 	PYTHONPATH=. $(PYTHON) scripts/aggregate.py --config configs/report/default.yaml
 
 report-lite:
-	PYTHONPATH=. $(PYTHON) scripts/aggregate.py --config configs/report/default.yaml --lite
+	PYTHONPATH=. $(PYTHON) scripts/aggregate.py --config configs/report/default.yaml --lite --out reports/lite --seed-dirs artifacts/paper-lite/*
 
 report-paper:
 	PYTHONPATH=. $(PYTHON) scripts/aggregate.py --config configs/report/paper.yaml
@@ -61,3 +64,6 @@ paper:
 	if [ "$(DRY)" = "1" ]; then CMD="$$CMD --dry-run"; fi; \
 	echo "$$CMD"; \
 	$$CMD
+
+paper-lite:
+	scripts/run_of_record.sh --lite --run-root artifacts/paper-lite

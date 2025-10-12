@@ -1,0 +1,103 @@
+name: Nightly
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+env:
+  PYTHON_VERSION: "3.10"
+  PYTHONPATH: .
+  WANDB_MODE: offline
+  OMP_NUM_THREADS: "1"
+  MKL_THREADING_LAYER: SEQUENTIAL
+
+jobs:
+  nightly:
+    name: Full nightly pipeline
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            environment.yml
+
+      - name: Cache conda packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.conda/pkgs
+          key: nightly-conda-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('environment.yml') }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Stage full dataset
+        run: make data
+
+      - name: Reset nightly outputs
+        run: |
+          rm -rf artifacts/paper-nightly
+          rm -rf reports/nightly
+
+      - name: Run paper pipeline (10 seeds)
+        run: scripts/run_of_record.sh --seeds 10 --run-root artifacts/paper-nightly
+
+      - name: Aggregate nightly report
+        run: |
+          PYTHONPATH=. python scripts/aggregate.py \
+            --config configs/report/default.yaml \
+            --out reports/nightly \
+            --seed-dirs artifacts/paper-nightly/*
+
+      - name: Validate golden baselines
+        run: python tools/check_golden.py
+
+      - name: Upload nightly artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-artifacts
+          path: |
+            artifacts
+            reports
+          if-no-files-found: ignore
+
+      - name: Archive release payloads
+        if: always()
+        run: |
+          tar -czf paper-nightly-artifacts.tar.gz -C artifacts paper-nightly
+          tar -czf nightly-report.tar.gz -C reports nightly
+
+      - name: Publish nightly draft release
+        if: always()
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          prerelease: true
+          tag_name: nightly-${{ github.run_id }}
+          name: Nightly run ${{ github.run_id }}
+          body: |
+            Automated nightly pipeline executed on ${{ github.run_number }}.
+            - Seeds: 10
+            - Dataset: staged via `make data`
+          files: |
+            paper-nightly-artifacts.tar.gz
+            nightly-report.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

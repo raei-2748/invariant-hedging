@@ -122,6 +122,8 @@ conda-meta/
 
 # Project specific
 runs/
+artifacts/
+reports/
 *.log
 smoke.log
 Miniforge3-MacOSX-arm64.sh

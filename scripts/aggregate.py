@@ -1,4 +1,5 @@
 """Command-line entrypoint for the reporting aggregation pipeline."""
+
 from __future__ import annotations
 
 import argparse
@@ -41,7 +42,11 @@ def _write_tables(result: AggregateResult, output_dirs: Dict[str, Path]) -> None
     metrics_cfg = report_cfg.get("metrics", {})
 
     blocks = [
-        ("scorecard", [metric for metrics in metrics_cfg.values() for metric in metrics], "Main scorecard"),
+        (
+            "scorecard",
+            [metric for metrics in metrics_cfg.values() for metric in metrics],
+            "Main scorecard",
+        ),
         ("invariance", metrics_cfg.get("invariance", []), "Invariance metrics"),
         ("robustness", metrics_cfg.get("robustness", []), "Robustness metrics"),
         ("efficiency", metrics_cfg.get("efficiency", []), "Efficiency metrics"),
@@ -66,7 +71,9 @@ def _write_tables(result: AggregateResult, output_dirs: Dict[str, Path]) -> None
     result.raw.to_csv(raw_path, index=False)
 
 
-def _write_plots(result: AggregateResult, output_dirs: Dict[str, Path], lite: bool) -> None:
+def _write_plots(
+    result: AggregateResult, output_dirs: Dict[str, Path], lite: bool
+) -> None:
     report_cfg = result.config["report"]
     figures_dir = output_dirs["figures"]
     plot_scorecard(result.summary, report_cfg, figures_dir)
@@ -108,6 +115,8 @@ def run_pipeline(args: argparse.Namespace) -> None:
         config["report"] = report_cfg
     if args.lite:
         report_cfg["seeds"] = min(int(report_cfg.get("seeds", 5)), 5)
+    if args.seed_dirs:
+        report_cfg["seed_dirs"] = list(args.seed_dirs)
     config["report"] = report_cfg
     outputs_dir = Path(report_cfg.get("outputs_dir", "outputs/report_assets"))
     dirs = _ensure_directories(outputs_dir)
@@ -127,8 +136,12 @@ def run_pipeline(args: argparse.Namespace) -> None:
         extra_manifest.update(
             {
                 "ire3d": {
-                    "winsor_bounds": {k: list(v) for k, v in ire_result.winsor_bounds.items()},
-                    "minmax_bounds": {k: list(v) for k, v in ire_result.minmax_bounds.items()},
+                    "winsor_bounds": {
+                        k: list(v) for k, v in ire_result.winsor_bounds.items()
+                    },
+                    "minmax_bounds": {
+                        k: list(v) for k, v in ire_result.minmax_bounds.items()
+                    },
                     "alpha": ire_result.alpha,
                 }
             }
@@ -139,11 +152,20 @@ def run_pipeline(args: argparse.Namespace) -> None:
 
 
 def parse_args(argv: List[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Aggregate 30-seed diagnostics into report assets")
+    parser = argparse.ArgumentParser(
+        description="Aggregate 30-seed diagnostics into report assets"
+    )
     parser.add_argument("--config", required=True, help="Path to YAML configuration")
-    parser.add_argument("--lite", action="store_true", help="Run in lite mode (≤5 seeds, lighter plots)")
+    parser.add_argument(
+        "--lite", action="store_true", help="Run in lite mode (≤5 seeds, lighter plots)"
+    )
     parser.add_argument("--out", help="Override outputs directory")
     parser.add_argument("--skip-3d", action="store_true", help="Skip IRE 3D rendering")
+    parser.add_argument(
+        "--seed-dirs",
+        action="append",
+        help="Glob pattern for curated diagnostics directories (repeatable)",
+    )
     return parser.parse_args(argv)
 
 

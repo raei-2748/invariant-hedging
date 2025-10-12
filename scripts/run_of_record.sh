@@ -3,6 +3,9 @@ set -euo pipefail
 
 DRY_RUN=0
 SMOKE=0
+LITE=0
+SEED_COUNT=5
+RUN_ROOT_ARG=""
 EXTRA_ARGS=()
 
 while [[ $# -gt 0 ]]; do
@@ -14,6 +17,39 @@ while [[ $# -gt 0 ]]; do
     --smoke)
       SMOKE=1
       shift
+      ;;
+    --lite)
+      LITE=1
+      shift
+      ;;
+    --seeds)
+      if [[ $# -lt 2 ]]; then
+        echo "Missing value for --seeds" >&2
+        exit 1
+      fi
+      SEED_COUNT="$2"
+      shift 2
+      ;;
+    --run-root)
+      if [[ $# -lt 2 ]]; then
+        echo "Missing value for --run-root" >&2
+        exit 1
+      fi
+      RUN_ROOT_ARG="$2"
+      shift 2
+      ;;
+    -h|--help)
+      cat <<'EOF'
+Usage: scripts/run_of_record.sh [options] [-- extra hydra overrides]
+
+Options:
+  --dry-run            Print commands without executing them.
+  --smoke              Run the 1-seed smoke configuration.
+  --lite               Run the lighter paper configuration (2 seeds by default).
+  --seeds N            Override the number of seeds to execute (non-smoke mode).
+  --run-root PATH      Store curated artifacts under PATH (default: runs/paper).
+EOF
+      exit 0
       ;;
     --)
       shift
@@ -30,7 +66,23 @@ while [[ $# -gt 0 ]]; do
 done
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)
-RUN_ROOT="${REPO_ROOT}/runs/paper"
+
+if ! [[ "${SEED_COUNT}" =~ ^[0-9]+$ ]]; then
+  echo "Invalid seed count: ${SEED_COUNT}" >&2
+  exit 1
+fi
+
+if [[ -n "${RUN_ROOT_ARG}" ]]; then
+  if [[ "${RUN_ROOT_ARG}" == /* ]]; then
+    RUN_ROOT="${RUN_ROOT_ARG}"
+  else
+    RUN_ROOT="${REPO_ROOT}/${RUN_ROOT_ARG#./}"
+  fi
+else
+  RUN_ROOT="${REPO_ROOT}/runs/paper"
+fi
+RUN_ROOT=$(python3 -c "import os, sys; print(os.path.realpath(sys.argv[1]))" "${RUN_ROOT}")
+RUN_ROOT=${RUN_ROOT%/}
 
 if [[ ! -f "${REPO_ROOT}/scripts/run_train.sh" ]] || [[ ! -f "${REPO_ROOT}/scripts/run_eval.sh" ]]; then
   echo "Expected run scripts not found under scripts/." >&2
@@ -44,6 +96,7 @@ if [[ ! -f "${REPO_ROOT}/data/spy_sample.csv" ]]; then
 fi
 
 if (( SMOKE )); then
+  LITE=0
   METHODS=("train/erm")
   SEEDS=("0")
   EVAL_WINDOWS=("smoke")
@@ -64,7 +117,17 @@ else
     "train/groupdro"
     "train/vrex"
   )
-  SEEDS=("0" "1" "2" "3" "4")
+  if (( LITE )) && (( SEED_COUNT > 2 )); then
+    SEED_COUNT=2
+  fi
+  if (( SEED_COUNT < 1 )); then
+    echo "Seed count must be at least 1" >&2
+    exit 1
+  fi
+  SEEDS=()
+  for (( idx=0; idx<SEED_COUNT; idx++ )); do
+    SEEDS+=("${idx}")
+  done
   EVAL_WINDOWS=("daily" "robustness")
   TRAIN_OVERRIDES=()
   EVAL_OVERRIDES=()
@@ -172,6 +235,8 @@ for method in "${METHODS[@]}"; do
           exit 1
         fi
       done
+      echo "[run_of_record] Building diagnostics for ${method} (seed=${seed})"
+      python3 "${REPO_ROOT}/scripts/build_paper_diagnostics.py" "${run_dir}"
     fi
   done
 done
