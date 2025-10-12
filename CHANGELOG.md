@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+- Added crisis stress toggles for synthetic simulation, including Heston+Merton jump overlay and volatility-linked liquidity costs with provenance outputs.
 - Added deterministic real-market anchor loader with episode tagging and
   canonical output paths.
 - Documented data expectations for real-market runs and shipped default
