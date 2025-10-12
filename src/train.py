@@ -206,15 +206,14 @@ def _freeze_policy_components(policy: PolicyMLP, cfg: DictConfig) -> None:
             _freeze(adapter, True)
 
 
-@hydra.main(config_path="../configs", config_name="experiment", version_base=None)
-def main(cfg: DictConfig) -> None:
+def run(cfg: DictConfig) -> Path:
     cfg = unwrap_experiment_config(cfg)
+    generator = seed_utils.seed_everything(cfg.train.seed)
     resolved_cfg = OmegaConf.to_container(cfg, resolve=True)
     _maybe_patch_method_env()
     _enforce_legacy_flags(cfg)
     device = _device(cfg.get("runtime", {}))
-    generator = seed_utils.seed_everything(cfg.train.seed)
-    data_ctx = prepare_data_module(cfg)
+    data_ctx = prepare_data_module(cfg, seed=cfg.train.seed)
     train_batches = data_ctx.data_module.prepare("train", cfg.envs.train)
     val_batches = data_ctx.data_module.prepare("val", cfg.envs.val)
     test_batches = data_ctx.data_module.prepare("test", cfg.envs.test)
@@ -244,6 +243,7 @@ def main(cfg: DictConfig) -> None:
     scaler = torch.cuda.amp.GradScaler(enabled=(device.type == "cuda" and cfg.runtime.get("mixed_precision", True)))
 
     run_logger = log_utils.RunLogger(OmegaConf.to_container(cfg.logging, resolve=True), resolved_cfg)
+    final_metrics_path = Path(run_logger.final_metrics_path)
     checkpoint_dir = Path(run_logger.checkpoint_dir)
     ckpt_manager = checkpoints.CheckpointManager(checkpoint_dir, top_k=cfg.train.checkpoint_topk)
 
@@ -258,51 +258,52 @@ def main(cfg: DictConfig) -> None:
     max_position = float(cfg.model.max_position)
     max_trade_warn = warning_factor * max_position if warning_factor > 0 else 0.0
     spike_alerted_envs: set[str] = set()
-    for step in range(1, cfg.train.steps + 1):
-        optimizer.zero_grad()
-        env_losses: List[torch.Tensor] = []
-        metrics_to_log = {}
-        dummy = torch.tensor(1.0, requires_grad=(objective == "irm"), device=device)
-        irm_batches: List[dict] = []
+    try:
+        for step in range(1, cfg.train.steps + 1):
+            optimizer.zero_grad()
+            env_losses: List[torch.Tensor] = []
+            metrics_to_log = {}
+            dummy = torch.tensor(1.0, requires_grad=(objective == "irm"), device=device)
+            irm_batches: List[dict] = []
 
-        for env_idx, env_name in enumerate(cfg.envs.train):
-            env = train_envs[env_name]
-            indices = env.sample_indices(per_env_batch, generator)
-            rep_scale = dummy if objective == "irm" else None
-            sim = env.simulate(
-                policy,
-                indices,
-                device,
-                representation_scale=rep_scale,
-                collect_representation=False,
-            )
-            if sim.probe:
-                run_logger.log_probe(env_name, step, sim.probe)
-            pnl = sim.pnl
-            if cfg.model.name == "erm_reg":
-                smoothing = cfg.model.regularization.get("label_smoothing", 0.0)
-                pnl = _label_smoothing(pnl, smoothing)
-            loss = cvar_obj.differentiable_cvar(-pnl, alpha)
-            env_losses.append(loss)
-            metrics_to_log[f"train/{env_name}_mean_pnl"] = float(pnl.mean().item())
-            metrics_to_log[f"train/{env_name}_cvar"] = float(cvar_obj.cvar_from_pnl(pnl, alpha).item())
-            metrics_to_log[f"train/{env_name}_turnover"] = float(sim.turnover.mean().item())
-            trades = sim.positions[:, 1:] - sim.positions[:, :-1]
-            final_trade = -sim.positions[:, -1:]
-            all_trades = torch.cat([trades, final_trade], dim=1)
-            mean_abs_trade = float(torch.abs(all_trades).mean().item())
-            metrics_to_log[f"train/{env_name}_mean_abs_trade"] = mean_abs_trade
-            max_trade_val = float(sim.max_trade.max().item())
-            metrics_to_log[f"train/{env_name}_max_trade"] = max_trade_val
-            if max_trade_warn > 0 and max_trade_val > max_trade_warn and env_name not in spike_alerted_envs:
-                print(
-                    f"[warn] large trade magnitude detected: {max_trade_val:.2f} "
-                    f"(threshold {max_trade_warn:.2f}) in env '{env_name}' at step {step}"
+            for env_idx, env_name in enumerate(cfg.envs.train):
+                env = train_envs[env_name]
+                indices = env.sample_indices(per_env_batch, generator)
+                rep_scale = dummy if objective == "irm" else None
+                sim = env.simulate(
+                    policy,
+                    indices,
+                    device,
+                    representation_scale=rep_scale,
+                    collect_representation=False,
                 )
-                spike_alerted_envs.add(env_name)
+                if sim.probe:
+                    run_logger.log_probe(env_name, step, sim.probe)
+                pnl = sim.pnl
+                if cfg.model.name == "erm_reg":
+                    smoothing = cfg.model.regularization.get("label_smoothing", 0.0)
+                    pnl = _label_smoothing(pnl, smoothing)
+                loss = cvar_obj.differentiable_cvar(-pnl, alpha)
+                env_losses.append(loss)
+                metrics_to_log[f"train/{env_name}_mean_pnl"] = float(pnl.mean().item())
+                metrics_to_log[f"train/{env_name}_cvar"] = float(cvar_obj.cvar_from_pnl(pnl, alpha).item())
+                metrics_to_log[f"train/{env_name}_turnover"] = float(sim.turnover.mean().item())
+                trades = sim.positions[:, 1:] - sim.positions[:, :-1]
+                final_trade = -sim.positions[:, -1:]
+                all_trades = torch.cat([trades, final_trade], dim=1)
+                mean_abs_trade = float(torch.abs(all_trades).mean().item())
+                metrics_to_log[f"train/{env_name}_mean_abs_trade"] = mean_abs_trade
+                max_trade_val = float(sim.max_trade.max().item())
+                metrics_to_log[f"train/{env_name}_max_trade"] = max_trade_val
+                if max_trade_warn > 0 and max_trade_val > max_trade_warn and env_name not in spike_alerted_envs:
+                    print(
+                        f"[warn] large trade magnitude detected: {max_trade_val:.2f} "
+                        f"(threshold {max_trade_warn:.2f}) in env '{env_name}' at step {step}"
+                    )
+                    spike_alerted_envs.add(env_name)
 
-            if objective == "hirm" and irm_settings.enabled:
-                irm_batches.append({"loss": loss, "name": env_name})
+                if objective == "hirm" and irm_settings.enabled:
+                    irm_batches.append({"loss": loss, "name": env_name})
 
         loss_tensor = torch.stack(env_losses)
         if objective == "groupdro":
@@ -424,9 +425,16 @@ def main(cfg: DictConfig) -> None:
                 score,
                 ckpt_payload,
             )
-    test_metrics = _evaluate(policy, test_envs, device, alpha)
-    run_logger.log_final({f"test/{k}_{m}": v for k, metrics in test_metrics.items() for m, v in metrics.items()})
-    run_logger.close()
+        test_metrics = _evaluate(policy, test_envs, device, alpha)
+        run_logger.log_final({f"test/{k}_{m}": v for k, metrics in test_metrics.items() for m, v in metrics.items()})
+        return final_metrics_path
+    finally:
+        run_logger.close()
+
+
+@hydra.main(config_path="../configs", config_name="experiment", version_base=None)
+def main(cfg: DictConfig) -> None:
+    run(cfg)
 
 
 if __name__ == "__main__":
