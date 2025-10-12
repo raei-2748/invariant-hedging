@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Dict, Iterable, Mapping, Sequence
 
@@ -181,7 +181,7 @@ def run_training(config: ExperimentConfig, *, base_dir: Path | None = None) -> P
         [p for p in model.parameters() if p.requires_grad], lr=1e-3
     )
 
-    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     run_root = base_dir if base_dir is not None else Path("runs")
     run_dir = run_root / f"{timestamp}_hirm_head"
     seed_dir = run_dir / "seeds" / str(config.train.seed)
