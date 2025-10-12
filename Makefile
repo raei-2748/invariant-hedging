@@ -2,7 +2,7 @@ SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 PYTHON ?= python3
 CONFIG ?= configs/experiment.yaml
-.PHONY: setup train evaluate reproduce lint tests smoke phase2 report report-lite phase2_scorecard data paper report-paper
+.PHONY: setup train evaluate reproduce lint tests smoke phase2 report report-lite report-paper phase2_scorecard
 setup:
 	$(PYTHON) -m pip install -r requirements.txt
 train:
@@ -41,6 +41,10 @@ report-lite:
 
 report-paper:
 	PYTHONPATH=. $(PYTHON) scripts/aggregate.py --config configs/report/paper.yaml
+
+.PHONY: report-paper
+report-paper:
+	$(PYTHON) scripts/report/generate_report.py --config configs/report/default.yaml $(ARGS)
 
 .PHONY: phase2_scorecard
 phase2_scorecard:

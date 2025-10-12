@@ -32,13 +32,117 @@ requirements see [REPRODUCE.md](REPRODUCE.md).
    ```bash
    make paper
    ```
-5. **Build publication tables/figures from the paper run**
-   ```bash
-   make report-paper
-   ```
-6. *(Optional)* **Rebuild the full report assets for multi-seed runs**
-   ```bash
-   make report
+   Each run mirrors metrics locally under `runs/<timestamp>/` and, if W&B is available, logs to the `invariant-hedging` project.
+
+## Roadmap
+
+<a id="phase-1-erm"></a>
+### Phase 1 — ERM Baseline (Complete)
+See [`experiments/phase1_summary.md`](experiments/phase1_summary.md) for the ERM-v1 baseline protocol and artifacts.
+
+<a id="phase-2-headirm"></a>
+### Phase 2 — Head-Only IRM + Diagnostics (Current)
+See [`experiments/phase2_plan.md`](experiments/phase2_plan.md) for objectives, sweeps, and metrics.
+
+## Repository layout
+
+```
+configs/               Hydra configs for data, environments, models, training and evaluation
+src/
+  data/                Synthetic generators, real-data anchor, feature engineering
+  markets/             Black–Scholes pricing and execution cost models
+  envs/                Daily rebalancing single-asset environment
+  objectives/          CVaR estimator, entropic risk and regularisation penalties
+  models/              Policy networks and representation heads
+  utils/               Logging, checkpoints, determinism helpers, statistics
+  train.py             Three-phase training loop (ERM → IRM ramp → full horizon)
+  eval.py              Crisis evaluation with CVaR-95 table and QQ plots
+scripts/               Convenience wrappers (`run_train.sh`, `run_eval.sh`, `make_reproduce.sh`)
+tests/                 Unit tests for pricing, CVaR, costs and seeding
+notebooks/             Diagnostics (e.g. `phi_invariance.ipynb`)
+```
+
+## Logging and outputs
+
+Every run (train or eval) writes to `runs/<timestamp>/` with the following structure:
+
+- `config.yaml`: resolved Hydra configuration
+- `metrics.jsonl`: stepwise metrics
+- `final_metrics.json`: summary metrics
+- `checkpoints/`: top-k checkpoints selected by validation CVaR-95
+- `artifacts/`: crisis tables, QQ plots and any additional evaluation artefacts
+- `metadata.json`: git commit hash, platform fingerprint, Python and PyTorch versions
+
+If W&B credentials are available the same metrics are mirrored to the `invariant-hedging` project; offline mode is supported via `WANDB_MODE=offline`.
+
+### PR-05 Reporting
+
+The reporting pipeline aggregates cross-seed diagnostics, emits publication-ready tables/figures, and captures provenance in [`outputs/report_assets/`](outputs/report_assets/). Use the convenience targets:
+
+```bash
+make report          # full 30-seed aggregation with 3D I–R–E assets
+make report-lite     # ≤5 seeds, skips heavy plots for CI runs
+```
+
+Both targets resolve [`configs/report/default.yaml`](configs/report/default.yaml). Adjust metric blocks, QQ options, and the 3D toggle there. Set `generate_3d: false` or pass `--skip-3d` via `scripts/aggregate.py` to disable the I–R–E projection entirely. Outputs include LaTeX tables, CSV mirrors, heatmaps, QQ plots, seed distributions, efficiency frontiers, and (optionally) interactive + static I–R–E visualisations.
+
+For paper-aligned artefacts use the combined generator:
+
+```bash
+make report-paper                   # full pipeline
+make report-paper ARGS="--smoke"     # lightweight placeholders for CI checks
+```
+
+`report-paper` writes to [`outputs/report_paper/`](outputs/report_paper/) with a stable layout:
+
+| Directory | Contents |
+| --- | --- |
+| `figures/` | Penalty sweeps, head-vs-feature ablations, I–R–E diagnostics, capital frontiers, and fallbacks in smoke mode. |
+| `tables/` | LaTeX + CSV scorecards (invariance/robustness/efficiency blocks) and per-seed exports. |
+| `manifests/` | `paper_manifest.json` capturing the git commit, config hash, generated assets, and `final_metrics.json` validation results. |
+
+Smoke mode keeps schema validation strict but replaces missing assets with clearly labelled placeholders so the publication layout can be exercised without the full 30-seed corpus.
+
+## Testing
+
+Unit tests cover pricing Greeks, CVaR estimation, cost kernels and deterministic seeding. Run them with:
+
+```bash
+make tests
+```
+
+## Diagnostics (PR-04): Invariance–Robustness–Efficiency
+
+The diagnostics stack exports per-seed scorecards that align with the paper’s
+I–R–E geometry. After evaluation each enabled run writes a tidy CSV and a JSON
+manifest under `runs/<timestamp>/` (or a custom directory configured via
+`diagnostics.outputs.dir`). CSV rows contain one entry per environment plus an
+`__overall__` aggregate with the following columns:
+
+| Column | Description |
+| --- | --- |
+| `seed, git_hash, exp_id` | Run provenance and experiment identifiers. |
+| `split_name, regime_tag, env_id, is_eval_split` | Split metadata and environment labels. |
+| `n_obs` | Number of observations used for the diagnostic probe. |
+| `C1_global_stability` | Normalised risk dispersion across environments (1 = stable). |
+| `C2_mechanistic_stability` | Cosine-alignment of head gradients across environments. |
+| `C3_structural_stability` | Representation similarity across environments. |
+| `ISI` | Weighted combination of C1/C2/C3 clipped to `[0, 1]`. |
+| `IG` | Invariance gap (dispersion of realised outcomes). |
+| `WG_risk`, `VR_risk` | Worst-group risk and variance across environments. |
+| `ER_mean_pnl`, `TR_turnover` | Efficiency metrics: mean PnL and turnover. |
+
+The manifest (`diagnostics_manifest.json`) records the seed, git hash,
+config hash, instrument, metric basis, ISI weights, units, and creation
+timestamp for reproducibility.
+
+### Running the diagnostics probe
+
+1. Enable diagnostics in the Hydra config (see `configs/diagnostics/default.yaml`):
+
+   ```yaml
+   defaults:
+     - diagnostics: default
    ```
 
 The commands above execute in minutes on a single CPU-only workstation; see the
