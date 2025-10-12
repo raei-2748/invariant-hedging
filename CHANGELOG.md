@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+- Added figure-generation pipeline converting Track 4 tables into publication-ready plots, CLI entrypoints, and manifest logging.
+- Documented plotting workflow and added CI coverage plus artifact export.
+- Hardened the figure pipeline against schema drift with table-column aliases and defensive skipping for missing diagnostics.
 - Added crisis stress toggles for synthetic simulation, including Heston+Merton jump overlay and volatility-linked liquidity costs with provenance outputs.
 - Added deterministic real-market anchor loader with episode tagging and
   canonical output paths.
