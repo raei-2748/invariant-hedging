@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from collections import defaultdict
 from dataclasses import asdict
 from datetime import datetime, timezone
@@ -161,13 +162,24 @@ def main() -> None:
                 spec = registry.get(regime)
                 episode_pnls: List[float] = []
                 aggregates: Dict[str, List[float]] = defaultdict(list)
-                jump_sizes_all: List[float] = []
+                jump_count_total = 0
+                jump_sum = 0.0
+                jump_sq_sum = 0.0
                 episodes_processed = 0
                 for episode in range(episode_cfg["count"]):
                     episode_seed = seed + spec.seed_offset + episode
                     path = simulate_heston(heston_params, seed=episode_seed)
                     episodes_processed += 1
-                    stressed, _ = _apply_jump(path, jump_cfg, spec.stress_jump, episode_seed)
+                    stressed, jump_summary = _apply_jump(
+                        path, jump_cfg, spec.stress_jump, episode_seed
+                    )
+                    if jump_summary.count > 0:
+                        jump_count_total += jump_summary.count
+                        jump_sum += jump_summary.mean * jump_summary.count
+                        jump_sq_sum += (
+                            (jump_summary.std ** 2 + jump_summary.mean**2)
+                            * jump_summary.count
+                        )
                     liquidity_cost = _apply_liquidity(
                         stressed,
                         liquidity_cfg,
@@ -177,8 +189,6 @@ def main() -> None:
                     )
                     pnl = float(stressed["spot"].iloc[-1] - stressed["spot"].iloc[0] - liquidity_cost)
                     episode_pnls.append(pnl)
-                    if "jump_size" in stressed:
-                        jump_sizes_all.extend(stressed["jump_size"].to_numpy(dtype=float).tolist())
                 regime_dir = run_dir / "seeds" / str(seed) / split / regime
                 regime_dir.mkdir(parents=True, exist_ok=True)
                 pnl_df = pd.DataFrame({"episode": np.arange(len(episode_pnls)), "pnl": episode_pnls})
@@ -195,14 +205,19 @@ def main() -> None:
                     "episodes": episode_cfg["count"],
                 }
                 write_sim_params_json(regime_dir / "sim_params.json", sim_params)
-                jump_sizes = np.asarray([size for size in jump_sizes_all if abs(size) > 0.0], dtype=float)
                 mean_spread = float(np.mean(aggregates["mean_spread_bps"]) if aggregates["mean_spread_bps"] else 0.0)
                 mean_slip = float(np.mean(aggregates["mean_slippage"]) if aggregates["mean_slippage"] else 0.0)
                 turnover = float(np.mean(aggregates["turnover"]) if aggregates["turnover"] else 0.0)
-                jump_count = int(jump_sizes.size)
-                jump_freq = float(jump_count / max(episodes_processed, 1))
-                jump_mean = float(np.mean(jump_sizes)) if jump_sizes.size else 0.0
-                jump_std = float(np.std(jump_sizes)) if jump_sizes.size else 0.0
+                jump_count = int(jump_count_total)
+                jump_freq = float(jump_count_total / max(episodes_processed, 1))
+                if jump_count_total > 0:
+                    jump_mean = float(jump_sum / jump_count_total)
+                    second_moment = jump_sq_sum / jump_count_total
+                    jump_var = max(second_moment - jump_mean**2, 0.0)
+                    jump_std = float(math.sqrt(jump_var))
+                else:
+                    jump_mean = 0.0
+                    jump_std = 0.0
                 stress_summary = {
                     "jump_count": jump_count,
                     "jump_frequency": jump_freq,
