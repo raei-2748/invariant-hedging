@@ -1,0 +1,30 @@
+name: Setup Python environment
+description: Set up Python with cached dependencies and install project requirements.
+inputs:
+  python-version:
+    description: Python version to install.
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+        cache: pip
+        cache-dependency-path: |
+          requirements.txt
+          environment.yml
+    - name: Cache conda packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.conda/pkgs
+        key: conda-${{ runner.os }}-${{ inputs.python-version }}-${{ hashFiles('environment.yml') }}
+        restore-keys: |
+          conda-${{ runner.os }}-${{ inputs.python-version }}-
+          conda-${{ runner.os }}-
+    - name: Install dependencies
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install -r requirements.txt

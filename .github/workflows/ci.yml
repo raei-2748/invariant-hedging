@@ -17,33 +17,92 @@ env:
   MKL_THREADING_LAYER: SEQUENTIAL
 
 jobs:
-  pr:
-    name: PR Validation
+  quality:
+    name: Quality checks (${{ matrix.task }})
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        task: [ruff, black, mypy]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Setup Python
+        uses: ./.github/actions/python-env
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
-          cache-dependency-path: |
-            requirements.txt
-            environment.yml
 
-      - name: Cache conda packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.conda/pkgs
-          key: conda-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('environment.yml') }}
+      - name: Prepare diagnostics directory
+        run: mkdir -p artifacts/diagnostics
 
-      - name: Install dependencies
+      - name: Ruff lint
+        if: matrix.task == 'ruff'
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
+          python -m ruff check scripts/aggregate.py scripts/prepare_data.py tools/check_golden.py \
+            2>&1 | tee artifacts/diagnostics/ruff.log
+
+      - name: Black formatting
+        if: matrix.task == 'black'
+        run: |
+          python -m black --check scripts/aggregate.py scripts/prepare_data.py tools/check_golden.py \
+            2>&1 | tee artifacts/diagnostics/black.log
+
+      - name: Type checking
+        if: matrix.task == 'mypy'
+        run: |
+          python -m mypy src 2>&1 | tee artifacts/diagnostics/mypy.log
+
+      - name: Upload ${{ matrix.task }} diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostics-${{ matrix.task }}
+          path: artifacts/diagnostics/${{ matrix.task }}.log
+          if-no-files-found: warn
+
+  tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: ./.github/actions/python-env
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Run unit tests
+        run: |
+          mkdir -p artifacts/test-logs
+          python -m pytest -m "not heavy" --junitxml=artifacts/test-logs/pytest.xml
+
+      - name: Upload test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-results
+          path: artifacts/test-logs
+          if-no-files-found: warn
+
+  lite-pipeline:
+    name: Lite pipeline
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs:
+      - quality
+      - tests
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: ./.github/actions/python-env
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Restore mini data cache
         id: mini-data
@@ -51,35 +110,34 @@ jobs:
         with:
           path: artifacts/data-mini
           key: mini-data-${{ runner.os }}-${{ hashFiles('data/spy_sample.csv') }}
-
-      - name: Ruff lint
-        run: python -m ruff check scripts/aggregate.py scripts/prepare_data.py tools/check_golden.py
-
-      - name: Black formatting
-        run: python -m black --check scripts/aggregate.py scripts/prepare_data.py tools/check_golden.py
-
-      - name: Type checking
-        run: python -m mypy src
-
-      - name: Run unit tests
-        run: python -m pytest -m "not heavy"
-
-      - name: Prepare staged data
-        run: make data-mini
+          restore-keys: |
+            mini-data-${{ runner.os }}-
 
       - name: Clean staged artifacts
         run: |
           rm -rf artifacts/paper-lite
           rm -rf reports/lite
+          mkdir -p artifacts/diagnostics
+
+      - name: Prepare staged data
+        run: make data-mini 2>&1 | tee artifacts/diagnostics/data-mini.log
 
       - name: Paper lite pipeline
-        run: make paper-lite
+        run: make paper-lite 2>&1 | tee artifacts/diagnostics/paper-lite.log
 
       - name: Generate lite report
-        run: make report-lite
+        run: make report-lite 2>&1 | tee artifacts/diagnostics/report-lite.log
 
       - name: Validate golden metrics
-        run: python tools/check_golden.py
+        run: python tools/check_golden.py 2>&1 | tee artifacts/diagnostics/golden-metrics.log
+
+      - name: Upload lite diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lite-diagnostics
+          path: artifacts/diagnostics
+          if-no-files-found: warn
 
       - name: Upload artifacts bundle
         if: always()
