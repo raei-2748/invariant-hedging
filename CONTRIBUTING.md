@@ -1,46 +1,91 @@
 # Contributing
 
-Thanks for your interest in improving the invariant-hedging project! This guide covers the
-expected workflow and conventions.
+Thank you for helping improve **invariant-hedging**! This guide explains
+how we collaborate, keep the codebase consistent, and extend the
+research pipeline.
 
-## Development workflow
+## Branch workflow
 
-1. Fork the repository and create a feature branch named `feature/<summary>` or `fix/<summary>`.
-2. Install the pinned dependencies:
-   ```bash
-   python3 -m pip install -r requirements.txt
-   ```
-   Conda users can replicate the environment with:
-   ```bash
-   conda env create -f environment.yml
-   ```
-3. Format and lint using Ruff before sending a PR:
-   ```bash
-   python3 -m ruff check src tests
-   ```
-4. Run the full test matrix locally:
-   ```bash
-   make tests
-   make smoke
-   python scripts/train.py config=train/smoke steps=100 seed=0
-   python scripts/train.py config=train/smoke steps=100 seed=0
-   python scripts/diff_metrics.py runs/latest_0/metrics.jsonl runs/latest_1/metrics.jsonl
-   ```
-   The diff step should report a mean absolute difference below `1e-6`.
+1. **Sync main**: `git checkout main && git pull origin main`.
+2. **Create a topic branch** from main using
+   `git checkout -b <user>/<ticket>-<short-description>`.
+3. **Keep branches short-lived**. Rebase rather than merge to avoid noisy
+   histories: `git fetch origin && git rebase origin/main`.
+4. **Open a draft pull request early** so CI signals arrive while you
+   iterate.
+5. **Reference issues** in the PR description and summarise the metrics or
+   screenshots that demonstrate the change.
 
-## Code style
+## Environment & tooling
 
-- Python code follows Ruff's defaults plus type annotations where practical.
-- Avoid global state; prefer dependency injection via Hydra configs.
-- Keep Hydra configs composable and prefer overriding via `train=<variant>`.
+- Install dependencies via `pip install -r requirements.txt`. Conda
+  users can bootstrap with `conda env create -f environment.yml` first.
+- The [`Makefile`](Makefile) exposes helpful shortcuts:
+  - `make data` — stage the bundled SPY sample for smoke tests.
+  - `make smoke` — train + evaluate the smoke configuration end to end.
+  - `make tests` — run the full pytest suite.
 
-## Pull requests
+## Pre-commit hooks
 
-- Reference the GitHub issue when applicable.
-- Summarise user-facing changes and include relevant metrics or screenshots.
-- CI must pass before requesting review. Branch protection requires the following
-  workflows to succeed on every pull request:
-  - **CI Smoke** — linting, unit tests, paper-config smoke train/eval, and the SPY
-    data-loader checks.
-  - **CI Dependencies** — captures the package environment, CUDA metadata, and the
-    `paper_provenance.py` manifest used for reproducibility verification.
+We vendor a [`.pre-commit-config.yaml`](.pre-commit-config.yaml) so style
+checks run before code lands on `main`.
+
+```bash
+pip install pre-commit
+pre-commit install
+pre-commit run --all-files
+```
+
+Hooks currently enforce Ruff linting/formatting and prevent committing
+large notebooks. Feel free to run
+`pre-commit run --all-files --hook-stage push` before opening a PR if you
+want to mirror CI.
+
+## Code style & review checklist
+
+- **Python**: Ruff (`ruff check` and `ruff format`) is the single source
+  of truth. Prefer explicit type annotations on public interfaces.
+- **Hydra configs**: Keep overrides composable. New knobs belong in the
+  relevant config group (e.g. `configs/model/`, `configs/envs/`).
+- **Logging**: Use the existing structured logging helpers; avoid
+  printing raw tensors.
+- **Tests**: Add or update tests under `tests/` when behaviour changes.
+  Target deterministic seeds and avoid network calls.
+
+Before requesting review, run:
+
+```bash
+python -m ruff check src tests
+python -m pytest -m "not heavy"
+make smoke  # optional but recommended for training changes
+```
+
+## Adding a new algorithm
+
+1. **Define the model/objective** in `configs/model/<name>.yaml`.
+2. **Create a training recipe** under `configs/train/<name>.yaml`. Start
+   by copying `configs/train/erm.yaml` and adjusting defaults.
+3. **Register any new loss or objective** inside `train/objectives/` and
+   expose it via `train/objectives/__init__.py`.
+4. **Wire the model** into `src/models/__init__.py` if it introduces new
+   modules.
+5. **Document overrides** in `CONFIGS.md` so future runs understand the
+   knobs.
+6. **Add tests** (for example under `tests/test_<name>.py`) that exercise
+   the new objective on synthetic data.
+
+## Adding a new metric
+
+1. **Emit the metric during evaluation** by extending
+   `src/eval.py` (for reporting) or the relevant diagnostics writer under
+   `src/report/aggregate.py`.
+2. **Persist it in `final_metrics.json`** using the helpers from
+   `src/report/schema.py` to keep the schema stable.
+3. **Expose the metric in reports** via `configs/report/*.yaml`. Add it
+   to the appropriate block (invariance, robustness, efficiency, etc.).
+4. **Update visualisations** in `src/report/plots.py` if the new metric
+   needs a dedicated plot.
+5. **Write regression tests** to cover the new aggregation path.
+
+Keeping these steps in mind ensures new features land with the artefacts
+and documentation needed for reproducible research.

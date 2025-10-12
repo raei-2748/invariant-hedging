@@ -1,78 +1,142 @@
-# Paper reproduction playbook
+# Operator reproduction playbook
 
-This guide provides the exact commands, environment assumptions, and artefact
-checkpoints required to regenerate the paper figures and tables from scratch.
-It mirrors the configuration used to build the "paper" snapshot referenced in
-the manuscript.
+This playbook is written for engineers who need to re-run the paper
+experiments (or a slimmed down version) without pinging the original
+authors. It focuses on **repeatable environments**, **clear runtime
+expectations**, and **where each artefact ends up**.
 
-## Reference environment
+## 1. Choose your environment
 
-| Component | Reference value |
-| --- | --- |
-| OS | Ubuntu 22.04 LTS |
-| Python | 3.10.13 |
-| Hardware | 8 vCPU (Intel Ice Lake), 32 GB RAM, **no GPU required** |
-| Expected wall-clock | ≈5 minutes end-to-end |
+Pick whichever option matches your workstation. All of them will place
+artefacts under the repository checkout on the host.
 
-The commands below were validated on the configuration above. Slower laptops
-can expect proportionally longer runtimes, but the workflow remains entirely
-CPU-compatible.
+### Path A — Docker one-liner
 
-## Step-by-step commands
+```bash
+# From the repository root on your host machine
+DOCKER_IMAGE=ghcr.io/pytorch/pytorch:2.2.1-cpu-py3.10
 
-1. **Stage the dataset**
-   ```bash
-   make data
-   ```
-   Copies `data/spy_sample.csv` into `outputs/paper_data/`. Replace the source
-   file with your institutional SPY export before running this step for the
-   full reproduction. *(Expected runtime: <1 s).* 
+docker run --rm -it \
+  -v "$(pwd)":/workspace/invariant-hedging \
+  -w /workspace/invariant-hedging \
+  "$DOCKER_IMAGE" \
+  bash -lc "pip install -r requirements.txt && exec bash"
+```
 
-2. **Dry-run the orchestration script**
-   ```bash
-   scripts/run_of_record.sh --dry-run
-   ```
-   Prints the training and evaluation commands that will run, verifying that
-   Hydra configs resolve correctly on your machine. *(Expected runtime: <1 s).* 
+This drops you inside a container with all dependencies. The bind mount
+means anything written to `runs/` or `outputs/` is visible on the host.
+You can exit the container after experiments with `exit`.
 
-3. **Train and evaluate the paper configuration**
-   ```bash
-   make paper
-   ```
-   Executes `configs/train/paper.yaml` and `configs/eval/paper.yaml`, writing
-   artefacts to `runs/paper/` and `runs/paper_eval/`. Checkpoints, resolved
-   configs, and diagnostics CSV files are created here. *(Expected runtime: ≈3
-   min on the reference CPU).* 
+### Path B — Local Conda environment
 
-4. **Generate publication-ready tables and plots**
-   ```bash
-   make report-paper
-   ```
-   Aggregates the evaluation outputs into `outputs/report_paper/` using
-   `configs/report/paper.yaml`. Produces LaTeX/CSV tables, scorecard heatmaps,
-   and a provenance manifest. *(Expected runtime: ≈2 min on the reference CPU).* 
+```bash
+conda env create -f environment.yml
+conda activate hirm
+python -m pip install -r requirements.txt  # keeps pip extras in sync
+```
 
-### Optional follow-up
+The pinned `environment.yml` creates a CPU-only setup that mirrors the
+Docker image. Installing `requirements.txt` afterwards ensures Ruff and
+pytest match the CI versions.
 
-- `make report` — rebuilds the full 30-seed aggregate using
-  `configs/report/default.yaml`. This is unnecessary for the single-seed smoke
-  check but reproduces the full paper appendix when all seeds are available.
+### Path C — GitHub Codespaces
 
-## Provenance and artifact tracking
+1. Open the repository in a new Codespace (4 vCPU / 8 GB is sufficient).
+2. Run `pip install -r requirements.txt` in the integrated terminal.
+3. Codespaces already mounts the repo at `/workspaces/invariant-hedging`,
+   so the commands below work without modification.
 
-- **Git state.** Record the commit hash from `runs/paper/*/metadata.json` and
-  `runs/paper_eval/*/metadata.json`. The script captures a `git_status_clean`
-  flag; rerun after committing local patches so the flag is `true`.
-- **Data lineage.** Retain the original SPY export path and acquisition
-  agreement. When sharing artefacts, redact raw prices and provide aggregate
-  metrics only.
-- **Runtime manifests.** `outputs/report_paper/manifests/aggregate_manifest.json`
-  contains hashes for every diagnostics CSV included in the report. Archive this
-  manifest with the final paper submission.
-- **Hardware notes.** Include CPU model, RAM, and whether a GPU was available in
-  any reproduction log. The official snapshot is CPU-only, but documenting
-  accelerators helps others interpret runtime differences.
+## 2. Stage data once per workspace
 
-By following the sequence above and storing the generated manifests, another
-researcher can audit the pipeline and regenerate the same tables and figures
-without additional assumptions.
+Every path above should run this exactly once per repository clone:
+
+```bash
+make data
+```
+
+This copies the bundled `data/spy_sample.csv` into
+`outputs/paper_data/spy_sample.csv`. Swap in your institutional export by
+placing it under `data/` before invoking `make data`.
+
+## 3. Pick your experiment recipe
+
+Two presets cover the common needs. **Paper-lite** is meant for quick
+checks (ERM vs HIRM within ~8 minutes on 8 vCPU). **Full-paper** is the
+published sweep and takes ~5 minutes on the reference machine.
+
+### Paper-lite (quick ERM vs HIRM comparison)
+
+> **Runtime**: ≈8 minutes total on 8 vCPU / 32 GB RAM.  
+> **Outputs**: Hydra runs under `runs/`, metrics and diagnostics under each
+> run directory, aggregated CSV previews printed to the terminal.
+
+```bash
+# 1. Train ERM (smoke configuration)
+scripts/run_train.sh train/smoke
+ERM_RUN=$(ls -td runs/*_erm/ | head -1)
+ERM_CKPT=$(python scripts/find_latest_checkpoint.py "$ERM_RUN")
+
+# 2. Evaluate ERM checkpoint on the smoke eval suite
+scripts/run_eval.sh eval/smoke eval.report.checkpoint_path="$ERM_CKPT"
+
+# 3. Train HIRM with the same lightweight schedule
+scripts/run_train.sh train/smoke model=hirm_head irm.enabled=true
+HIRM_RUN=$(ls -td runs/*_hirm*/ | head -1)
+HIRM_CKPT=$(python scripts/find_latest_checkpoint.py "$HIRM_RUN")
+
+# 4. Evaluate HIRM checkpoint
+scripts/run_eval.sh eval/smoke model=hirm_head \
+  eval.report.checkpoint_path="$HIRM_CKPT"
+
+# 5. Summarise the results (prints CSV tables)
+python scripts/summarize.py --pattern "*_erm" --steps 100
+python scripts/summarize.py --pattern "*_hirm*" --steps 100
+```
+
+Key artefacts:
+
+- Training diagnostics live under `runs/<timestamp>_erm/` and
+  `runs/<timestamp>_hirm_head/`. Each directory contains
+  `metrics.jsonl`, `final_metrics.json`, and `diagnostics_seed_*.csv`.
+- Evaluation summaries land in `runs/<timestamp>_erm_eval/` and the
+  matching HIRM folder with per-regime CSVs.
+- The `scripts/summarize.py` output gives you P&L, CVaR, and turnover in
+  a single glance for both objectives.
+
+### Full-paper (camera-ready reproduction)
+
+> **Runtime**: ≈5 minutes on the reference CPU; allow 10 minutes on slower
+> laptops.  
+> **Outputs**: Paper-aligned runs in `runs/paper*/` and a ready-to-ship
+> report in `outputs/report_paper/`.
+
+```bash
+# Preview the orchestration without executing
+scripts/run_of_record.sh --dry-run
+
+# Execute the full training + evaluation stack
+make paper
+
+# Render publication tables and figures
+make report-paper
+```
+
+Optional extensions:
+
+- `make paper SMOKE=1` keeps the command topology but trims epochs—useful
+  when sanity-checking infrastructure.
+- `make report` rebuilds every appendix asset using the multi-seed sweep.
+
+## 4. Provenance checklist
+
+- **Git revision**: recorded inside each `runs/*/metadata.json`. Commit
+  local patches before running so `"git_status_clean": true`.
+- **Data lineage**: log the original SPY export location and access grant
+  alongside any shared artefacts.
+- **Runtime manifests**: `outputs/report_paper/manifests/*.json` capture
+  the exact diagnostics bundled in the report.
+- **Hardware**: note CPU model, RAM, and GPU availability (even if
+  unused) in any experiment log to contextualise runtime differences.
+
+Following this guide keeps future contributors unblocked while ensuring
+paper artefacts stay reproducible end to end.
