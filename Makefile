@@ -2,6 +2,9 @@ SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 PYTHON ?= python3
 CONFIG ?= configs/experiment.yaml
+DRY ?= 0
+SMOKE ?= 0
+.PHONY: setup train evaluate reproduce lint tests smoke phase2 report report-lite phase2_scorecard paper
 .PHONY: setup train evaluate reproduce lint tests smoke phase2 report report-lite report-paper phase2_scorecard
 setup:
 	$(PYTHON) -m pip install -r requirements.txt
@@ -50,3 +53,11 @@ report-paper:
 phase2_scorecard:
 	@echo "[DEPRECATED] 'make phase2_scorecard' now forwards to 'make report'." >&2
 	$(PYTHON) scripts/aggregate.py --config configs/report/default.yaml
+
+paper:
+	@set -euo pipefail; \
+	CMD="scripts/run_of_record.sh"; \
+	if [ "$(SMOKE)" = "1" ]; then CMD="$$CMD --smoke"; fi; \
+	if [ "$(DRY)" = "1" ]; then CMD="$$CMD --dry-run"; fi; \
+	echo "$$CMD"; \
+	$$CMD

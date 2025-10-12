@@ -41,6 +41,116 @@ requirements see [REPRODUCE.md](REPRODUCE.md).
    make report
    ```
 
+2. Provide diagnostic batches (held-out from training) via
+   `diagnostics.probe`. Batches are dictionaries containing `risk`, `outcome`,
+   `positions`, and optionally `grad`/`representation` tensors per environment.
+
+3. Run evaluation. The export helper will assemble I–R–E metrics using the new
+   modules in `src/diagnostics/` and log the output CSV path via the existing
+   run logger.
+
+## Smoke test
+
+The helper scripts export conservative Intel OpenMP settings so PyTorch runs even in sandboxes with no shared-memory segment. Kick off the short training loop with:
+
+```bash
+scripts/run_train.sh train/smoke
+```
+
+If you prefer to invoke Python directly, mirror those defaults explicitly:
+
+```bash
+OMP_NUM_THREADS=1 MKL_THREADING_LAYER=SEQUENTIAL KMP_AFFINITY=disabled KMP_INIT_AT_FORK=FALSE python3 -m src.train --config-name=train/smoke
+```
+
+GitHub Actions executes the test suite together with a smoke train/eval pass on every push.
+
+## Simulation Regimes & Calibration (PR-02)
+
+PR-02 introduces YAML-driven calibration hooks so synthetic markets can flip between calm and crisis regimes without touching code. The configs live under `configs/sim`:
+
+- `heston_*.yaml` toggle the base diffusion (mean reversion, vol-of-vol, correlations) while pinning the random seed that flows into `SimRecipe`.
+- `merton_*.yaml` overlay Merton jump diffusion (λ, μ<sub>j</sub>, σ<sub>j</sub>) and can be omitted to disable jumps.
+- `liquidity_*.yaml` widen transaction costs through a variance-linked spread multiplier.
+- `sabr_*.yaml` capture lognormal SABR smiles for pricing sanity checks.
+
+Use `src.sim.calibrators.compose_sim_recipe` to merge a base diffusion with optional jump and liquidity overlays:
+
+```python
+from src.sim.calibrators import compose_sim_recipe
+
+calm_recipe = compose_sim_recipe(
+    "heston",
+    "configs/sim/heston_calm.yaml",
+    "configs/sim/merton_calm.yaml",
+    "configs/sim/liquidity_calm.yaml",
+    seed=None,
+)
+```
+
+Swapping the YAML paths selects the crisis regime (e.g. `heston_crisis.yaml`, `merton_crisis.yaml`, `liquidity_crisis.yaml`). The composed recipe exposes deterministic seeds, Heston/SABR parameters, optional jump overlays and liquidity spread helpers that downstream simulators consume.
+
+### Validation & Expected Behaviour
+
+Two pytest modules document calibration fidelity and the qualitative jump to crisis dynamics:
+
+- `tests/sim/test_calibration_moments.py` checks annualised moments, variance persistence and jump frequency for calm/crisis with and without Merton jumps. It also writes `runs/sim_tests/sim_manifest.json` with the observed stats for reproducibility.
+- `tests/sim/test_pricing_sanity.py` confirms European call prices and implied vols rise from calm to crisis and that SABR crisis parameters widen the smile.
+
+Run the CI-light suite with:
+
+```bash
+pytest -m "not heavy" tests/sim
+```
+
+The heavy 50k-path moment test is marked `@pytest.mark.heavy` for local benchmarking.
+
+## Data
+
+The synthetic generator supports GBM and Heston dynamics with environment-specific transaction costs. A tiny SPY options slice (`data/spy_sample.csv`) is bundled as a deterministic real-data anchor that exercises the full feature pipeline.
+
+### SPY real-data splits (paper-aligned)
+
+Paper experiments reference fixed SPY windows for training, validation, and crisis tests. The repository now encodes those ranges as versioned YAML under [`configs/splits/`](configs/splits/):
+
+- [`spy_train.yaml`](configs/splits/spy_train.yaml) — train on low/medium volatility from **2017-01-03 → 2019-12-31**.
+- [`spy_val.yaml`](configs/splits/spy_val.yaml) — validate on the **2018 volatility spike** (default `2018-10-01 → 2018-12-31`). The paper leaves the exact endpoints unspecified; this default is **paper-unspecified—settable via YAML** so authors can refine the window without code changes.
+- Crisis tests [`spy_test_2018.yaml`](configs/splits/spy_test_2018.yaml), [`spy_test_2020.yaml`](configs/splits/spy_test_2020.yaml), [`spy_test_2022.yaml`](configs/splits/spy_test_2022.yaml) capture Volmageddon, COVID, and inflation/tightening regimes, respectively.
+- [`spy_test_2008.yaml`](configs/splits/spy_test_2008.yaml) adds a held-out **GFC anchor** for extended stress testing.
+
+Generate a slice with:
+
+```bash
+python -m src.data.spy_loader --split configs/splits/spy_train.yaml --out_parquet outputs/slices/spy_train.parquet --runs_dir runs/spy_train
+```
+
+Each invocation prints the covered date span, writes an optional Parquet file, and records provenance (split YAML, git hash, Python/platform fingerprint) under `runs/<timestamp>/metadata.json`. Because the splits live in YAML, downstream papers should update and version-control any boundary tweaks alongside their experiment logs.
+
+Episode configuration, cost files and model settings live under `configs/`. Adjust these as needed for experiments or sweeps. The default training protocol performs 20k ERM pre-training steps, a 10k IRM ramp, and continues until 150k total updates with environment-balanced batching.
+
+## Reproducibility
+
+`scripts/make_reproduce.sh` re-runs the ERM, ERM-reg, IRM, GroupDRO and V-REx configurations for seed 0, evaluates the best checkpoint for each on the crisis environment, and regenerates the crisis CVaR-95 table plus QQ plots. All seeds are controlled via `configs/train/*.yaml` and `src/utils/seed.py` to guarantee deterministic `metrics.jsonl` for `seed=0`.
+
+## Reproduce the paper
+
+The paper harness automates the full cross-product of methods, seeds, and evaluation windows that back the reported metrics.
+
+- Ensure the packaged SPY slice (`data/spy_sample.csv`) and Hydra configs under `configs/train/` and `configs/eval/` are present. The driver refuses to start if any prerequisite is missing.
+- Run the full protocol with:
+  ```bash
+  make paper
+  ```
+  Results are written under `runs/paper/` with one directory per method/seed plus nested evaluation windows. The directory also captures a consolidated `final_metrics.json` and provenance manifest `paper_provenance.json` describing the git SHA, environment, and resolved config grid.
+- For a command preview without execution, use `make paper DRY=1`.
+- For a quick CI-friendly sweep (single seed, smoke configs) run `make paper SMOKE=1`.
+
+## Reproducibility checklist
+
+- Deterministic seeds for training, evaluation, and tests (`seed_list.txt` and Hydra configs).
+- Resolved Hydra configs saved under each run directory (`runs/<timestamp>/config.yaml`).
+- Metrics logged per-step (`metrics.jsonl`) and in aggregate (`final_metrics.json`) including CVaR-95, Sharpe, and turnover.
+- Run metadata captured in `metadata.json` with git commit, platform, Python, and PyTorch versions.
 The commands above execute in minutes on a single CPU-only workstation; see the
 [reproduction playbook](REPRODUCE.md) for the precise runtime profile and
 hardware that were used for the reference paper snapshot.
