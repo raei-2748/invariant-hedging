@@ -239,7 +239,10 @@ def _plot_qq(record: Dict, output_path: Path) -> None:
     ref = torch.from_numpy(pnl).mean().item()
     quantiles = torch.linspace(0, 1, len(pnl))
     sorted_pnl = torch.sort(torch.from_numpy(pnl))[0]
-    normal = torch.distributions.Normal(sorted_pnl.mean(), sorted_pnl.std(unbiased=False))
+    scale = sorted_pnl.std(unbiased=False)
+    if float(scale.item()) <= 0.0:
+        scale = torch.tensor(1e-6, dtype=sorted_pnl.dtype)
+    normal = torch.distributions.Normal(sorted_pnl.mean(), scale)
     ref_quant = normal.icdf(quantiles.clamp(1e-3, 1 - 1e-3))
     plt.figure(figsize=(6, 6))
     plt.plot(ref_quant.numpy(), sorted_pnl.numpy(), marker="o", linestyle="")

@@ -1,0 +1,15 @@
+report:
+  seeds: 1
+  seed_dirs: ["runs/paper_eval/*"]
+  outputs_dir: "outputs/report_paper"
+  regimes_order: ["smoke", "__overall__"]
+  confidence_level: 0.95
+  include_gfc: false
+  metrics:
+    invariance: ["ISI", "IG"]
+    robustness: ["WG_risk", "VR_risk", "C1_global_stability"]
+    efficiency: ["ER_mean_pnl", "TR_turnover"]
+  figures:
+    dpi_preview: 160
+    backend: "agg"
+  generate_3d: false
