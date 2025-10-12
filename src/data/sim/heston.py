@@ -1,12 +1,13 @@
-"""Deterministic Heston regime simulator utilities."""
+"""Heston simulation utilities with crisis stress support."""
 from __future__ import annotations
 
 import math
 import zlib
-from dataclasses import dataclass
-from typing import Dict, List, Sequence
+from dataclasses import dataclass, replace
+from typing import Dict, List, Mapping, Sequence
 
 import numpy as np
+import pandas as pd
 import torch
 
 from ...markets.pricing import black_scholes_price
@@ -21,6 +22,39 @@ def _stable_seed_offset(label: str) -> int:
     """Return a deterministic 32-bit offset for the provided label."""
 
     return zlib.adler32(label.encode("utf-8")) & 0xFFFFFFFF
+
+
+@dataclass(frozen=True)
+class HestonParams:
+    """Container describing a single-path Heston configuration."""
+
+    s0: float
+    v0: float
+    mu: float
+    kappa: float
+    theta: float
+    sigma: float
+    rho: float
+    dt_days: float
+    days: int
+
+    def with_updates(self, **kwargs) -> "HestonParams":
+        """Return a copy with the provided values replaced."""
+
+        return replace(self, **kwargs)
+
+
+DEFAULT_HESTON_PARAMS = HestonParams(
+    s0=100.0,
+    v0=0.04,
+    mu=0.0,
+    kappa=1.5,
+    theta=0.04,
+    sigma=0.5,
+    rho=-0.7,
+    dt_days=1.0,
+    days=60,
+)
 
 
 @dataclass(frozen=True)
@@ -44,6 +78,67 @@ REGIME_DEFAULTS: Dict[str, RegimeParams] = {
 }
 
 
+def _as_heston_params(params: Mapping[str, float] | HestonParams) -> HestonParams:
+    if isinstance(params, HestonParams):
+        return params
+    required = {"s0", "v0", "kappa", "theta", "sigma", "rho", "dt_days", "days"}
+    missing = required.difference(params.keys())
+    if missing:
+        raise KeyError(f"Missing Heston parameters: {sorted(missing)}")
+    return HestonParams(
+        s0=float(params["s0"]),
+        v0=float(params["v0"]),
+        mu=float(params.get("mu", 0.0)),
+        kappa=float(params["kappa"]),
+        theta=float(params["theta"]),
+        sigma=float(params["sigma"]),
+        rho=float(params["rho"]),
+        dt_days=float(params["dt_days"]),
+        days=int(params["days"]),
+    )
+
+
+def simulate_heston(params: Mapping[str, float] | HestonParams, seed: int) -> pd.DataFrame:
+    """Simulate a single Heston path and return a tidy dataframe."""
+
+    cfg = _as_heston_params(params)
+    steps = max(int(cfg.days), 1)
+    dt = float(cfg.dt_days) / 252.0
+    sqrt_dt = math.sqrt(max(dt, 1e-12))
+    rng = np.random.default_rng(int(seed) & 0xFFFFFFFF)
+
+    spot = np.zeros(steps + 1, dtype=np.float64)
+    var = np.zeros(steps + 1, dtype=np.float64)
+    log_returns = np.zeros(steps + 1, dtype=np.float64)
+    spot[0] = max(cfg.s0, 1e-8)
+    var[0] = max(cfg.v0, 1e-10)
+
+    for t in range(steps):
+        z1 = rng.standard_normal()
+        z2 = rng.standard_normal()
+        z2 = cfg.rho * z1 + math.sqrt(max(1.0 - cfg.rho**2, 1e-8)) * z2
+        vt = max(var[t], 1e-10)
+        drift = cfg.kappa * (cfg.theta - vt) * dt
+        diffusion = cfg.sigma * math.sqrt(max(vt, 0.0)) * sqrt_dt * z2
+        next_var = max(vt + drift + diffusion, 1e-10)
+        var[t + 1] = next_var
+        dlog = (cfg.mu - 0.5 * vt) * dt + math.sqrt(max(vt, 1e-12)) * sqrt_dt * z1
+        log_returns[t + 1] = dlog
+        spot[t + 1] = spot[t] * math.exp(dlog)
+
+    df = pd.DataFrame(
+        {
+            "step": np.arange(steps + 1, dtype=np.int32),
+            "spot": spot,
+            "variance": var,
+            "log_return": log_returns,
+            "vol": np.sqrt(np.maximum(var, 0.0)),
+        }
+    )
+    df["time"] = df["step"] * dt
+    return df[["step", "time", "spot", "variance", "vol", "log_return"]]
+
+
 class HestonGenerator:
     """Euler-Maruyama simulator for the Heston stochastic volatility model."""
 
@@ -65,7 +160,7 @@ class HestonGenerator:
         for t in range(steps):
             z1 = rng.standard_normal(n_paths)
             z2 = rng.standard_normal(n_paths)
-            z2 = self.rho * z1 + math.sqrt(max(1.0 - self.rho ** 2, 1e-8)) * z2
+            z2 = self.rho * z1 + math.sqrt(max(1.0 - self.rho**2, 1e-8)) * z2
             vt = np.clip(var[:, t], 1e-8, None)
             var[:, t + 1] = np.clip(
                 vt + self.mean_rev * (self.long_term_var - vt) * self.dt + self.vol_of_vol * np.sqrt(vt) * sqrt_dt * z2,

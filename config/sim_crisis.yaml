@@ -1,0 +1,38 @@
+data:
+  source: "sim"
+  heston:
+    s0: 100.0
+    v0: 0.04
+    kappa: 1.5
+    theta: 0.04
+    sigma: 0.5
+    rho: -0.7
+    dt_days: 1
+    days: 60
+  regimes:
+    bands:
+      - { name: "train_low",   vix_max: 0.10 }
+      - { name: "train_med",   vix_min: 0.10, vix_max: 0.25 }
+      - { name: "val_high",    vix_min: 0.25, vix_max: 0.40 }
+      - { name: "test_crisis", vix_min: 0.40 }
+  stress:
+    jump:
+      enabled: true
+      lam: 0.10
+      mu_j: -0.08
+      sigma_j: 0.12
+      apply_to: ["val_high", "test_crisis"]
+    liquidity:
+      enabled: true
+      base_spread_bps: 1.0
+      vol_slope_bps: 12.0
+      size_slope_bps: 4.0
+      slippage_coeff: 0.0002
+      apply_to: ["test_crisis"]
+  episode:
+    count_per_regime: 64
+    seed: 7
+train:
+  envs: ["train_low", "train_med"]
+  val_envs: ["val_high"]
+  test_envs: ["test_crisis"]

@@ -30,6 +30,36 @@ jobs:
 
       - name: Unit tests and tiny train
         run: make ci-smoke
+      - name: Paper smoke eval
+        run: |
+          RUN_DIR=$(readlink -f runs/latest)
+          CKPT=$(python scripts/find_latest_checkpoint.py "$RUN_DIR")
+          python -m src.eval --config-name=train/phase2 eval.report.checkpoint_path="$CKPT" logging.wandb.enabled=false
+
+      - name: Make Figures
+        run: |
+          RUN_DIR=$(readlink -f runs/latest)
+          python scripts/make_all_figures.py --run_dir "$RUN_DIR"
+
+      - name: SPY data-loader checks
+        run: pytest tests/test_spy_loader.py
+
+      - name: Upload Figures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: figures
+          path: runs/latest/figures
+          if-no-files-found: ignore
+
+      - name: Prepare failure artifacts
+        if: failure()
+        run: |
+          mkdir -p ci-artifacts
+          echo "smoke artifacts" > ci-artifacts/README.txt
+          if [ -d runs ]; then
+            find runs -maxdepth 3 -type f \( -name 'config.yaml' -o -name 'metrics.jsonl' -o -name 'metadata.json' -o -name 'provenance.json' -o -name '*.log' \) -exec cp --parents {} ci-artifacts \;
+          fi
 
       - name: Upload smoke artifacts on failure
         if: failure()

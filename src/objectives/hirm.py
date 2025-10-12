@@ -15,7 +15,7 @@ def compute_hirm_penalty(
     *,
     alignment_weight: float = 1.0,
     variance_weight: float = 0.0,
-) -> Tuple[torch.Tensor, Mapping[str, float]]:
+) -> Tuple[torch.Tensor, Mapping[str, torch.Tensor]]:
     """Return the combined HIRM penalty and diagnostic terms."""
 
     norm_grads = normalized_head_grads(head_grads)
@@ -36,7 +36,7 @@ def compute_hirm_penalty(
         "cosine": mean_cosine,
         "variance_raw": variance_raw,
     }
-    return penalty, detach_diagnostics(diagnostics)
+    return penalty, diagnostics
 
 
 def hirm_loss(

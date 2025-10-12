@@ -5,23 +5,28 @@ import math
 import os
 import warnings
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, TYPE_CHECKING
 
 import hydra
 import torch
 from omegaconf import DictConfig, OmegaConf
 
 from .data.features import FeatureEngineer
+from .envs.single_asset import SingleAssetHedgingEnv
 from .diagnostics import metrics as diag_metrics
 from .diagnostics import safe_eval_metric
 from .models import PolicyMLP
 from .objectives import cvar as cvar_obj
 from .objectives import penalties
+from .envs.single_asset import SingleAssetHedgingEnv
 from .irm.configs import IRMConfig
 from .irm.head_grads import compute_env_head_grads, freeze_backbone
 from .irm.penalties import cosine_alignment_penalty, varnorm_penalty
 from .utils import checkpoints, logging as log_utils, seed as seed_utils, stats
 from .utils.configs import build_envs, prepare_data_module, unwrap_experiment_config
+
+if TYPE_CHECKING:  # pragma: no cover - import for type checking only
+    from .envs.single_asset import SingleAssetHedgingEnv
 
 
 
@@ -58,6 +63,7 @@ def _init_policy(cfg: DictConfig, feature_dim: int, num_envs: int):
         representation_dim=cfg.model.representation_dim,
         adapter_hidden=cfg.model.adapter_hidden,
         max_position=cfg.model.max_position,
+        head_name=cfg.model.get("head_name"),
     )
 
 
