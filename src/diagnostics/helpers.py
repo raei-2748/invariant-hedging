@@ -15,7 +15,7 @@ def _detach_value(value: Any) -> Any:
     if isinstance(value, torch.Tensor):
         tensor = value.detach()
         if tensor.numel() == 1:
-            return float(tensor.item())
+            return tensor.clone()
         return tensor
     if isinstance(value, Mapping):
         return {key: _detach_value(val) for key, val in value.items()}
@@ -32,9 +32,9 @@ def detach_diagnostics(payload: _T) -> _T:
     """Detach a diagnostics payload from the autograd graph.
 
     The helper supports arbitrarily nested mappings and sequences whose leaves
-    may be ``torch.Tensor`` instances.  Scalars are converted to Python ``float``
-    objects when possible so downstream logging utilities can consume the
-    diagnostics without triggering autograd or dtype conversions.
+    may be ``torch.Tensor`` instances.  Scalar tensors are detached and cloned so
+    callers may keep using ``.item()`` without holding on to autograd history,
+    while higher-rank tensors are detached in-place.
     """
 
     return _detach_value(payload)
@@ -49,8 +49,8 @@ def safe_eval_metric(
     first detached from the autograd graph and then passed to ``metric_fn``.  The
     computation itself is wrapped in ``torch.no_grad()`` to guarantee the metric
     evaluation never contributes to gradient history.  The return value is
-    similarly detached via :func:`detach_diagnostics` which converts scalar
-    tensors to Python floats for convenience.
+    similarly detached via :func:`detach_diagnostics` so downstream consumers can
+    log metrics without tracking gradients.
     """
 
     detached_args = [_detach_value(arg) for arg in metric_args]
