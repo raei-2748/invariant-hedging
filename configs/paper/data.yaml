@@ -39,51 +39,52 @@ scheduler:
 # @package paper.data
 
 # Paper-aligned SPY windows sourced from configs/splits/.
-instrument: SPY
-source: configs/splits
-train:
-  name: train_low_med_vol
-  split: spy_train
-  file: configs/splits/spy_train.yaml
-  start_date: "2017-01-03"
-  end_date: "2019-12-31"
-  regime_tag: train_main
-  notes: "Baseline 2017–2019 low/medium volatility span."
-val:
-  name: val_2018_spike
-  split: spy_val_2018q4
-  file: configs/splits/spy_val.yaml
-  start_date: "2018-10-01"
-  end_date: "2018-12-31"
-  regime_tag: val_2018
-  notes: "Validation on the Q4 2018 volatility spike."
-tests:
-  - name: crisis_2018_volmageddon
-    split: spy_test_2018
-    file: configs/splits/spy_test_2018.yaml
-    start_date: "2018-02-01"
-    end_date: "2018-02-28"
-    regime_tag: crisis_2018
-    notes: "Volmageddon stress window."
-  - name: crisis_2020_covid
-    split: spy_test_2020
-    file: configs/splits/spy_test_2020.yaml
-    start_date: "2020-02-15"
-    end_date: "2020-04-15"
-    regime_tag: crisis_2020
-    notes: "COVID crash stress window."
-  - name: crisis_2022_inflation
-    split: spy_test_2022
-    file: configs/splits/spy_test_2022.yaml
-    start_date: "2022-06-01"
-    end_date: "2022-10-31"
-    regime_tag: crisis_2022
-    notes: "Inflation and tightening stress window."
-anchors:
-  - name: crisis_2008_gfc
-    split: spy_test_2008
-    file: configs/splits/spy_test_2008.yaml
-    start_date: "2008-09-01"
-    end_date: "2009-03-31"
-    regime_tag: crisis_2008
-    notes: "Optional GFC anchor requested post-publication."
+regimes:
+  instrument: SPY
+  source: configs/splits
+  train:
+    name: train_low_med_vol
+    split: spy_train
+    file: configs/splits/spy_train.yaml
+    start_date: "2017-01-03"
+    end_date: "2019-12-31"
+    regime_tag: train_main
+    notes: "Baseline 2017–2019 low/medium volatility span."
+  val:
+    name: val_2018_spike
+    split: spy_val_2018q4
+    file: configs/splits/spy_val.yaml
+    start_date: "2018-10-01"
+    end_date: "2018-12-31"
+    regime_tag: val_2018
+    notes: "Validation on the Q4 2018 volatility spike."
+  tests:
+    - name: crisis_2018_volmageddon
+      split: spy_test_2018
+      file: configs/splits/spy_test_2018.yaml
+      start_date: "2018-02-01"
+      end_date: "2018-02-28"
+      regime_tag: crisis_2018
+      notes: "Volmageddon stress window."
+    - name: crisis_2020_covid
+      split: spy_test_2020
+      file: configs/splits/spy_test_2020.yaml
+      start_date: "2020-02-15"
+      end_date: "2020-04-15"
+      regime_tag: crisis_2020
+      notes: "COVID crash stress window."
+    - name: crisis_2022_inflation
+      split: spy_test_2022
+      file: configs/splits/spy_test_2022.yaml
+      start_date: "2022-06-01"
+      end_date: "2022-10-31"
+      regime_tag: crisis_2022
+      notes: "Inflation and tightening stress window."
+  anchors:
+    - name: crisis_2008_gfc
+      split: spy_test_2008
+      file: configs/splits/spy_test_2008.yaml
+      start_date: "2008-09-01"
+      end_date: "2009-03-31"
+      regime_tag: crisis_2008
+      notes: "Optional GFC anchor requested post-publication."
