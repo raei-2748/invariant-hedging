@@ -38,6 +38,15 @@ data/
 The `data/sample/` subtree ships with the repository to power smoke tests. The
 real dataset must be staged under `data/raw/` by the user.
 
+### Miniature dataset for releases
+
+Tagged paper releases bundle a tarball named `data-mini.tar.gz` that mirrors the
+contents of `data/sample/`. The packaging helper (`scripts/package_release.py`)
+produces the tarball and an accompanying SHA256 checksum so downstream users can
+extract the lightweight fixtures without cloning the full repository history.
+Include the tarball when drafting the release and reference the checksum in the
+release notes to ease provenance tracking.
+
 ## Fetching public ingredients
 
 `scripts/data/fetch_spy.sh` downloads Yahoo Finance OHLCV data and the CBOE VIX

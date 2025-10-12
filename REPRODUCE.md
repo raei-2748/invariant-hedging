@@ -58,6 +58,16 @@ CPU-compatible.
   `configs/report/default.yaml`. This is unnecessary for the single-seed smoke
   check but reproduces the full paper appendix when all seeds are available.
 
+### Using tagged release assets
+
+Paper releases attach a bundle created by `scripts/package_release.py` that
+includes `environment.yml`, a Docker image digest, `data-mini.tar.gz`, and the
+rendered report tables. To perform a clean-room reproduction, extract the
+tarball, pull the recorded container image, and run `make report-lite` inside
+the container. Compare the regenerated CSVs in `outputs/report_paper/tables/`
+against the `golden/` copies shipped with the release to confirm the snapshot
+matches the manuscript.
+
 ## Provenance and artifact tracking
 
 - **Git state.** Record the commit hash from `runs/paper/*/metadata.json` and
