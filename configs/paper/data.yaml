@@ -42,6 +42,12 @@ scheduler:
 regimes:
   instrument: SPY
   source: configs/splits
+windows:
+  instrument: SPY
+  source: configs/splits
+instrument: SPY
+source: configs/splits
+windows:
   train:
     name: train_low_med_vol
     split: spy_train
