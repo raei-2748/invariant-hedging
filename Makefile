@@ -6,6 +6,7 @@ DRY ?= 0
 SMOKE ?= 0
 .PHONY: setup train evaluate reproduce lint tests smoke phase2 report report-lite phase2_scorecard paper
 .PHONY: setup train evaluate reproduce lint tests smoke phase2 report report-lite report-paper phase2_scorecard
+.PHONY: ci-smoke ci-unit ci-train-lite ci-report-lite
 setup:
 	$(PYTHON) -m pip install -r requirements.txt
 train:
@@ -22,6 +23,22 @@ lint:
 	$(PYTHON) -m ruff check src
 tests:
 	$(PYTHON) -m pytest
+
+ci-unit:
+	python -m pip install -e .[dev]
+	pytest -q tests/smoke tests/unit
+
+ci-train-lite:
+	python -m src.train \
+	  training.max_steps=150 \
+	  data.loader=smoke \
+	  logging.wandb.enabled=false \
+	  outputs.dir="runs/ci_smoke"
+
+ci-report-lite:
+	python -m src.report.lite --runs "runs/ci_smoke" --no_figures
+
+ci-smoke: ci-unit ci-train-lite ci-report-lite
 data:
 	$(PYTHON) scripts/prepare_data.py
 smoke:
