@@ -5,6 +5,7 @@ defaults:
   - /envs: daily
   - /model: erm
   - /eval: daily
+  - /logger: default
   - /logging: default
   - _self_
 

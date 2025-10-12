@@ -5,6 +5,7 @@ defaults:
   - /envs: daily
   - /model: hirm_head
   - /eval: daily
+  - /logger: default
   - /logging: default
   - _self_
 

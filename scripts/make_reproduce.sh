@@ -7,8 +7,6 @@ PHASE=${PHASE:-phase1}
 
 case "${PHASE}" in
   phase1)
-    export WANDB_MODE=${WANDB_MODE:-offline}
-
     for cfg in "${MODELS[@]}"; do
       echo "[make_reproduce] Training ${cfg}"
       scripts/run_train.sh "${cfg}" "$@"

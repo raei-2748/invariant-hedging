@@ -4,6 +4,7 @@ defaults:
   - algorithm: irm
   - training: default
   - evaluation: default
+  - logger: wandb
   - logging: wandb
   - _self_
 

@@ -10,4 +10,4 @@ export KMP_AFFINITY=${KMP_AFFINITY:-disabled}
 export KMP_INIT_AT_FORK=${KMP_INIT_AT_FORK:-FALSE}
 export HIRM_TORCH_NUM_THREADS=${HIRM_TORCH_NUM_THREADS:-$OMP_NUM_THREADS}
 
-WANDB_MODE=${WANDB_MODE:-offline} python -m src.train --config-name="${CONFIG}" "$@"
+python -m src.train --config-name="${CONFIG}" "$@"
