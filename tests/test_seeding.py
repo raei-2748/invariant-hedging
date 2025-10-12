@@ -15,3 +15,4 @@ def test_seed_everything_deterministic():
     np_gen = seed.numpy_generator()
     assert np_gen.integers(0, 10, size=5).shape == (5,)
     assert os.environ["PYTHONHASHSEED"] == "1234"
+    assert os.environ["NUMPY_DEFAULT_DTYPE"] == "float64"

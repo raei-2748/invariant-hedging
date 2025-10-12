@@ -1,7 +1,11 @@
-"""Tagging helpers for dataset provenance."""
+"""Canonical tagging helpers for dataset provenance."""
+
 from __future__ import annotations
 
-from typing import Dict
+from dataclasses import dataclass, field
+from typing import Any, Dict, Iterable, List, Mapping, MutableMapping
+
+from ..data.types import EpisodeBatch
 
 
 def build_episode_tags(
@@ -23,13 +27,6 @@ def build_episode_tags(
         "stress_jump": bool(stress_jump),
         "stress_liquidity": bool(stress_liquidity),
     }
-"""Canonical tagging helpers for real-market episodes."""
-from __future__ import annotations
-
-from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Mapping, MutableMapping
-
-from ..data.types import EpisodeBatch
 
 
 @dataclass(frozen=True)
@@ -47,6 +44,8 @@ class EpisodeTag:
     extra: Mapping[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
+        """Return a serialisable dictionary representation of the tag."""
+
         payload: Dict[str, Any] = {
             "episode_id": int(self.episode_id),
             "regime_name": self.regime_name,
@@ -91,11 +90,7 @@ def build_episode_tag(
 
 
 def attach_tags(batch: EpisodeBatch, tags: Iterable[EpisodeTag]) -> EpisodeBatch:
-    """Return a copy of ``batch`` with canonical tag metadata injected.
-
-    The metadata is stored under ``meta['episode_tags']`` as a list of dicts. The
-    input batch is not mutated to keep downstream consumers pure.
-    """
+    """Return a copy of ``batch`` with canonical tag metadata injected."""
 
     tag_payload: List[Dict[str, Any]] = [tag.to_dict() for tag in tags]
     meta: MutableMapping[str, Any] = dict(batch.meta)
@@ -118,3 +113,12 @@ def extract_episode_tags(batch: EpisodeBatch) -> List[Dict[str, Any]]:
     if isinstance(tags, list):
         return list(tags)
     return []
+
+
+__all__ = [
+    "EpisodeTag",
+    "attach_tags",
+    "build_episode_tag",
+    "build_episode_tags",
+    "extract_episode_tags",
+]

@@ -1,3 +1,6 @@
+import math
+
+import pytest
 import torch
 
 from src.markets.pricing import (
@@ -5,6 +8,34 @@ from src.markets.pricing import (
     black_scholes_gamma,
     black_scholes_price,
 )
+
+
+def _norm_cdf(value: float) -> float:
+    return 0.5 * (1.0 + math.erf(value / math.sqrt(2.0)))
+
+
+def test_black_scholes_price_matches_reference():
+    spot = 110.0
+    strike = 100.0
+    rate = 0.03
+    sigma = 0.25
+    tau = 0.75
+
+    price = black_scholes_price(
+        torch.tensor(spot),
+        torch.tensor(strike),
+        torch.tensor(rate),
+        torch.tensor(sigma),
+        torch.tensor(tau),
+        option_type="call",
+    )
+
+    sqrt_tau = math.sqrt(tau)
+    d1 = (math.log(spot / strike) + (rate + 0.5 * sigma**2) * tau) / (sigma * sqrt_tau)
+    d2 = d1 - sigma * sqrt_tau
+    expected = spot * _norm_cdf(d1) - strike * math.exp(-rate * tau) * _norm_cdf(d2)
+
+    assert price.item() == pytest.approx(expected, rel=1e-6, abs=1e-6)
 
 
 def test_black_scholes_delta_matches_autograd():
