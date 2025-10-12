@@ -118,7 +118,6 @@ def _melt_if_wide(df: pd.DataFrame) -> pd.DataFrame:
     if "regime" not in df.columns:
         raise ValueError("Diagnostics CSV must contain a 'regime' column")
     id_cols = [c for c in df.columns if c.lower() == "regime"]
-    value_cols = [c for c in df.columns if c not in id_cols]
     tidy = df.melt(id_vars=id_cols, var_name="metric", value_name="value")
     tidy.columns = [col.lower() for col in tidy.columns]
     return tidy

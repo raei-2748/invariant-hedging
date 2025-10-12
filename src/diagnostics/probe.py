@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Dict, Iterable, Iterator, List, Mapping, MutableMapping, Sequence
+from typing import Callable, Dict, Iterator, List, Mapping, MutableMapping, Sequence
 
 import torch
 
