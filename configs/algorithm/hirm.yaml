@@ -1,0 +1,11 @@
+name: hirm
+detach_features: true
+irm:
+  enabled: true
+  type: cosine
+  lambda_weight: 1.0
+  env_min: 2
+  eps: 1.0e-12
+  freeze_backbone: true
+  logging:
+    log_irm_grads: false

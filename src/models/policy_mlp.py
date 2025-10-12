@@ -6,7 +6,7 @@ from typing import Optional
 import torch
 from torch import nn
 
-from .heads import RepresentationHead
+from .feature_extractor import FeatureExtractor
 from .policy import Policy
 
 
@@ -26,18 +26,17 @@ class PolicyMLP(Policy):
         head_name: str | None = None,
     ) -> None:
         super().__init__(head_name=head_name or "decision_head")
-        layers = []
-        input_dim = feature_dim
-        for _ in range(hidden_depth):
-            layers.append(nn.Linear(input_dim, hidden_width))
-            if layer_norm:
-                layers.append(nn.LayerNorm(hidden_width))
-            layers.append(nn.GELU())
-            if dropout > 0:
-                layers.append(nn.Dropout(dropout))
-            input_dim = hidden_width
-        self.backbone = nn.Sequential(*layers)
-        self.representation = RepresentationHead(hidden_width, hidden_width, representation_dim)
+        self.feature_extractor = FeatureExtractor(
+            feature_dim=feature_dim,
+            hidden_width=hidden_width,
+            hidden_depth=hidden_depth,
+            dropout=dropout,
+            layer_norm=layer_norm,
+            representation_dim=representation_dim,
+        )
+        # Preserve legacy attribute names for downstream utilities.
+        self.backbone = self.feature_extractor.backbone
+        self.representation = self.feature_extractor.representation
         adapters = nn.ModuleList(
             [
                 nn.Sequential(
@@ -59,10 +58,7 @@ class PolicyMLP(Policy):
         env_index: int,
         representation_scale: Optional[torch.Tensor] = None,
     ) -> dict[str, torch.Tensor]:
-        h = self.backbone(features)
-        rep = self.representation(h)
-        if self.should_detach_features():
-            rep = rep.detach()
+        rep = self.feature_extractor(features, detach_for_penalty=self.should_detach_features())
         scale = representation_scale if representation_scale is not None else 1.0
         scaled_rep = rep * scale
         adapter = self.env_adapters[env_index]

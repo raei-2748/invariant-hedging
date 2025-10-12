@@ -4,6 +4,7 @@ defaults:
   - /data: synthetic
   - /envs: daily
   - /costs: low
+  - /algorithm: erm
   - /model: erm
   - /train: erm
   - /eval: daily

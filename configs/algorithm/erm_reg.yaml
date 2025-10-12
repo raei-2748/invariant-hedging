@@ -1,7 +1,2 @@
-name: erm_reg
-objective: mean_squared_pnl
-risk_measure: expected
-regularization:
-  weight_decay: 1e-3
-  dropout: 0.3
-  label_smoothing: 0.05
+name: erm
+label_smoothing: 0.05
