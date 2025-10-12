@@ -1,0 +1,56 @@
+# @package _global_
+
+defaults:
+  - /data: real_spy
+  - /envs: daily
+  - /model: irm
+  - /eval: daily
+  - /logging: default
+  - _self_
+
+runtime:
+  device: cpu
+
+envs:
+  train: [smoke]
+  val: [smoke]
+  test: [smoke]
+
+train:
+  steps: 200
+  batch_size: 16
+  grad_clip: 1.0
+  seed: 0
+  pretrain_steps: 40
+  irm_ramp_steps: 40
+  eval_interval: 200
+  checkpoint_topk: 1
+  max_trade_warning_factor: 0.0
+
+loss:
+  name: cvar
+  cvar_alpha: 0.95
+
+optimizer:
+  name: adam
+  lr: 3.0e-4
+  weight_decay: 1.0e-6
+
+scheduler:
+  name: none
+
+logging:
+  log_interval: 100
+  eval_interval: 400
+  local_mirror:
+    base_dir: runs/paper
+    metrics_file: metrics.jsonl
+    final_metrics_file: final_metrics.json
+    config_file: config.yaml
+    checkpoints_dir: checkpoints
+    artifacts_dir: artifacts
+
+irm:
+  lambda_init: 0.0
+  lambda_target: 0.1
+  ramp_steps: 80

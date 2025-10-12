@@ -13,7 +13,7 @@ model.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Mapping, Sequence, Tuple
+from typing import Iterable, List, Mapping, Sequence
 
 import torch
 import torch.nn.functional as F
