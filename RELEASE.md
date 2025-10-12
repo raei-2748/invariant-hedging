@@ -1,6 +1,6 @@
 # Release Process
 
-This project uses lightweight release candidates to capture the exact assets referenced in the accompanying paper. Follow the checklist below whenever preparing a new tagged release. `v0.9-paper-rc` serves as the feature freeze for the manuscript; promote the tag to `v1.0-paper` once CI and nightly smoke tests are green on the release candidate.
+This project uses lightweight release candidates to capture the exact assets referenced in the accompanying paper. Follow the numbered checklist below whenever preparing a new tagged release. `v0.9-paper-rc` serves as the feature freeze for the manuscript; promote the tag to `v1.0-paper` once CI and nightly smoke tests are green on the release candidate.
 
 ## 1. Prep the repository
 
@@ -22,12 +22,12 @@ Before tagging a release, the following checks must pass:
 
 1. Navigate to **Actions → Prepare Paper Release** in GitHub.
 2. Use **Run workflow** and supply:
-   - `dry_run`: keep as `true` to avoid publishing anything.
-   - `release_tag`: (optional) set to the intended tag such as `v0.9-paper-rc` so the artifact name matches expectations.
+   1. `dry_run`: keep as `true` to avoid publishing anything.
+   2. `release_tag`: (optional) set to the intended tag such as `v0.9-paper-rc` so the artifact name matches expectations.
 3. Download the resulting artifact and confirm it contains:
-   - The full `configs/paper/` directory.
-   - The updated `paper_provenance.json` file.
-   - Representative metrics such as `outputs/_phase1_snapshot/final_metrics.json` and `outputs/_phase1_snapshot/metrics.jsonl`.
+   1. The full `configs/paper/` directory.
+   2. The updated `paper_provenance.json` file.
+   3. Representative metrics such as `outputs/_phase1_snapshot/final_metrics.json` and `outputs/_phase1_snapshot/metrics.jsonl`.
 4. Inspect the ZIP contents to ensure no extraneous files or sensitive data slipped in.
 
 ## 4. Collect release assets
@@ -48,21 +48,31 @@ Before tagging the release, assemble the artefacts that will accompany the GitHu
    python scripts/package_release.py \
        --tag v0.9-paper-rc \
        --report-dir outputs/report_paper \
-       --golden scorecard.csv \
-       --golden seed_values.csv \
+       --golden tables/scorecard.csv \
+       --golden tables/seed_values.csv \
+       --exclude scratch/*.log \
+       --workers 4 \
        --docker-digest ghcr.io/acme/invariant-hedging@sha256:YOUR_DIGEST
    ```
    The helper copies the following into the bundle and emits `manifest.json` with checksums:
-   - `environment/environment.yml`
-   - `environment/docker_digest.txt`
-   - `data/data-mini.tar.gz` and `data/data-mini.sha256`
-   - `reports/` (tables, figures, manifests)
-   - `golden/` CSVs (fast access to the headline tables)
-   - `provenance/paper_provenance.json` and `provenance/final_metrics.json` (if available)
+   1. `environment/environment.yml`
+   2. `environment/docker_digest.txt`
+   3. `data/data-mini.tar.gz` and `data/data-mini.sha256`
+   4. `reports/` (tables, figures, manifests, with per-file SHA256 values)
+   5. `golden/` CSV and JSON tables for fast access to headline results
+   6. `provenance/paper_provenance.json` and `provenance/final_metrics.json` (if available)
 4. Inspect the manifest to verify every asset is present:
    ```bash
    cat releases/v0.9-paper-rc/manifest.json | jq '.'
    ```
+5. (Optional) Reuse an existing data tarball when iterating:
+   ```bash
+   python scripts/package_release.py \
+       --tag v0.9-paper-rc \
+       --data-tar releases/v0.8-paper/data/data-mini.tar.gz \
+       --output releases/v0.9-paper-rc
+   ```
+   Re-using the tarball keeps uploads small when the miniature dataset is unchanged.
 
 ## 5. Tag and publish
 
@@ -70,6 +80,7 @@ Before tagging the release, assemble the artefacts that will accompany the GitHu
 2. Push the tag to GitHub. The `Prepare Paper Release` workflow will run automatically and upload the release artifact for archival.
 3. Draft release notes summarizing the paper updates and link to the packaged bundle.
 4. Verify the final artifact uploaded by the workflow matches the dry-run output and attach the bundle contents (or archive) to the GitHub Release.
+5. Link to the [reproduction playbook](REPRODUCE.md) from the release notes so users can follow the clean-room steps.
 
 ## 6. Manual verification checklist
 
@@ -96,8 +107,15 @@ Verify the bundle supports clean-room reproduction before publishing the final t
      ghcr.io/acme/invariant-hedging@sha256:YOUR_DIGEST \
      bash -lc "pip install -r requirements.txt && make report-lite"
    ```
-4. Confirm the regenerated CSVs in `outputs/report_paper/tables/` match the golden copies shipped in the release bundle.
+4. Confirm the regenerated CSVs in `outputs/report_paper/tables/` match the golden and JSON tables shipped in the release bundle. The manifest records SHA256 checksums for each file to make comparisons scriptable.
 
 The release is ready once the clean-room run reproduces the lite report without manual tweaks.
 
 Following this process ensures that each tagged release captures the reproducibility assets required for the paper while maintaining a clear audit trail.
+
+## Troubleshooting
+
+1. **Docker digest lookup fails.** Re-run the helper with `--docker-digest` or set the `PAPER_RELEASE_DOCKER_DIGEST` environment variable. The CLI also accepts `--verbose` to surface the exact Docker error.
+2. **Manifest missing tables.** Confirm that `make report-paper` regenerated `outputs/report_paper/` and that you did not exclude required files via `--exclude`. The manifest lists the active exclusion patterns under `reports.excludes` for auditing.
+3. **Metrics absent.** If `provenance/final_metrics.json` is missing, re-run the evaluation sweep (`make paper`) and copy the resulting `runs/paper_eval/*/final_metrics.json` into place before packaging.
+4. **Large bundles during iteration.** Supply `--data-tar` with a previously published tarball to avoid rebuilding the miniature dataset when nothing changed.

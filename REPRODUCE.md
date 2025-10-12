@@ -62,11 +62,12 @@ CPU-compatible.
 
 Paper releases attach a bundle created by `scripts/package_release.py` that
 includes `environment.yml`, a Docker image digest, `data-mini.tar.gz`, and the
-rendered report tables. To perform a clean-room reproduction, extract the
-tarball, pull the recorded container image, and run `make report-lite` inside
-the container. Compare the regenerated CSVs in `outputs/report_paper/tables/`
-against the `golden/` copies shipped with the release to confirm the snapshot
-matches the manuscript.
+rendered report tables. To perform a clean-room reproduction:
+
+1. Follow the download and container steps in the [release guide](RELEASE.md#7-reproduce-the-paper-lite-report-from-release-assets).
+2. Extract `data/data-mini.tar.gz` to mirror the repository layout.
+3. Launch the recorded container image and run `make report-lite`.
+4. Compare the regenerated CSVs in `outputs/report_paper/tables/` against the `golden/` copies shipped with the release. The `manifest.json` emitted by the packaging script lists SHA256 checksums for quick diffing.
 
 ## Provenance and artifact tracking
 
@@ -78,11 +79,16 @@ matches the manuscript.
   metrics only.
 - **Runtime manifests.** `outputs/report_paper/manifests/aggregate_manifest.json`
   contains hashes for every diagnostics CSV included in the report. Archive this
-  manifest with the final paper submission.
+  manifest with the final paper submission and cross-check against the packaged
+  `manifest.json` when using release assets.
 - **Hardware notes.** Include CPU model, RAM, and whether a GPU was available in
   any reproduction log. The official snapshot is CPU-only, but documenting
   accelerators helps others interpret runtime differences.
 
-By following the sequence above and storing the generated manifests, another
-researcher can audit the pipeline and regenerate the same tables and figures
-without additional assumptions.
+## Troubleshooting
+
+1. **Golden tables differ.** Re-run `make report-paper` to ensure the report cache reflects the latest training outputs. Check `manifest.json` under the release bundle to confirm no required files were excluded during packaging.
+2. **Docker image unavailable.** If `docker pull` fails, copy the digest recorded in `environment/docker_digest.txt` and retry after authenticating to the registry. As a fallback, recreate the environment via `environment.yml` on a local Python installation.
+3. **Metrics missing from provenance.** Verify that `runs/paper_eval/*/final_metrics.json` exists and re-run `scripts/package_release.py` with the `--metrics` flag pointing at the refreshed file.
+
+By following the sequence above, referencing the linked release instructions, and storing the generated manifests, another researcher can audit the pipeline and regenerate the same tables and figures without additional assumptions.

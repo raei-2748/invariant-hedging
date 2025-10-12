@@ -44,8 +44,10 @@ Tagged paper releases bundle a tarball named `data-mini.tar.gz` that mirrors the
 contents of `data/sample/`. The packaging helper (`scripts/package_release.py`)
 produces the tarball and an accompanying SHA256 checksum so downstream users can
 extract the lightweight fixtures without cloning the full repository history.
-Include the tarball when drafting the release and reference the checksum in the
-release notes to ease provenance tracking.
+Supply the `--data-tar` flag to re-use an existing archive when the miniature
+dataset is unchanged, keeping uploads small during release iterations. See
+[RELEASE.md](RELEASE.md#4-collect-release-assets) for the full packaging workflow
+and manifest verification steps.
 
 ## Fetching public ingredients
 
@@ -106,7 +108,8 @@ python scripts/train.py --config-name paper/data data.require_fresh_cache=true
 
 `RealSpyDataModule` automatically rebuilds caches on first access. It also backs
 the CI-friendly sample dataset in `data/sample/`, which covers the same date
-ranges with synthetic values.
+ranges with synthetic values. If release packaging ever reports missing files,
+confirm this directory mirrors the expected layout described above.
 
 ## Using the loader in configs
 
