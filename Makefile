@@ -4,6 +4,7 @@ PYTHON ?= python3
 CONFIG ?= configs/experiment.yaml
 DRY ?= 0
 SMOKE ?= 0
+DATA_ROOT ?= data
 .PHONY: setup train evaluate reproduce lint tests smoke phase2 report report-lite phase2_scorecard paper
 .PHONY: setup train evaluate reproduce lint tests smoke phase2 report report-lite report-paper phase2_scorecard
 .PHONY: ci-smoke ci-unit ci-train-lite ci-report-lite
@@ -23,6 +24,7 @@ lint:
 	$(PYTHON) -m ruff check src
 tests:
 	$(PYTHON) -m pytest
+.PHONY: data data-mini
 
 ci-unit:
 	python -m pip install -e .[dev]
@@ -40,7 +42,13 @@ ci-report-lite:
 
 ci-smoke: ci-unit ci-train-lite ci-report-lite
 data:
-	$(PYTHON) scripts/prepare_data.py
+	DATA_DIR=$(DATA_ROOT) tools/fetch_data.sh
+	DATA_DIR=$(DATA_ROOT) $(PYTHON) tools/make_data_snapshot.py --mode both
+
+data-mini:
+	DATA_DIR=$(DATA_ROOT) tools/fetch_data.sh
+	DATA_DIR=$(DATA_ROOT) $(PYTHON) tools/make_data_snapshot.py --mode mini
+
 smoke:
 	@set -euo pipefail; \
 	python3 -m src.train --config-name=train/smoke; \
