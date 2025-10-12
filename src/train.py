@@ -13,6 +13,7 @@ from omegaconf import DictConfig, OmegaConf
 
 from .data.features import FeatureEngineer
 from .diagnostics import metrics as diag_metrics
+from .diagnostics import safe_eval_metric
 from .models import PolicyMLP
 from .objectives import cvar as cvar_obj
 from .objectives import penalties
@@ -356,27 +357,29 @@ def main(cfg: DictConfig) -> None:
                 metrics_to_log.setdefault("train/irm_penalty", 0.0)
                 metrics_to_log.setdefault("train/irm_penalty_weighted", 0.0)
             if irm_settings.logging.log_irm_grads and grad_list:
-                norms = [g.norm().detach() for g in grad_list]
-                if norms:
-                    stacked_norms = torch.stack(norms)
-                    metrics_to_log["train/irm_grad_norm_min"] = float(stacked_norms.min().item())
-                    metrics_to_log["train/irm_grad_norm_mean"] = float(stacked_norms.mean().item())
-                    metrics_to_log["train/irm_grad_norm_max"] = float(stacked_norms.max().item())
-                if len(grad_list) >= 2:
-                    normalised = []
-                    for grad in grad_list:
-                        norm = grad.norm()
-                        if norm <= irm_settings.eps:
-                            normalised.append(torch.zeros_like(grad))
-                        else:
-                            normalised.append(grad / norm.clamp_min(irm_settings.eps))
-                    stacked = torch.stack(normalised)
-                    cos_matrix = stacked @ stacked.T
-                    idx = torch.triu_indices(cos_matrix.shape[0], cos_matrix.shape[1], offset=1)
-                    pairwise_cos = cos_matrix[idx[0], idx[1]].detach()
-                    metrics_to_log["train/irm_grad_cosine_mean"] = float(pairwise_cos.mean().item())
-                    metrics_to_log["train/irm_grad_cosine_min"] = float(pairwise_cos.min().item())
-                    metrics_to_log["train/irm_grad_cosine_max"] = float(pairwise_cos.max().item())
+                detached_grads = [g.detach() for g in grad_list]
+                with torch.no_grad():
+                    norms = [grad.norm() for grad in detached_grads]
+                    if norms:
+                        stacked_norms = torch.stack(norms)
+                        metrics_to_log["train/irm_grad_norm_min"] = float(stacked_norms.min().item())
+                        metrics_to_log["train/irm_grad_norm_mean"] = float(stacked_norms.mean().item())
+                        metrics_to_log["train/irm_grad_norm_max"] = float(stacked_norms.max().item())
+                    if len(detached_grads) >= 2:
+                        normalised = []
+                        for grad in detached_grads:
+                            norm = grad.norm()
+                            if norm <= irm_settings.eps:
+                                normalised.append(torch.zeros_like(grad))
+                            else:
+                                normalised.append(grad / norm.clamp_min(irm_settings.eps))
+                        stacked = torch.stack(normalised)
+                        cos_matrix = stacked @ stacked.T
+                        idx = torch.triu_indices(cos_matrix.shape[0], cos_matrix.shape[1], offset=1)
+                        pairwise_cos = cos_matrix[idx[0], idx[1]]
+                        metrics_to_log["train/irm_grad_cosine_mean"] = float(pairwise_cos.mean().item())
+                        metrics_to_log["train/irm_grad_cosine_min"] = float(pairwise_cos.min().item())
+                        metrics_to_log["train/irm_grad_cosine_max"] = float(pairwise_cos.max().item())
 
         scaler.scale(total_loss).backward()
         torch.nn.utils.clip_grad_norm_(policy.parameters(), cfg.train.grad_clip)
@@ -393,9 +396,8 @@ def main(cfg: DictConfig) -> None:
         if objective in {"irm", "hirm"}:
             metrics_to_log["train/lambda"] = lambda_logged
         if objective == "hirm" and env_losses:
-            env_risk_vals = [float(loss.detach().item()) for loss in env_losses]
-            metrics_to_log["train/ig"] = diag_metrics.invariant_gap(env_risk_vals)
-            metrics_to_log["train/wg"] = diag_metrics.worst_group(env_risk_vals)
+            metrics_to_log["train/ig"] = safe_eval_metric(diag_metrics.invariant_gap, env_losses)
+            metrics_to_log["train/wg"] = safe_eval_metric(diag_metrics.worst_group, env_losses)
 
         if step % log_interval == 0 or step == 1:
             metrics_to_log["train/loss"] = float(total_loss.item())
