@@ -12,6 +12,7 @@ import torch
 from omegaconf import DictConfig, OmegaConf
 
 from .data.features import FeatureEngineer
+from .envs.single_asset import SingleAssetHedgingEnv
 from .diagnostics import metrics as diag_metrics
 from .diagnostics import safe_eval_metric
 from .models import PolicyMLP
