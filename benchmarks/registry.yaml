@@ -1,0 +1,87 @@
+# Benchmark task registry for invariant-hedging.
+#
+# Each entry defines a named task with metadata used by tools/run_benchmark.py.
+# The registry is intentionally simple so downstream automation (e.g. CI) can
+# materialise deterministic comparisons without bespoke scripting.
+#
+# Fields:
+#   name:        Unique identifier.
+#   method:      Human-friendly label for the optimisation method.
+#   description: Optional short text for the leaderboard.
+#   presets:     List of preset names that include the task (e.g. "mini", "full").
+#   runner:      Execution backend identifier understood by the benchmark tool.
+#   params:      Runner-specific keyword arguments.
+#
+# The default runner "synthetic_linear" simulates a linear regression hedging
+# problem across multiple environments. It accepts the parameters below:
+#   dataset_seed:       RNG seed for reproducibility.
+#   feature_dim:        Number of features per sample.
+#   n_envs:             Number of training environments.
+#   samples_per_env:    Training and evaluation samples per environment.
+#   noise:              Standard deviation of observation noise.
+#   delta_scale:        Scale of environment-specific weight perturbations.
+#   invariance_weight:  Blend factor between pooled and invariant estimators.
+#   alpha:              Tail probability used for CVaR (default 0.95).
+
+version: 1
+
+tasks:
+  - name: "ERM@mini"
+    method: "ERM"
+    description: "Pooled estimator on a compact synthetic regression task."
+    presets: ["mini"]
+    runner: "synthetic_linear"
+    params:
+      dataset_seed: 7
+      feature_dim: 5
+      n_envs: 3
+      samples_per_env: 96
+      noise: 0.06
+      delta_scale: 0.35
+      invariance_weight: 0.0
+      alpha: 0.95
+
+  - name: "HIRM@mini"
+    method: "HIRM"
+    description: "Invariant-averaged estimator with strong alignment penalty."
+    presets: ["mini"]
+    runner: "synthetic_linear"
+    params:
+      dataset_seed: 7
+      feature_dim: 5
+      n_envs: 3
+      samples_per_env: 96
+      noise: 0.06
+      delta_scale: 0.35
+      invariance_weight: 0.85
+      alpha: 0.95
+
+  - name: "ERM@full"
+    method: "ERM"
+    description: "Pooled estimator on an expanded synthetic regression task."
+    presets: ["full"]
+    runner: "synthetic_linear"
+    params:
+      dataset_seed: 101
+      feature_dim: 8
+      n_envs: 4
+      samples_per_env: 256
+      noise: 0.05
+      delta_scale: 0.4
+      invariance_weight: 0.0
+      alpha: 0.95
+
+  - name: "HIRM@full"
+    method: "HIRM"
+    description: "Invariant-averaged estimator tuned for the full preset."
+    presets: ["full"]
+    runner: "synthetic_linear"
+    params:
+      dataset_seed: 101
+      feature_dim: 8
+      n_envs: 4
+      samples_per_env: 256
+      noise: 0.05
+      delta_scale: 0.4
+      invariance_weight: 0.8
+      alpha: 0.95
