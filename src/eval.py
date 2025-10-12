@@ -237,7 +237,6 @@ def _evaluate_env(
 
 def _plot_qq(record: Dict, output_path: Path) -> None:
     pnl = record["pnl"].numpy()
-    ref = torch.from_numpy(pnl).mean().item()
     quantiles = torch.linspace(0, 1, len(pnl))
     sorted_pnl = torch.sort(torch.from_numpy(pnl))[0]
     scale = sorted_pnl.std(unbiased=False)

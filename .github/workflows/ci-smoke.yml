@@ -1,0 +1,65 @@
+name: CI Smoke
+
+on:
+  push:
+    branches:
+      - main
+      - dev/**
+  pull_request:
+    branches:
+      - main
+      - dev/**
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Ruff lint
+        run: python -m ruff check src tests
+
+      - name: Unit tests
+        run: make tests
+
+      - name: Paper smoke train
+        run: |
+          python scripts/train.py config=train/phase2 steps=200 batch_size=32 logging.wandb.enabled=false
+          RUN_DIR=$(readlink -f runs/latest)
+          python scripts/paper_provenance.py --run-dir "$RUN_DIR" --output "$RUN_DIR/provenance.json"
+
+      - name: Paper smoke eval
+        run: |
+          RUN_DIR=$(readlink -f runs/latest)
+          CKPT=$(python scripts/find_latest_checkpoint.py "$RUN_DIR")
+          python -m src.eval --config-name=train/phase2 eval.report.checkpoint_path="$CKPT" logging.wandb.enabled=false
+
+      - name: SPY data-loader checks
+        run: pytest tests/test_spy_loader.py
+
+      - name: Prepare failure artifacts
+        if: failure()
+        run: |
+          mkdir -p ci-artifacts
+          echo "smoke artifacts" > ci-artifacts/README.txt
+          if [ -d runs ]; then
+            find runs -maxdepth 3 -type f \( -name 'config.yaml' -o -name 'metrics.jsonl' -o -name 'metadata.json' -o -name 'provenance.json' -o -name '*.log' \) -exec cp --parents {} ci-artifacts \;
+          fi
+
+      - name: Upload smoke artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-smoke-artifacts
+          path: ci-artifacts
