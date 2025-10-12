@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import argparse
+import os
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Sequence
+from typing import Any, Dict, List, Mapping, Sequence
 
 import json
 
@@ -66,6 +68,15 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         type=str,
         default=None,
         help="Override ISO8601 timestamp (intended for testing).",
+    )
+    parser.add_argument(
+        "--jobs",
+        type=int,
+        default=1,
+        help=(
+            "Number of parallel worker processes to evaluate tasks with. "
+            "Use 1 to disable parallelism or 0 to auto-detect."
+        ),
     )
     return parser.parse_args(argv)
 
@@ -128,9 +139,9 @@ def _ensure_runner(name: str):
 def _cvar(values: np.ndarray, alpha: float) -> float:
     if values.size == 0:
         return float("nan")
-    sorted_vals = np.sort(values)
-    tail_count = max(int(np.ceil((1 - alpha) * sorted_vals.size)), 1)
-    tail_slice = sorted_vals[:tail_count]
+    tail_count = max(int(np.ceil((1 - alpha) * values.size)), 1)
+    partitioned = np.partition(values, tail_count - 1)
+    tail_slice = partitioned[:tail_count]
     return float(np.mean(tail_slice))
 
 
@@ -148,23 +159,22 @@ def _run_synthetic_linear(task: BenchmarkTask, preset: str) -> Dict[str, Any]:
 
     base_weight = rng.normal(0.0, 1.0, size=feature_dim)
     env_offsets = rng.normal(0.0, delta_scale, size=(n_envs, feature_dim))
+    env_weights_true = base_weight + env_offsets
 
-    train_sets: List[tuple[np.ndarray, np.ndarray]] = []
-    eval_sets: List[tuple[np.ndarray, np.ndarray]] = []
-    for env_idx in range(n_envs):
-        weight = base_weight + env_offsets[env_idx]
-        x_train = rng.normal(size=(samples_per_env, feature_dim))
-        y_train = x_train @ weight + rng.normal(0.0, noise, size=samples_per_env)
-        x_eval = rng.normal(size=(samples_per_env, feature_dim))
-        y_eval = x_eval @ weight + rng.normal(0.0, noise, size=samples_per_env)
-        train_sets.append((x_train, y_train))
-        eval_sets.append((x_eval, y_eval))
+    x_train = rng.normal(size=(n_envs, samples_per_env, feature_dim))
+    train_noise = rng.normal(0.0, noise, size=(n_envs, samples_per_env))
+    y_train = np.einsum("nef,nf->ne", x_train, env_weights_true) + train_noise
 
-    x_pooled = np.vstack([ds[0] for ds in train_sets])
-    y_pooled = np.concatenate([ds[1] for ds in train_sets])
+    x_eval = rng.normal(size=(n_envs, samples_per_env, feature_dim))
+    eval_noise = rng.normal(0.0, noise, size=(n_envs, samples_per_env))
+    y_eval = np.einsum("nef,nf->ne", x_eval, env_weights_true) + eval_noise
+
+    x_pooled = x_train.reshape(n_envs * samples_per_env, feature_dim)
+    y_pooled = y_train.reshape(n_envs * samples_per_env)
     pooled_weight = np.linalg.pinv(x_pooled) @ y_pooled
 
-    env_weights = [np.linalg.pinv(x) @ y for (x, y) in train_sets]
+    pinv_train = np.linalg.pinv(x_train)
+    env_weights = np.einsum("nfs,ns->nf", pinv_train, y_train)
     invariant_weight = np.mean(env_weights, axis=0)
     blend = float(np.clip(invariance_weight, 0.0, 1.0))
 
@@ -176,21 +186,17 @@ def _run_synthetic_linear(task: BenchmarkTask, preset: str) -> Dict[str, Any]:
     else:
         final_weight = (1.0 - blend) * pooled_weight + blend * invariant_weight
 
-    residuals: List[np.ndarray] = []
-    env_rmses: List[float] = []
-    env_means: List[float] = []
-    for x_eval, y_eval in eval_sets:
-        preds = x_eval @ final_weight
-        err = y_eval - preds
-        residuals.append(err)
-        env_rmses.append(float(np.sqrt(np.mean(err**2))))
-        env_means.append(float(np.mean(err)))
+    preds = np.einsum("nef,f->ne", x_eval, final_weight)
+    residuals = y_eval - preds
 
-    residual_all = np.concatenate(residuals)
+    env_rmses = np.sqrt(np.mean(residuals**2, axis=1))
+    env_means = np.mean(residuals, axis=1)
+
+    residual_all = residuals.reshape(-1)
     pnl = -(residual_all**2)
     cvar_val = _cvar(pnl, alpha)
-    var_idx = max(int(np.ceil((1 - alpha) * residual_all.size)) - 1, 0)
-    var_val = float(np.sort(pnl)[var_idx])
+    tail_count = max(int(np.ceil((1 - alpha) * residual_all.size)), 1)
+    var_threshold = float(np.partition(pnl, tail_count - 1)[tail_count - 1])
     rmse = float(np.sqrt(np.mean(residual_all**2)))
 
     return {
@@ -207,13 +213,15 @@ def _run_synthetic_linear(task: BenchmarkTask, preset: str) -> Dict[str, Any]:
         "invariance_weight": invariance_weight,
         "alpha": alpha,
         "cvar": cvar_val,
-        "var": var_val,
+        "var": var_threshold,
         "mean_pnl": float(np.mean(pnl)),
         "rmse": rmse,
-        "env_rmse_max": max(env_rmses) if env_rmses else float("nan"),
-        "env_rmse_min": min(env_rmses) if env_rmses else float("nan"),
-        "env_rmse_gap": (max(env_rmses) - min(env_rmses)) if env_rmses else float("nan"),
-        "env_mean_error": float(np.mean(env_means)) if env_means else float("nan"),
+        "env_rmse_max": float(np.max(env_rmses)) if env_rmses.size else float("nan"),
+        "env_rmse_min": float(np.min(env_rmses)) if env_rmses.size else float("nan"),
+        "env_rmse_gap": float(np.max(env_rmses) - np.min(env_rmses))
+        if env_rmses.size
+        else float("nan"),
+        "env_mean_error": float(np.mean(env_means)) if env_means.size else float("nan"),
         "weight_norm": float(np.linalg.norm(final_weight)),
         "pooled_weight_norm": float(np.linalg.norm(pooled_weight)),
         "invariant_weight_norm": float(np.linalg.norm(invariant_weight)),
@@ -223,32 +231,36 @@ def _run_synthetic_linear(task: BenchmarkTask, preset: str) -> Dict[str, Any]:
 def _read_existing_results(path: Path) -> pd.DataFrame:
     try:
         return pd.read_parquet(path)
-    except ImportError:
+    except ImportError as exc:
         raw = path.read_text(encoding="utf-8")
         if raw.startswith("JSON::"):
             payload = json.loads(raw[len("JSON::") :])
             return pd.DataFrame(payload)
-        raise
-    except (ValueError, OSError):
+        raise BenchmarkError(
+            "Parquet support requires optional dependencies (pyarrow or fastparquet)."
+        ) from exc
+    except (ValueError, OSError) as exc:
         raw = path.read_text(encoding="utf-8")
         if raw.startswith("JSON::"):
             payload = json.loads(raw[len("JSON::") :])
             return pd.DataFrame(payload)
-        raise
+        raise BenchmarkError(
+            f"Failed to read benchmark results from {path}: {exc}"
+        ) from exc
 
 
 def _merge_results(path: Path, rows: Sequence[Mapping[str, Any]]) -> pd.DataFrame:
     new_df = pd.DataFrame(rows)
     if path.exists():
         existing = _read_existing_results(path)
-        combined = existing
-        if not existing.empty:
-            new_keys = set(zip(new_df.get("task", []), new_df.get("preset", [])))
-            if new_keys:
-                existing_keys = list(zip(existing.get("task", []), existing.get("preset", [])))
-                mask = [key not in new_keys for key in existing_keys]
-                combined = existing.loc[mask]
-        combined = pd.concat([combined, new_df], ignore_index=True)
+        combined = pd.concat([existing, new_df], ignore_index=True)
+        dedup_subset = [col for col in ("task", "preset") if col in combined.columns]
+        if dedup_subset:
+            sort_cols: List[str] = [col for col in ("timestamp",) if col in combined.columns]
+            if sort_cols:
+                combined = combined.sort_values(by=sort_cols, kind="stable")
+            combined = combined.drop_duplicates(subset=dedup_subset, keep="last")
+        combined = combined.reset_index(drop=True)
     else:
         combined = new_df
     return combined
@@ -266,8 +278,7 @@ def _write_parquet(path: Path, df: pd.DataFrame) -> None:
 def _render_leaderboard(df: pd.DataFrame, output_path: Path, generated_ts: str) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     sections: List[str] = []
-    for preset in sorted(df["preset"].unique()):
-        subset = df[df["preset"] == preset].copy()
+    for preset, subset in df.groupby("preset", sort=True):
         if subset.empty:
             continue
         subset = subset.sort_values(by="cvar", ascending=False)
@@ -282,10 +293,7 @@ def _render_leaderboard(df: pd.DataFrame, output_path: Path, generated_ts: str) 
             "feature_dim",
             "timestamp",
         ]
-        for col in display_cols:
-            if col not in subset.columns:
-                subset[col] = np.nan
-        table = subset[display_cols]
+        table = subset.reindex(columns=display_cols)
         table = table.rename(
             columns={
                 "task": "Task",
@@ -339,13 +347,34 @@ def main(argv: Sequence[str] | None = None) -> None:
         )
 
     timestamp = args.timestamp or datetime.now(timezone.utc).isoformat()
+    jobs = int(args.jobs)
+    if jobs < 0:
+        raise BenchmarkError("--jobs must be non-negative")
+    if jobs == 0:
+        jobs = min(len(selected), os.cpu_count() or 1) or 1
+
     results: List[Dict[str, Any]] = []
-    for task in selected:
-        runner = _ensure_runner(task.runner)
-        outcome = runner(task, preset)
-        outcome["timestamp"] = timestamp
-        outcome["score"] = outcome.get("cvar")
-        results.append(outcome)
+    if jobs == 1 or len(selected) == 1:
+        for task in selected:
+            runner = _ensure_runner(task.runner)
+            outcome = runner(task, preset)
+            outcome["timestamp"] = timestamp
+            outcome["score"] = outcome.get("cvar")
+            results.append(outcome)
+    else:
+        with ProcessPoolExecutor(max_workers=jobs) as executor:
+            future_map = {
+                executor.submit(_ensure_runner(task.runner), task, preset): idx
+                for idx, task in enumerate(selected)
+            }
+            ordered_results: List[Dict[str, Any]] = [{} for _ in selected]
+            for future in as_completed(future_map):
+                idx = future_map[future]
+                outcome = future.result()
+                outcome["timestamp"] = timestamp
+                outcome["score"] = outcome.get("cvar")
+                ordered_results[idx] = outcome
+            results.extend(ordered_results)
 
     combined = _merge_results(args.results, results)
     _write_parquet(args.results, combined)
