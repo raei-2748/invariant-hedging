@@ -1,0 +1,38 @@
+defaults:
+  - /experiment
+  - override /data: real_spy_paper
+  - _self_
+
+runtime:
+  seed: 0
+  device: cpu
+  mixed_precision: false
+  output_dir: runs
+
+data:
+  cache_dir: data/sample/cache
+  raw:
+    spy_ohlcv: data/sample/raw/spy_ohlcv.csv
+    optionmetrics: data/sample/raw/optionmetrics_spy.csv
+    cboe: data/sample/raw/cboe_vix.csv
+  require_fresh_cache: false
+  prefer_parquet: false
+  base_linear_bps: 6.0
+  base_quadratic: 0.0
+  base_slippage_multiplier: 1.0
+
+train:
+  steps: 16
+  batch_size: 8
+  pretrain_steps: 0
+  irm_ramp_steps: 0
+  eval_interval: 8
+  checkpoint_topk: 1
+  max_trade_warning_factor: 1.0
+
+optimizer:
+  lr: 5.0e-4
+  weight_decay: 0.0
+
+scheduler:
+  name: none
