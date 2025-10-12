@@ -158,6 +158,23 @@ make report-lite     # ≤5 seeds, skips heavy plots for CI runs
 
 Both targets resolve [`configs/report/default.yaml`](configs/report/default.yaml). Adjust metric blocks, QQ options, and the 3D toggle there. Set `generate_3d: false` or pass `--skip-3d` via `scripts/aggregate.py` to disable the I–R–E projection entirely. Outputs include LaTeX tables, CSV mirrors, heatmaps, QQ plots, seed distributions, efficiency frontiers, and (optionally) interactive + static I–R–E visualisations.
 
+For paper-aligned artefacts use the combined generator:
+
+```bash
+make report-paper                   # full pipeline
+make report-paper ARGS="--smoke"     # lightweight placeholders for CI checks
+```
+
+`report-paper` writes to [`outputs/report_paper/`](outputs/report_paper/) with a stable layout:
+
+| Directory | Contents |
+| --- | --- |
+| `figures/` | Penalty sweeps, head-vs-feature ablations, I–R–E diagnostics, capital frontiers, and fallbacks in smoke mode. |
+| `tables/` | LaTeX + CSV scorecards (invariance/robustness/efficiency blocks) and per-seed exports. |
+| `manifests/` | `paper_manifest.json` capturing the git commit, config hash, generated assets, and `final_metrics.json` validation results. |
+
+Smoke mode keeps schema validation strict but replaces missing assets with clearly labelled placeholders so the publication layout can be exercised without the full 30-seed corpus.
+
 ## Testing
 
 Unit tests cover pricing Greeks, CVaR estimation, cost kernels and deterministic seeding. Run them with:
