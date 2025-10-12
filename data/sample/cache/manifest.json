@@ -1,0 +1,22 @@
+{
+  "splits": {
+    "spy_test_2008": {
+      "csv": "splits/spy_test_2008.csv"
+    },
+    "spy_test_2018": {
+      "csv": "splits/spy_test_2018.csv"
+    },
+    "spy_test_2020": {
+      "csv": "splits/spy_test_2020.csv"
+    },
+    "spy_test_2022": {
+      "csv": "splits/spy_test_2022.csv"
+    },
+    "spy_train": {
+      "csv": "splits/spy_train.csv"
+    },
+    "spy_val_2018q4": {
+      "csv": "splits/spy_val_2018q4.csv"
+    }
+  }
+}
