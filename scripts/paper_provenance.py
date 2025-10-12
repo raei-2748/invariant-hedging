@@ -4,10 +4,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Callable, List, Optional, Tuple
 
-from src.report.paper_provenance import collect_provenance, write_provenance
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _resolve_provenance_functions() -> Tuple[Callable[..., object], Callable[[Path, object], None]]:
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
+    from src.report.paper_provenance import collect_provenance, write_provenance
+
+    return collect_provenance, write_provenance
 
 
 def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
@@ -34,6 +43,7 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
 
 def main(argv: Optional[List[str]] = None) -> int:
     args = _parse_args(argv)
+    collect_provenance, write_provenance = _resolve_provenance_functions()
     data = collect_provenance(args.run_dir)
     indent = 2 if args.pretty or args.output else None
     text = json.dumps(data, indent=indent, sort_keys=True)

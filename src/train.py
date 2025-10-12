@@ -13,6 +13,7 @@ from omegaconf import DictConfig, OmegaConf
 
 from .data.features import FeatureEngineer
 from .diagnostics import metrics as diag_metrics
+from .envs.single_asset import SingleAssetHedgingEnv
 from .models import PolicyMLP
 from .objectives import cvar as cvar_obj
 from .objectives import penalties

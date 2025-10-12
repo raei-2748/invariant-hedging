@@ -43,7 +43,7 @@ jobs:
         run: |
           RUN_DIR=$(readlink -f runs/latest)
           CKPT=$(python scripts/find_latest_checkpoint.py "$RUN_DIR")
-          python -m src.eval --config-name=eval/daily eval.report.checkpoint_path="$CKPT" logging.wandb.enabled=false
+          python -m src.eval --config-name=train/phase2 eval.report.checkpoint_path="$CKPT" logging.wandb.enabled=false
 
       - name: SPY data-loader checks
         run: pytest tests/test_spy_loader.py
