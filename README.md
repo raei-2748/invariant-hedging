@@ -291,6 +291,19 @@ Episode configuration, cost files and model settings live under `configs/`. Adju
 
 `scripts/make_reproduce.sh` re-runs the ERM, ERM-reg, IRM, GroupDRO and V-REx configurations for seed 0, evaluates the best checkpoint for each on the crisis environment, and regenerates the crisis CVaR-95 table plus QQ plots. All seeds are controlled via `configs/train/*.yaml` and `src/utils/seed.py` to guarantee deterministic `metrics.jsonl` for `seed=0`.
 
+## Reproduce the paper
+
+The paper harness automates the full cross-product of methods, seeds, and evaluation windows that back the reported metrics.
+
+- Ensure the packaged SPY slice (`data/spy_sample.csv`) and Hydra configs under `configs/train/` and `configs/eval/` are present. The driver refuses to start if any prerequisite is missing.
+- Run the full protocol with:
+  ```bash
+  make paper
+  ```
+  Results are written under `runs/paper/` with one directory per method/seed plus nested evaluation windows. The directory also captures a consolidated `final_metrics.json` and provenance manifest `paper_provenance.json` describing the git SHA, environment, and resolved config grid.
+- For a command preview without execution, use `make paper DRY=1`.
+- For a quick CI-friendly sweep (single seed, smoke configs) run `make paper SMOKE=1`.
+
 ## Reproducibility checklist
 
 - Deterministic seeds for training, evaluation, and tests (`seed_list.txt` and Hydra configs).
