@@ -17,7 +17,7 @@ import torch
 from omegaconf import DictConfig, OmegaConf
 
 from .baselines import DeltaBaselinePolicy, DeltaGammaBaselinePolicy
-from .data.features import FeatureEngineer, FeatureScaler
+from .data.features import FeatureEngineer, FeatureScaler, save_feature_metadata
 from .diagnostics.export import DiagnosticsRunContext, gather_and_export
 from .data.types import EpisodeBatch
 from .models.policy_mlp import PolicyMLP
@@ -740,6 +740,7 @@ def main(cfg: DictConfig) -> None:
         policy.eval()
 
     run_logger = log_utils.RunLogger(OmegaConf.to_container(cfg.logging, resolve=True), resolved_cfg)
+    save_feature_metadata(feature_engineer, run_logger.base_dir)
 
     env_batches: Dict[str, Dict[str, EpisodeBatch]] = {}
     env_batches["test"] = data_ctx.data_module.prepare("test", cfg.envs.test)

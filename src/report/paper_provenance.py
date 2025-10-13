@@ -95,6 +95,7 @@ def _describe_run(run_dir: Path) -> Mapping[str, object]:
     tracked: Dict[str, FileDigest] = {}
     for candidate in (
         "config.yaml",
+        "features.json",
         "metrics.jsonl",
         "metadata.json",
         "provenance.json",
