@@ -11,7 +11,7 @@ import hydra
 import torch
 from omegaconf import DictConfig, OmegaConf
 
-from .data.features import FeatureEngineer
+from .data.features import FeatureEngineer, save_feature_metadata
 from .envs.single_asset import SingleAssetHedgingEnv
 from .diagnostics import metrics as diag_metrics
 from .diagnostics import safe_eval_metric
@@ -250,6 +250,7 @@ def run(cfg: DictConfig) -> Path:
     scaler = torch.cuda.amp.GradScaler(enabled=(device.type == "cuda" and cfg.runtime.get("mixed_precision", True)))
 
     run_logger = log_utils.RunLogger(OmegaConf.to_container(cfg.logging, resolve=True), resolved_cfg)
+    save_feature_metadata(feature_engineer, run_logger.base_dir)
     final_metrics_path = Path(run_logger.final_metrics_path)
     checkpoint_dir = Path(run_logger.checkpoint_dir)
     ckpt_manager = checkpoints.CheckpointManager(checkpoint_dir, top_k=cfg.train.checkpoint_topk)
