@@ -4,9 +4,9 @@ from __future__ import annotations
 import torch
 from torch import nn
 
-from src.diagnostics import detach_diagnostics, safe_eval_metric
-from src.diagnostics import metrics as diag_metrics
-from src.objectives.hirm import compute_hirm_penalty, hirm_loss
+from hirm.diagnostics import detach_diagnostics, safe_eval_metric
+from hirm.diagnostics import metrics as diag_metrics
+from hirm.objectives.hirm import compute_hirm_penalty, hirm_loss
 
 
 def _build_model() -> nn.Module:

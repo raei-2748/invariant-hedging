@@ -5,8 +5,8 @@ from typing import Dict, Sequence
 import pytest
 import torch
 
-from src.objectives import penalties
-from src.objectives.hirm import compute_hirm_penalty
+from hirm.objectives import penalties
+from hirm.objectives.hirm import compute_hirm_penalty
 
 
 def test_irm_penalty_matches_polynomial_reference(float_tolerance: Dict[str, float]) -> None:

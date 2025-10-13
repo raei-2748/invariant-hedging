@@ -5,22 +5,22 @@ import argparse
 from pathlib import Path
 from typing import Dict, List
 
-from src.report.aggregate import (
+from hirm.report.aggregate import (
     AggregateResult,
     aggregate_runs,
     build_table_dataframe,
     load_report_config,
 )
-from src.report.ire3d import build_ire_coordinates, write_ire_assets
-from src.report.latex import build_table, save_latex_table, write_table_csv
-from src.report.plots import (
+from hirm.report.ire3d import build_ire_coordinates, write_ire_assets
+from hirm.report.latex import build_table, save_latex_table, write_table_csv
+from hirm.report.plots import (
     plot_efficiency_frontier,
     plot_heatmaps,
     plot_qq,
     plot_scorecard,
     plot_seed_distributions,
 )
-from src.report.provenance import build_manifest, write_manifest
+from hirm.report.provenance import build_manifest, write_manifest
 
 
 def _ensure_directories(base: Path) -> Dict[str, Path]:

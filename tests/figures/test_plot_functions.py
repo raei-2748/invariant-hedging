@@ -5,7 +5,7 @@ from pathlib import Path
 
 import matplotlib
 
-from infra.plot_io import parse_formats
+from hirm.infra.plot_io import parse_formats
 from scripts import (
     plot_alignment_curves,
     plot_capital_efficiency_frontier,

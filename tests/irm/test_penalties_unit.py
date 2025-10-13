@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from src.irm.penalties import cosine_alignment_penalty, varnorm_penalty
+from hirm.irm.penalties import cosine_alignment_penalty, varnorm_penalty
 
 
 def test_cosine_penalty_zero_for_identical_grads():

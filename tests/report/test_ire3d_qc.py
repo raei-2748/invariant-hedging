@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from src.report.ire3d import build_ire_coordinates, write_ire_assets
+from hirm.report.ire3d import build_ire_coordinates, write_ire_assets
 
 
 def _make_raw() -> pd.DataFrame:

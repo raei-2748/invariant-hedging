@@ -60,7 +60,7 @@ scripts/run_train.sh train/smoke
 If you prefer to invoke Python directly, mirror those defaults explicitly:
 
 ```bash
-OMP_NUM_THREADS=1 MKL_THREADING_LAYER=SEQUENTIAL KMP_AFFINITY=disabled KMP_INIT_AT_FORK=FALSE python3 -m src.train --config-name=train/smoke
+OMP_NUM_THREADS=1 MKL_THREADING_LAYER=SEQUENTIAL KMP_AFFINITY=disabled KMP_INIT_AT_FORK=FALSE python3 -m hirm.train --config-name=train/smoke
 ```
 
 GitHub Actions executes the test suite together with a smoke train/eval pass on every push.
@@ -74,10 +74,10 @@ PR-02 introduces YAML-driven calibration hooks so synthetic markets can flip bet
 - `liquidity_*.yaml` widen transaction costs through a variance-linked spread multiplier.
 - `sabr_*.yaml` capture lognormal SABR smiles for pricing sanity checks.
 
-Use `src.sim.calibrators.compose_sim_recipe` to merge a base diffusion with optional jump and liquidity overlays:
+Use `hirm.sim.calibrators.compose_sim_recipe` to merge a base diffusion with optional jump and liquidity overlays:
 
 ```python
-from src.sim.calibrators import compose_sim_recipe
+from hirm.sim.calibrators import compose_sim_recipe
 
 calm_recipe = compose_sim_recipe(
     "heston",
@@ -121,7 +121,7 @@ Paper experiments reference fixed SPY windows for training, validation, and cris
 Generate a slice with:
 
 ```bash
-python -m src.data.spy_loader --split configs/splits/spy_train.yaml --out_parquet outputs/slices/spy_train.parquet --runs_dir runs/spy_train
+python -m hirm.data.spy_loader --split configs/splits/spy_train.yaml --out_parquet outputs/slices/spy_train.parquet --runs_dir runs/spy_train
 ```
 
 Each invocation prints the covered date span, writes an optional Parquet file, and records provenance (split YAML, git hash, Python/platform fingerprint) under `runs/<timestamp>/metadata.json`. Because the splits live in YAML, downstream papers should update and version-control any boundary tweaks alongside their experiment logs.
@@ -130,7 +130,7 @@ Episode configuration, cost files and model settings live under `configs/`. Adju
 
 ## Reproducibility
 
-`scripts/make_reproduce.sh` re-runs the ERM, ERM-reg, IRM, GroupDRO and V-REx configurations for seed 0, evaluates the best checkpoint for each on the crisis environment, and regenerates the crisis CVaR-95 table plus QQ plots. All seeds are controlled via `configs/train/*.yaml` and `src/utils/seed.py` to guarantee deterministic `metrics.jsonl` for `seed=0`.
+`scripts/make_reproduce.sh` re-runs the ERM, ERM-reg, IRM, GroupDRO and V-REx configurations for seed 0, evaluates the best checkpoint for each on the crisis environment, and regenerates the crisis CVaR-95 table plus QQ plots. All seeds are controlled via `configs/train/*.yaml` and `hirm/utils/seed.py` to guarantee deterministic `metrics.jsonl` for `seed=0`.
 
 ## Reproduce the paper
 

@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.envs.registry import register_real_anchors
+from hirm.envs.registry import register_real_anchors
 
 
 @pytest.fixture

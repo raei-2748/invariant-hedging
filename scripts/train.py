@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convenience wrapper around ``python -m src.train`` with sane defaults."""
+"""Convenience wrapper around ``python -m hirm.train`` with sane defaults."""
 from __future__ import annotations
 
 import argparse
@@ -54,7 +54,7 @@ def _rewrite_overrides(cli_args: List[str]) -> Tuple[List[str], str, str | None]
 
 
 def _call_train(overrides: List[str], config_name: str | None) -> int:
-    cmd = [sys.executable, "-m", "src.train"]
+    cmd = [sys.executable, "-m", "hirm.train"]
     if config_name:
         cmd.extend(["--config-name", config_name])
     cmd.extend(overrides)

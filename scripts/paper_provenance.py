@@ -193,7 +193,7 @@ def main() -> int:
 def _resolve_provenance_functions() -> Tuple[Callable[..., object], Callable[[Path, object], None]]:
     if str(REPO_ROOT) not in sys.path:
         sys.path.insert(0, str(REPO_ROOT))
-    from src.report.paper_provenance import collect_provenance, write_provenance
+    from hirm.report.paper_provenance import collect_provenance, write_provenance
 
     return collect_provenance, write_provenance
 

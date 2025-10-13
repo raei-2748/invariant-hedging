@@ -8,8 +8,8 @@ import pandas as pd
 import pytest
 import torch
 
-from src.data.real.loader import RealAnchorLoader
-from src.infra.paths import canonical_run_dir, episode_file_path
+from hirm.data.real.loader import RealAnchorLoader
+from hirm.infra.paths import canonical_run_dir, episode_file_path
 
 
 @pytest.fixture

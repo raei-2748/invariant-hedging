@@ -24,7 +24,7 @@ except ImportError:  # pragma: no cover - executed when run as a script
 
 bootstrap_cli_environment()
 
-from infra.plot_io import ensure_out_dir, parse_formats
+from hirm.infra.plot_io import ensure_out_dir, parse_formats
 from scripts import (
     plot_alignment_curves,
     plot_capital_efficiency_frontier,

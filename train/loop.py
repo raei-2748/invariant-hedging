@@ -9,9 +9,9 @@ from typing import Callable, Dict, Iterable, Mapping, Sequence
 import torch
 import torch.nn.functional as F
 
-from infra.io import write_alignment_csv
-from src.models import PolicyMLP
-from train.objectives.hirm_head import (
+from hirm.infra.io import write_alignment_csv
+from hirm.models import PolicyMLP
+from hirm.train.objectives.hirm_head import (
     EnvLossPayload,
     HIRMHeadConfig,
     HIRMHeadLoss,

@@ -3,7 +3,7 @@ import math
 import numpy as np
 import pandas as pd
 
-from diagnostics.invariance import compute_IG, compute_ISI
+from hirm.diagnostics.invariance import compute_IG, compute_ISI
 
 
 def test_components_match_formulas():

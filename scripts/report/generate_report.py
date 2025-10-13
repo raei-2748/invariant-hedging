@@ -17,7 +17,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from report import attach_deltas, load_report_inputs
-from report.figures import (
+from hirm.report.figures import (
     plot_capital_frontier,
     plot_cross_regime_heatmap,
     plot_cvar_violin,
@@ -26,10 +26,10 @@ from report.figures import (
     plot_penalty_sweep,
     plot_isi_decomposition,
 )
-from src.report.aggregate import AggregateResult, aggregate_runs, build_table_dataframe, load_report_config
-from src.report.latex import build_table, save_latex_table, write_table_csv
-from src.report.provenance import build_manifest, write_manifest
-from src.report.schema import FinalMetricsValidationError, load_final_metrics
+from hirm.report.aggregate import AggregateResult, aggregate_runs, build_table_dataframe, load_report_config
+from hirm.report.latex import build_table, save_latex_table, write_table_csv
+from hirm.report.provenance import build_manifest, write_manifest
+from hirm.report.schema import FinalMetricsValidationError, load_final_metrics
 
 LOGGER = logging.getLogger("report.generate")
 

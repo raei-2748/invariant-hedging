@@ -2,7 +2,7 @@
 
 This module provides deterministic slicing of the historical SPY dataset based on
 paper-aligned windows. The CLI entry point can be invoked with
-``python -m src.data.spy_loader --split configs/splits/spy_train.yaml``.
+``python -m hirm.data.spy_loader --split configs/splits/spy_train.yaml``.
 """
 from __future__ import annotations
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import torch
 
-from src.data.sim.heston import (
+from hirm.data.sim.heston import (
     REGIME_ORDER,
     SPLIT_OFFSETS,
     HestonRegimeSimulator,

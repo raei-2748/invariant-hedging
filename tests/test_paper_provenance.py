@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from src.report import paper_provenance
+from hirm.report import paper_provenance
 
 
 @pytest.fixture()

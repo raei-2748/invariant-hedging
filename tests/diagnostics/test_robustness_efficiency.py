@@ -2,8 +2,8 @@ import math
 
 import pandas as pd
 
-from diagnostics.efficiency import compute_ER, compute_TR
-from diagnostics.robustness import compute_VR, compute_WG
+from hirm.diagnostics.efficiency import compute_ER, compute_TR
+from hirm.diagnostics.robustness import compute_VR, compute_WG
 
 
 def test_wg_matches_cvar_objective():

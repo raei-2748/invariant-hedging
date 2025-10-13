@@ -7,9 +7,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from src.sim.calibrators import compose_sim_recipe
-from src.sim.params import SimRecipe
-from src.sim.utils import (
+from hirm.sim.calibrators import compose_sim_recipe
+from hirm.sim.params import SimRecipe
+from hirm.sim.utils import (
     SampleMoments,
     aggregate_ac1,
     annualize_mean,

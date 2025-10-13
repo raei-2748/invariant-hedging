@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from hydra import compose, initialize_config_dir
 
-from src.train import run as run_training
+from hirm.train import run as run_training
 
 CONFIG_DIR = Path(__file__).resolve().parents[1] / "configs"
 

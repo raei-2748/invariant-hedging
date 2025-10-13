@@ -4,9 +4,9 @@ from __future__ import annotations
 import pandas as pd
 import torch
 
-from src.data.sim import HestonParams, simulate_heston
-from src.data.sim.merton import overlay_merton_jumps
-from src.objectives.cvar import cvar_from_pnl
+from hirm.data.sim import HestonParams, simulate_heston
+from hirm.data.sim.merton import overlay_merton_jumps
+from hirm.objectives.cvar import cvar_from_pnl
 
 
 def _pnl_from_path(df: pd.DataFrame) -> float:

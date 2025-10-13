@@ -1,6 +1,6 @@
 import torch
 
-from src.objectives.grad_align import env_variance, normalized_head_grads, pairwise_cosine
+from hirm.objectives.grad_align import env_variance, normalized_head_grads, pairwise_cosine
 
 
 def test_normalized_head_grads_preserve_shape_and_scale():

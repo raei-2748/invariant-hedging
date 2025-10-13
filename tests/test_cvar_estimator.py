@@ -1,6 +1,6 @@
 import torch
 
-from src.objectives import cvar as cvar_obj
+from hirm.objectives import cvar as cvar_obj
 
 
 def test_cvar_matches_numpy_quantile():

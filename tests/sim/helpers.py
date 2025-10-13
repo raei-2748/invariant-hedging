@@ -5,8 +5,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from src.sim.params import SimRecipe
-from src.sim.utils import make_rng
+from hirm.sim.params import SimRecipe
+from hirm.sim.utils import make_rng
 
 
 @dataclass

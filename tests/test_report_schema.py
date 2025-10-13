@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from src.report.schema import (
+from hirm.report.schema import (
     FinalMetricsValidationError,
     load_final_metrics,
     validate_final_metrics,
