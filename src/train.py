@@ -404,7 +404,9 @@ def run(cfg: DictConfig) -> Path:
             metrics_to_log["train/lambda"] = lambda_logged
         if objective == "hirm" and env_losses:
             metrics_to_log["train/ig"] = safe_eval_metric(diag_metrics.invariant_gap, env_losses)
-            metrics_to_log["train/wg"] = safe_eval_metric(diag_metrics.worst_group, env_losses)
+            metrics_to_log["train/wg"] = safe_eval_metric(
+                diag_metrics.worst_group, env_losses, mode="loss"
+            )
 
         if step % log_interval == 0 or step == 1:
             metrics_to_log["train/loss"] = float(total_loss.item())
