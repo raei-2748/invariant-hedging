@@ -60,7 +60,7 @@ def _run_training_step(log_diagnostics: bool) -> list[torch.Tensor]:
         total_loss = total_loss + 0.1 * penalty.detach()
 
         ig_value = safe_eval_metric(diag_metrics.invariant_gap, losses)
-        wg_value = safe_eval_metric(diag_metrics.worst_group, losses)
+        wg_value = safe_eval_metric(diag_metrics.worst_group, losses, mode="loss")
         assert isinstance(ig_value, float)
         assert isinstance(wg_value, float)
 
