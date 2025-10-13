@@ -2,7 +2,7 @@ import os
 
 import torch
 
-from src.utils import seed
+from hirm.utils import seed
 
 
 def test_seed_everything_deterministic():

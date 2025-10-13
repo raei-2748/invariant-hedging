@@ -11,9 +11,9 @@ from typing import Dict, Iterable, List, Mapping
 
 import pandas as pd
 
-from diagnostics.efficiency import compute_ER, compute_TR
-from diagnostics.invariance import compute_IG, compute_ISI
-from diagnostics.robustness import compute_VR, compute_WG
+from hirm.diagnostics.efficiency import compute_ER, compute_TR
+from hirm.diagnostics.invariance import compute_IG, compute_ISI
+from hirm.diagnostics.robustness import compute_VR, compute_WG
 
 DEFAULT_CONFIG: Mapping[str, Mapping[str, object]] = {
     "invariance": {

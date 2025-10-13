@@ -3,8 +3,8 @@
 import pytest
 import torch
 
-from src.diagnostics.efficiency import compute_TR
-from src.diagnostics.external import compute_IG, compute_VR, compute_WG
+from hirm.diagnostics.efficiency import compute_TR
+from hirm.diagnostics.external import compute_IG, compute_VR, compute_WG
 
 
 def test_worst_group_matches_max():

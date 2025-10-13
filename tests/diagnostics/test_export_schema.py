@@ -6,7 +6,7 @@ from pathlib import Path
 
 import torch
 
-from src.diagnostics.export import DiagnosticsRunContext, gather_and_export
+from hirm.diagnostics.export import DiagnosticsRunContext, gather_and_export
 
 
 def _make_batch(risk, outcome, positions, grad, representation):

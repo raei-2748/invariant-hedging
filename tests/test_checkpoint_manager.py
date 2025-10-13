@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from src.utils.checkpoints import CheckpointManager
+from hirm.utils.checkpoints import CheckpointManager
 
 
 def _collect_manifest(path: Path) -> list[dict]:

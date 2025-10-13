@@ -26,8 +26,8 @@ bootstrap_cli_environment()
 
 import matplotlib.pyplot as plt
 
-from infra.plot_io import append_manifest, apply_style, ensure_out_dir, parse_formats, save_figure
-from infra.tables import (
+from hirm.infra.plot_io import append_manifest, apply_style, ensure_out_dir, parse_formats, save_figure
+from hirm.infra.tables import (
     maybe_filter_regimes,
     maybe_filter_seeds,
     read_capital_efficiency_frontier,

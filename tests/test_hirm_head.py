@@ -8,10 +8,10 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from infra.io import write_alignment_csv
-from train.loop import build_config, run_training
-from train.objectives.hirm_head import EnvLossPayload, HIRMHeadConfig, hirm_head_loss
-from src.models import Policy
+from hirm.infra.io import write_alignment_csv
+from hirm.train.loop import build_config, run_training
+from hirm.train.objectives.hirm_head import EnvLossPayload, HIRMHeadConfig, hirm_head_loss
+from hirm.models import Policy
 
 
 class TinyPolicy(Policy):

@@ -6,7 +6,7 @@ from typing import Dict
 import pytest
 import torch
 
-from src.diagnostics.isi import (
+from hirm.diagnostics.isi import (
     ISINormalizationConfig,
     compute_C1_global_stability,
     compute_C2_mechanistic_stability,

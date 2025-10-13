@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from src.data.sim.liquidity import LiquidityStressConfig, liquidity_costs
-from src.envs.registry import SyntheticRegimeRegistry
+from hirm.data.sim.liquidity import LiquidityStressConfig, liquidity_costs
+from hirm.envs.registry import SyntheticRegimeRegistry
 
 
 def test_cost_monotonicity() -> None:

@@ -39,10 +39,10 @@ class DeltaGammaBaselinePolicy:
     features.  The following assumptions are made and documented explicitly:
 
     * ``feature_names`` contains the canonical entries produced by
-      :class:`~src.data.features.FeatureEngineer` (``delta``, ``gamma``,
+      :class:`~hirm.data.features.FeatureEngineer` (``delta``, ``gamma``,
       ``time_to_maturity``, ``realized_vol`` and ``inventory``).
     * The realised volatility feature is treated as a proxy for the Black--Scholes implied
-      volatility used by :mod:`src.markets.pricing`.
+      volatility used by :mod:`hirm.markets.pricing`.
     * Risk-free rates are assumed negligible during the short evaluation horizon and are
       therefore set to zero when applying the pricing formulas.
 

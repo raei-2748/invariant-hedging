@@ -15,12 +15,12 @@ import pandas as pd
 import yaml
 import torch
 
-from src.data.sim import HestonParams, simulate_heston
-from src.data.sim.liquidity import LiquidityStressConfig, liquidity_costs
-from src.data.sim.merton import JumpSummary, overlay_merton_jumps
-from src.envs.registry import SyntheticRegimeRegistry
-from src.infra.io import write_sim_params_json, write_stress_summary_json
-from src.objectives.cvar import cvar_from_pnl
+from hirm.data.sim import HestonParams, simulate_heston
+from hirm.data.sim.liquidity import LiquidityStressConfig, liquidity_costs
+from hirm.data.sim.merton import JumpSummary, overlay_merton_jumps
+from hirm.envs.registry import SyntheticRegimeRegistry
+from hirm.infra.io import write_sim_params_json, write_stress_summary_json
+from hirm.objectives.cvar import cvar_from_pnl
 
 
 def _extract_heston(cfg: Mapping[str, object]) -> HestonParams:
@@ -255,10 +255,10 @@ import numpy as np
 import pandas as pd
 from omegaconf import OmegaConf
 
-from src.data.real.anchors import AnchorSpec
-from src.data.real.loader import RealAnchorLoader
-from src.infra.paths import canonical_run_dir, episode_file_path
-from src.infra.tags import extract_episode_tags
+from hirm.data.real.anchors import AnchorSpec
+from hirm.data.real.loader import RealAnchorLoader
+from hirm.infra.paths import canonical_run_dir, episode_file_path
+from hirm.infra.tags import extract_episode_tags
 
 
 @dataclass(frozen=True)
@@ -514,7 +514,7 @@ from typing import Any
 
 import yaml
 
-from train.loop import build_config, run_training
+from hirm.train.loop import build_config, run_training
 
 
 def _load_config(path: Path) -> dict[str, Any]:

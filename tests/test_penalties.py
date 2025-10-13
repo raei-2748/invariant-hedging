@@ -1,6 +1,6 @@
 import torch
 
-from src.objectives import penalties
+from hirm.objectives import penalties
 
 
 def _env_losses(param: torch.Tensor) -> torch.Tensor:

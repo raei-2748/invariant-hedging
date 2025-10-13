@@ -3,10 +3,10 @@ from __future__ import annotations
 import pytest
 import torch
 
-from src.data.features import FeatureEngineer
-from src.data.synthetic import EpisodeBatch
-from src.envs.single_asset import SingleAssetHedgingEnv
-from src import eval as eval_module
+from hirm.data.features import FeatureEngineer
+from hirm.data.synthetic import EpisodeBatch
+from hirm.envs.single_asset import SingleAssetHedgingEnv
+from hirm import eval as eval_module
 
 
 def _make_episode_batch() -> EpisodeBatch:
