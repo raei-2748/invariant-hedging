@@ -38,6 +38,7 @@ class DiagnosticsRunContext:
     instrument: str
     metric_basis: str
     units: Mapping[str, str] | None = None
+    run_id: str | None = None
 
 
 def _stack(values: Iterable[torch.Tensor]) -> torch.Tensor:
@@ -45,6 +46,22 @@ def _stack(values: Iterable[torch.Tensor]) -> torch.Tensor:
     if not tensors:
         return torch.tensor([], dtype=torch.float32)
     return torch.cat(tensors)
+
+
+def _normalise_value(value: object) -> float | int:
+    if isinstance(value, torch.Tensor):
+        if value.numel() == 0:
+            return float("nan")
+        return float(value.detach().cpu().item())
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return int(value)
+    if isinstance(value, float):
+        return float(value)
+    if value is None:
+        return float("nan")
+    return float(value)
 
 
 def gather_and_export(
@@ -160,15 +177,10 @@ def gather_and_export(
     WG = compute_WG(env_risk_means)
     VR = compute_VR(env_risk_means)
 
-    csv_rows: List[Dict[str, object]] = []
-    columns = [
-        "seed",
-        "git_hash",
-        "exp_id",
-        "split_name",
-        "regime_tag",
-        "env_id",
-        "is_eval_split",
+    phase = "eval" if run_ctx.is_eval_split else "train"
+    run_id = run_ctx.run_id or output_dir.name
+
+    metric_order = [
         "n_obs",
         "C1_global_stability",
         "C2_mechanistic_stability",
@@ -181,52 +193,7 @@ def gather_and_export(
         "TR_turnover",
     ]
 
-    all_positions: List[torch.Tensor] = []
-    all_outcomes: List[torch.Tensor] = []
-
-    for env_id, risks in env_risk_means.items():
-        er = compute_ER(env_outcomes.get(env_id, torch.tensor([])))
-        env_positions_list = positions_by_env.get(env_id, [])
-        if env_positions_list:
-            stacked_positions = torch.cat(env_positions_list, dim=0)
-            tr = compute_TR(stacked_positions)
-        else:
-            tr = 0.0
-        row = {
-            "seed": run_ctx.seed,
-            "git_hash": run_ctx.git_hash,
-            "exp_id": run_ctx.exp_id,
-            "split_name": run_ctx.split_name,
-            "regime_tag": run_ctx.regime_tag,
-            "env_id": env_id,
-            "is_eval_split": bool(run_ctx.is_eval_split),
-            "n_obs": n_obs_by_env.get(env_id, 0),
-            "C1_global_stability": C1,
-            "C2_mechanistic_stability": C2,
-            "C3_structural_stability": C3,
-            "ISI": ISI_value,
-            "IG": IG,
-            "WG_risk": WG,
-            "VR_risk": VR,
-            "ER_mean_pnl": er,
-            "TR_turnover": tr,
-        }
-        csv_rows.append(row)
-        if env_outcomes.get(env_id) is not None:
-            all_outcomes.append(env_outcomes[env_id])
-        env_positions = positions_by_env.get(env_id, [])
-        if env_positions:
-            all_positions.extend(env_positions)
-
-    overall_row = {
-        "seed": run_ctx.seed,
-        "git_hash": run_ctx.git_hash,
-        "exp_id": run_ctx.exp_id,
-        "split_name": run_ctx.split_name,
-        "regime_tag": run_ctx.regime_tag,
-        "env_id": "__overall__",
-        "is_eval_split": bool(run_ctx.is_eval_split),
-        "n_obs": sum(n_obs_by_env.values()),
+    common_metrics: Dict[str, float] = {
         "C1_global_stability": C1,
         "C2_mechanistic_stability": C2,
         "C3_structural_stability": C3,
@@ -234,21 +201,85 @@ def gather_and_export(
         "IG": IG,
         "WG_risk": WG,
         "VR_risk": VR,
-        "ER_mean_pnl": compute_ER(_stack(all_outcomes)) if all_outcomes else 0.0,
-        "TR_turnover": compute_TR(torch.cat(all_positions, dim=0)) if all_positions else 0.0,
     }
-    csv_rows.append(overall_row)
 
-    csv_path = output_dir / f"diagnostics_seed_{run_ctx.seed}.csv"
+    long_rows: List[Dict[str, object]] = []
+    all_positions: List[torch.Tensor] = []
+    all_outcomes: List[torch.Tensor] = []
+
+    env_ids = list(env_risk_means.keys())
+    env_ids.sort()
+
+    for env_id in env_ids:
+        env_metrics: Dict[str, float | int] = dict(common_metrics)
+        env_metrics["n_obs"] = n_obs_by_env.get(env_id, 0)
+        env_metrics["ER_mean_pnl"] = compute_ER(env_outcomes.get(env_id, torch.tensor([])))
+        env_positions_list = positions_by_env.get(env_id, [])
+        if env_positions_list:
+            stacked_positions = torch.cat(env_positions_list, dim=0)
+            env_metrics["TR_turnover"] = compute_TR(stacked_positions)
+        else:
+            env_metrics["TR_turnover"] = 0.0
+
+        outcome_tensor = env_outcomes.get(env_id)
+        if outcome_tensor is not None:
+            all_outcomes.append(outcome_tensor)
+        env_positions = positions_by_env.get(env_id, [])
+        if env_positions:
+            all_positions.extend(env_positions)
+
+        for metric_name in metric_order:
+            if metric_name not in env_metrics:
+                continue
+            long_rows.append(
+                {
+                    "run_id": run_id,
+                    "phase": phase,
+                    "env": env_id,
+                    "metric": metric_name,
+                    "value": _normalise_value(env_metrics[metric_name]),
+                }
+            )
+
+    overall_metrics: Dict[str, float | int] = dict(common_metrics)
+    overall_metrics["n_obs"] = sum(n_obs_by_env.values())
+    overall_metrics["ER_mean_pnl"] = (
+        compute_ER(_stack(all_outcomes)) if all_outcomes else 0.0
+    )
+    overall_metrics["TR_turnover"] = (
+        compute_TR(torch.cat(all_positions, dim=0)) if all_positions else 0.0
+    )
+
+    for metric_name in metric_order:
+        if metric_name not in overall_metrics:
+            continue
+        long_rows.append(
+            {
+                "run_id": run_id,
+                "phase": phase,
+                "env": "__overall__",
+                "metric": metric_name,
+                "value": _normalise_value(overall_metrics[metric_name]),
+            }
+        )
+
+    csv_path = output_dir / "scorecard.csv"
     with csv_path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=columns)
+        writer = csv.DictWriter(
+            handle, fieldnames=["run_id", "phase", "env", "metric", "value"]
+        )
         writer.writeheader()
-        for row in csv_rows:
+        for row in long_rows:
             writer.writerow(row)
 
     manifest = {
+        "run_id": run_id,
+        "phase": phase,
         "seed": run_ctx.seed,
         "git_hash": run_ctx.git_hash,
+        "exp_id": run_ctx.exp_id,
+        "split_name": run_ctx.split_name,
+        "regime_tag": run_ctx.regime_tag,
         "config_hash": run_ctx.config_hash,
         "instrument": run_ctx.instrument,
         "metric_basis": run_ctx.metric_basis,
