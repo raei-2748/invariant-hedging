@@ -277,7 +277,7 @@ def _parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
         "--config",
         type=str,
         required=True,
-        help="Path to a YAML configuration compatible with config/real_anchors.yaml.",
+        help="Path to a YAML configuration compatible with configs/examples/real_anchors.yaml.",
     )
     parser.add_argument("--seed", type=int, default=None, help="Override the run seed")
     parser.add_argument(
@@ -527,7 +527,7 @@ def _load_config(path: Path) -> dict[str, Any]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", type=Path, default=Path("config/hirm.yaml"))
+    parser.add_argument("--config", type=Path, default=Path("configs/examples/hirm_minimal.yaml"))
     parser.add_argument("--epochs", type=int, default=None)
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--base-dir", type=Path, default=None)

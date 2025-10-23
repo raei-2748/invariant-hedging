@@ -131,3 +131,8 @@ wandb/
 # Data artefacts
 data/external/
 data/raw/
+
+# Generated artefacts
+outputs/
+!legacy/outputs/
+

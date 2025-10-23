@@ -6,7 +6,7 @@ from pathlib import Path
 import matplotlib
 
 from infra.plot_io import parse_formats
-from scripts import (
+from src.visualization import (
     plot_alignment_curves,
     plot_capital_efficiency_frontier,
     plot_invariance_vs_ig,

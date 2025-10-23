@@ -79,7 +79,7 @@ TR compares the mean \(\ell_2\) turnover to the average position magnitude:
 
 ## Aggregation Outputs
 
-Running `python scripts/aggregate_diagnostics.py --run_dir <path>` produces the
+Running `python tools/scripts/aggregate_diagnostics.py --run_dir <path>` produces the
 following tables inside `<run_dir>/tables/`:
 
 - `diagnostics_summary.csv`: one row per seed × regime × split with ISI, IG,

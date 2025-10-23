@@ -1,6 +1,6 @@
 # Real Market Anchors
 
-The `config/real_anchors.yaml` configuration defines the deterministic market
+The `configs/examples/real_anchors.yaml` configuration defines the deterministic market
 regimes used throughout the real-data experiments. Each anchor names a
 contiguous window of historical SPY data and is expanded into multiple rolling
 episodes using the `episode.days` length and `episode.stride_days` stride. All

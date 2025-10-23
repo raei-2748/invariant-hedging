@@ -3,7 +3,7 @@ import json
 import pandas as pd
 import pytest
 
-from scripts.aggregate_diagnostics import aggregate_run
+from tools.scripts.aggregate_diagnostics import aggregate_run
 
 
 def test_aggregate_diagnostics_creates_tables(tmp_path):

@@ -5,7 +5,7 @@ import math
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-BASELINE_CSV = PROJECT_ROOT / "outputs" / "_baseline_erm_base" / "artifacts" / "ERM_base_crisis.csv"
+BASELINE_CSV = PROJECT_ROOT / "legacy" / "outputs" / "_baseline_erm_base" / "artifacts" / "ERM_base_crisis.csv"
 
 EXPECTED_MEAN = {
     "test/crisis_cvar": 395.1852,

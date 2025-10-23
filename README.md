@@ -3,7 +3,7 @@
 [![CI](https://github.com/raei-2748/invariant-hedging/actions/workflows/ci.yml/badge.svg)](https://github.com/raei-2748/invariant-hedging/actions/workflows/ci.yml)
 [![Python 3.10–3.11](https://img.shields.io/badge/python-3.10--3.11-blue.svg)](https://www.python.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Paper reproduction guide](https://img.shields.io/badge/reproduce-paper-blue.svg)](REPRODUCE.md)
+[![Paper reproduction guide](https://img.shields.io/badge/reproduce-paper-blue.svg)](docs/REPRODUCE.md)
 
 HIRM (Hedging with IRM) is a research codebase for reproducing the paper results on
 robust hedging under regime shifts. This repository now defaults to the
@@ -12,7 +12,9 @@ compact training/evaluation pipeline, and generating the camera-ready tables and
 figures.
 
 For a full walkthrough of every command, expected artefacts, and provenance
-requirements see [REPRODUCE.md](REPRODUCE.md).
+requirements see [docs/REPRODUCE.md](docs/REPRODUCE.md).
+Supporting guides live under [docs/](docs/README.md).
+
 
 ## Quickstart
 
@@ -26,7 +28,7 @@ requirements see [REPRODUCE.md](REPRODUCE.md).
    ```
 3. **Preview the end-to-end workflow** (prints the commands that will run)
    ```bash
-   scripts/run_of_record.sh --dry-run
+   tools/run_of_record.sh --dry-run
    ```
 4. **Train + evaluate the paper configuration on CPU**
    ```bash
@@ -69,12 +71,13 @@ Legacy utilities (including the original `train/` loop and report builders) now 
 Regenerate the Phase-2 diagnostic figures from either a per-seed scoreboard or the aggregated `scorecard.csv` produced by `make report`:
 
 ```bash
-python scripts/plot_cvar_by_method.py --in outputs/_phase2_snapshot/scoreboard.csv --out reports/figs/cvar_by_method.png
-python scripts/plot_diag_correlations.py --in outputs/_phase2_snapshot/scoreboard.csv --out reports/figs/diag_vs_cvar.png
-python scripts/plot_capital_frontier.py --in outputs/_phase2_snapshot/scoreboard.csv --out reports/figs/capital_frontier.png
+RUN_DIR=$(readlink -f runs/latest)
+python src/visualization/plot_cvar_by_method.py --run_dir "$RUN_DIR" --out_dir reports/figs
+python src/visualization/plot_diag_correlations.py --run_dir "$RUN_DIR" --out_dir reports/figs
+python src/visualization/plot_capital_frontier.py --run_dir "$RUN_DIR" --out_dir reports/figs
 ```
 
-Outputs are written to `reports/figs/` alongside `.meta.json` files capturing the exact filters and inputs.
+Outputs are written to `reports/figs/` (or `--out_dir`) alongside `.meta.json` files capturing the exact filters and inputs.
 
 2. Provide diagnostic batches (held-out from training) via
    `diagnostics.probe`. Batches are dictionaries containing `risk`, `outcome`,
@@ -89,7 +92,7 @@ Outputs are written to `reports/figs/` alongside `.meta.json` files capturing th
 The helper scripts export conservative Intel OpenMP settings so PyTorch runs even in sandboxes with no shared-memory segment. Kick off the short training loop with:
 
 ```bash
-scripts/run_train.sh train/smoke
+tools/run_train.sh train/smoke
 ```
 
 If you prefer to invoke Python directly, mirror those defaults explicitly:
@@ -165,7 +168,7 @@ Episode configuration, cost files and model settings live under `configs/`. Adju
 
 ## Reproducibility
 
-`scripts/make_reproduce.sh` re-runs the ERM, ERM-reg, IRM, GroupDRO and V-REx configurations for seed 0, evaluates the best checkpoint for each on the crisis environment, and regenerates the crisis CVaR-95 table plus QQ plots. All seeds are controlled via `configs/train/*.yaml` and `src/core/utils/seed.py` to guarantee deterministic `metrics.jsonl` for `seed=0`.
+`tools/make_reproduce.sh` re-runs the ERM, ERM-reg, IRM, GroupDRO and V-REx configurations for seed 0, evaluates the best checkpoint for each on the crisis environment, and regenerates the crisis CVaR-95 table plus QQ plots. All seeds are controlled via `configs/train/*.yaml` and `src/core/utils/seed.py` to guarantee deterministic `metrics.jsonl` for `seed=0`.
 
 ## Reproduce the paper
 
@@ -187,7 +190,7 @@ The paper harness automates the full cross-product of methods, seeds, and evalua
 - Metrics logged per-step (`metrics.jsonl`) and in aggregate (`final_metrics.json`) including CVaR-95, Sharpe, and turnover.
 - Run metadata captured in `metadata.json` with git commit, platform, Python, and PyTorch versions.
 The commands above execute in minutes on a single CPU-only workstation; see the
-[reproduction playbook](REPRODUCE.md) for the precise runtime profile and
+[reproduction playbook](docs/REPRODUCE.md) for the precise runtime profile and
 hardware that were used for the reference paper snapshot.
 
 ## Data acquisition summary
@@ -202,12 +205,12 @@ For the full paper reproduction you must supply the institutional SPY dataset
 cited in the paper (2017–2022 daily close-to-close options). Place the CSV (or
 parquet) export in `data/` and update `configs/data/real_spy.yaml` with the
 filename if it differs from the default. Provenance expectations are documented
-in [REPRODUCE.md](REPRODUCE.md#provenance-and-artifact-tracking).
+in [docs/REPRODUCE.md](docs/REPRODUCE.md#provenance-and-artifact-tracking).
 
 ## Paper pipelines
 
 ### `make paper`
-Runs `scripts/run_of_record.sh`, which trains the compact IRM head model on the
+Runs `tools/run_of_record.sh`, which trains the compact IRM head model on the
 paper configuration (`configs/train/paper.yaml`) and evaluates the resulting
 checkpoint with the matching evaluation profile (`configs/eval/paper.yaml`).
 Outputs are written to `runs/paper/` (training) and `runs/paper_eval/`
@@ -259,9 +262,9 @@ under your own agreement.
 
 ## Additional references
 
-- [REPRODUCE.md](REPRODUCE.md): command-by-command reproduction checklist with
+- [docs/REPRODUCE.md](docs/REPRODUCE.md): command-by-command reproduction checklist with
   runtime, hardware, and provenance notes.
 - [`experiments/`](experiments/): original research plans, baselines, and phase
   summaries for historical context.
-- [`scripts/run_of_record.sh`](scripts/run_of_record.sh): orchestration script
+- [`tools/run_of_record.sh`](tools/run_of_record.sh): orchestration script
   used by `make paper`.
