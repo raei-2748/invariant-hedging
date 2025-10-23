@@ -10,8 +10,8 @@ import torch
 import torch.nn.functional as F
 
 from infra.io import write_alignment_csv
-from src.models import PolicyMLP
-from train.objectives.hirm_head import (
+from src.modules.models import PolicyMLP
+from legacy.train.objectives.hirm_head import (
     EnvLossPayload,
     HIRMHeadConfig,
     HIRMHeadLoss,

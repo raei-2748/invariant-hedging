@@ -4,9 +4,8 @@ from __future__ import annotations
 import torch
 from torch import nn
 
-from src.diagnostics import detach_diagnostics, safe_eval_metric
-from src.diagnostics import metrics as diag_metrics
-from src.objectives.hirm import compute_hirm_penalty, hirm_loss
+from src.core.losses import compute_hirm_penalty, hirm_loss
+from src.modules.diagnostics import detach_diagnostics, invariant_gap, safe_eval_metric, worst_group
 
 
 def _build_model() -> nn.Module:
@@ -59,8 +58,8 @@ def _run_training_step(log_diagnostics: bool) -> list[torch.Tensor]:
                 assert not value.requires_grad
         total_loss = total_loss + 0.1 * penalty.detach()
 
-        ig_value = safe_eval_metric(diag_metrics.invariant_gap, losses)
-        wg_value = safe_eval_metric(diag_metrics.worst_group, losses)
+        ig_value = safe_eval_metric(invariant_gap, losses)
+        wg_value = safe_eval_metric(worst_group, losses)
         assert isinstance(ig_value, float)
         assert isinstance(wg_value, float)
 

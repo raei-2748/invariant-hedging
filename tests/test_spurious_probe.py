@@ -1,7 +1,7 @@
 import torch
 
 from src.eval_probes.spurious_vol import SpuriousVolConfig, apply_spurious_vol_probe
-from src.diagnostics.metrics import mechanistic_sensitivity
+from src.modules.diagnostics import mechanistic_sensitivity
 
 
 def test_spurious_probe_amplify_increases_msi_and_limits_hirm_delta():

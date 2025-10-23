@@ -15,4 +15,4 @@ export CUDNN_DETERMINISTIC=${CUDNN_DETERMINISTIC:-1}
 export CUDA_LAUNCH_BLOCKING=${CUDA_LAUNCH_BLOCKING:-1}
 export NUMPY_DEFAULT_DTYPE=${NUMPY_DEFAULT_DTYPE:-float64}
 
-WANDB_MODE=${WANDB_MODE:-offline} python -m src.train --config-name="${CONFIG}" "$@"
+WANDB_MODE=${WANDB_MODE:-offline} python experiments/run_train.py --config-name="${CONFIG}" "$@"

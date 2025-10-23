@@ -41,6 +41,29 @@ requirements see [REPRODUCE.md](REPRODUCE.md).
    make report
    ```
 
+## Paper-aligned layout
+
+```
+invariant-hedging/
+├── src/
+│   ├── core/              # Optimisation engine and reusable losses
+│   ├── modules/           # Invariance, robustness, and data modules
+│   ├── evaluation/        # Crisis evaluation and diagnostics entrypoints
+│   └── visualization/     # Plotting helpers for the manuscript figures
+├── experiments/           # Thin CLIs that launch training/diagnostics runs
+├── configs/               # Hydra configuration tree (defaults, sweeps, methods)
+├── reports/               # Generated tables/figures/logs from evaluations
+└── legacy/                # Archived scripts retained for provenance
+```
+
+| Paper concept | Implementation |
+| --- | --- |
+| Invariance (gradient alignment heads) | `src/core/losses.py`, `src/modules/head_invariance.py` |
+| Robustness diagnostics | `src/modules/diagnostics.py`, `src/evaluation/analyze_diagnostics.py` |
+| Efficiency frontiers & crisis evaluation | `src/evaluation/evaluate_crisis.py`, `src/visualization/` |
+| Training engine & orchestration | `src/core/engine.py`, `experiments/run_*.py` |
+
+Legacy utilities (including the original `train/` loop and report builders) now live under `legacy/` and remain importable for provenance-sensitive experiments.
 ### Figures
 
 Regenerate the Phase-2 diagnostic figures from either a per-seed scoreboard or the aggregated `scorecard.csv` produced by `make report`:
@@ -57,8 +80,8 @@ Outputs are written to `reports/figs/` alongside `.meta.json` files capturing th
    `diagnostics.probe`. Batches are dictionaries containing `risk`, `outcome`,
    `positions`, and optionally `grad`/`representation` tensors per environment.
 
-3. Run evaluation. The export helper will assemble I–R–E metrics using the new
-   modules in `src/diagnostics/` and log the output CSV path via the existing
+3. Run evaluation. The export helper will assemble I–R–E metrics using the
+   modules in `src/modules/diagnostics.py` and log the output CSV path via the existing
    run logger.
 
 ## Smoke test
@@ -72,7 +95,7 @@ scripts/run_train.sh train/smoke
 If you prefer to invoke Python directly, mirror those defaults explicitly:
 
 ```bash
-OMP_NUM_THREADS=1 MKL_THREADING_LAYER=SEQUENTIAL KMP_AFFINITY=disabled KMP_INIT_AT_FORK=FALSE python3 -m src.train --config-name=train/smoke
+OMP_NUM_THREADS=1 MKL_THREADING_LAYER=SEQUENTIAL KMP_AFFINITY=disabled KMP_INIT_AT_FORK=FALSE python3 experiments/run_train.py --config-name=train/smoke
 ```
 
 GitHub Actions executes the test suite together with a smoke train/eval pass on every push.
@@ -142,7 +165,7 @@ Episode configuration, cost files and model settings live under `configs/`. Adju
 
 ## Reproducibility
 
-`scripts/make_reproduce.sh` re-runs the ERM, ERM-reg, IRM, GroupDRO and V-REx configurations for seed 0, evaluates the best checkpoint for each on the crisis environment, and regenerates the crisis CVaR-95 table plus QQ plots. All seeds are controlled via `configs/train/*.yaml` and `src/utils/seed.py` to guarantee deterministic `metrics.jsonl` for `seed=0`.
+`scripts/make_reproduce.sh` re-runs the ERM, ERM-reg, IRM, GroupDRO and V-REx configurations for seed 0, evaluates the best checkpoint for each on the crisis environment, and regenerates the crisis CVaR-95 table plus QQ plots. All seeds are controlled via `configs/train/*.yaml` and `src/core/utils/seed.py` to guarantee deterministic `metrics.jsonl` for `seed=0`.
 
 ## Reproduce the paper
 

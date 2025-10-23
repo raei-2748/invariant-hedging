@@ -1,2 +1,3 @@
-- **Phase 1:** Baseline ERM v1 reproduction
-- **Phase 2:** Head-Only IRM + Diagnostics → [phase2_plan.md](phase2_plan.md)
+# Experiment Entrypoints
+
+Command-line scripts that launch the training, diagnostics, and reproduction pipelines referenced in the paper live in this directory.

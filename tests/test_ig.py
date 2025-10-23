@@ -5,7 +5,7 @@ from typing import Dict
 import pytest
 import torch
 
-from src.diagnostics.external import compute_IG
+from src.modules.diagnostics import compute_IG
 
 
 def test_ig_empty_mapping_returns_zero(float_tolerance: Dict[str, float]) -> None:

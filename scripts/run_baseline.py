@@ -146,8 +146,7 @@ def main() -> None:
         before = snapshot(run_dir)
         train_cmd = [
             sys.executable,
-            "-m",
-            "src.train",
+            "experiments/run_train.py",
             f"--config-name={args.config}",
             f"train.steps={args.steps}",
             f"train.pretrain_steps={args.pretrain}",
@@ -171,8 +170,7 @@ def main() -> None:
         eval_run_base = eval_dir / f"seed_{seed}"
         eval_cmd = [
             sys.executable,
-            "-m",
-            "src.eval",
+            "experiments/run_diagnostics.py",
             f"--config-name={args.eval_config}",
             f"eval.report.checkpoint_path={checkpoint_path}",
             f"logging.local_mirror.base_dir={eval_run_base}",

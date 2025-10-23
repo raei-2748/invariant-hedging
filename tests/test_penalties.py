@@ -1,6 +1,5 @@
 import torch
-
-from src.objectives import penalties
+from src.core.losses import irm_penalty, vrex_penalty
 
 
 def _env_losses(param: torch.Tensor) -> torch.Tensor:
@@ -18,7 +17,7 @@ def test_irm_penalty_reduces_variance():
         dummy = torch.tensor(1.0, requires_grad=True)
         env_losses = [((param - 2.0) * dummy) ** 2, ((param + 1.0) * dummy) ** 2]
         mean_loss = torch.stack(env_losses).mean()
-        irm_pen = penalties.irm_penalty(env_losses, dummy)
+        irm_pen = irm_penalty(env_losses, dummy)
         total = mean_loss + 1e-3 * irm_pen
         total.backward()
         optimizer.step()
@@ -37,7 +36,7 @@ def test_vrex_penalty_reduces_variance():
         optimizer.zero_grad()
         env_losses = _env_losses(param)
         mean_loss = env_losses.mean()
-        vrex_pen = penalties.vrex_penalty(env_losses)
+        vrex_pen = vrex_penalty(env_losses)
         total = mean_loss + 1.0 * vrex_pen
         total.backward()
         optimizer.step()

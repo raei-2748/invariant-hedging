@@ -1,0 +1,4 @@
+# Canonical entrypoint for training and evaluation experiments.
+defaults:
+  - experiment
+

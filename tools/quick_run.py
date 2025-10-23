@@ -20,7 +20,7 @@ from src.data.sim.liquidity import LiquidityStressConfig, liquidity_costs
 from src.data.sim.merton import JumpSummary, overlay_merton_jumps
 from src.envs.registry import SyntheticRegimeRegistry
 from src.infra.io import write_sim_params_json, write_stress_summary_json
-from src.objectives.cvar import cvar_from_pnl
+from src.core.losses import cvar_from_pnl
 
 
 def _extract_heston(cfg: Mapping[str, object]) -> HestonParams:
@@ -514,7 +514,7 @@ from typing import Any
 
 import yaml
 
-from train.loop import build_config, run_training
+from legacy.train.loop import build_config, run_training
 
 
 def _load_config(path: Path) -> dict[str, Any]:

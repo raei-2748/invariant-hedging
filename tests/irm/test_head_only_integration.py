@@ -2,8 +2,12 @@ import pytest
 import torch
 from torch import nn
 
-from src.irm.head_grads import compute_env_head_grads, freeze_backbone
-from src.irm.penalties import cosine_alignment_penalty, varnorm_penalty
+from src.modules.head_invariance import (
+    compute_env_head_grads,
+    cosine_alignment_penalty,
+    freeze_backbone,
+    varnorm_penalty,
+)
 
 
 class ToyModel(nn.Module):
