@@ -5,7 +5,7 @@ from pathlib import Path
 
 import matplotlib
 
-from scripts import make_all_figures
+from tools.scripts import make_all_figures
 from tests.figures.utils import make_run_directory
 
 matplotlib.use("Agg")

@@ -43,13 +43,13 @@ Generate all figures for the latest smoke run:
 
 ```bash
 RUN_DIR=$(readlink -f runs/latest)
-python scripts/make_all_figures.py --run_dir "$RUN_DIR"
+python tools/scripts/make_all_figures.py --run_dir "$RUN_DIR"
 ```
 
 Regenerate only the capital-efficiency frontier with a poster layout:
 
 ```bash
-python scripts/plot_capital_efficiency_frontier.py \
+python src/visualization/plot_capital_efficiency_frontier.py \
   --run_dir runs/20240101_paper \
   --style poster \
   --format pdf
@@ -58,7 +58,7 @@ python scripts/plot_capital_efficiency_frontier.py \
 Create I–R–E small multiples for selected regimes:
 
 ```bash
-python scripts/plot_ire_scatter_3d.py \
+python src/visualization/plot_ire_scatter_3d.py \
   --run_dir runs/20240101_paper \
   --regime_filter crisis_a,crisis_b \
   --separate_by_regime

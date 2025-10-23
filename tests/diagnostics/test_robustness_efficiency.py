@@ -2,8 +2,12 @@ import math
 
 import pandas as pd
 
-from diagnostics.efficiency import compute_ER, compute_TR
-from diagnostics.robustness import compute_VR, compute_WG
+from src.modules.diagnostics import (
+    compute_ER,
+    compute_TR,
+    compute_VR,
+    compute_WG,
+)
 
 
 def test_wg_matches_cvar_objective():

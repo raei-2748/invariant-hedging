@@ -29,4 +29,4 @@ Both SPY option files must contain the following columns:
 trade_date,spot,strike,type,iv_bid,iv_ask,iv_mid,bid,ask,mid,volume,ttm_days
 ```
 
-Run `scripts/check_schema.py` to verify the schema and capture summary statistics in `reports/data_ingest_report.md` once the full datasets are in place.
+Run `tools/scripts/check_schema.py` to verify the schema and capture summary statistics in `reports/data_ingest_report.md` once the full datasets are in place.

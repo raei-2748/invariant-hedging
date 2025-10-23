@@ -11,7 +11,7 @@ The synthetic generator now composes a Heston stochastic volatility backbone wit
 
 Both toggles are deterministic, gated by configuration, and tagged in the output metadata.
 
-## Configuration (`config/sim_crisis.yaml`)
+## Configuration (`configs/examples/sim_crisis.yaml`)
 
 Key sections:
 
@@ -24,7 +24,7 @@ Key sections:
 
 ## Outputs
 
-Running `python -m tools.quick_run --config config/sim_crisis.yaml` creates artefacts under `runs/<timestamp>_sim_crisis/` with the structure:
+Running `python -m tools.quick_run --config configs/examples/sim_crisis.yaml` creates artefacts under `runs/<timestamp>_sim_crisis/` with the structure:
 
 ```
 runs/<timestamp>_sim_crisis/

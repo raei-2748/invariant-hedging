@@ -11,11 +11,11 @@ All notable changes to this project will be documented in this file.
 - Added deterministic real-market anchor loader with episode tagging and
   canonical output paths.
 - Documented data expectations for real-market runs and shipped default
-  `config/real_anchors.yaml` reference configuration.
+  `configs/examples/real_anchors.yaml` reference configuration.
 - Implemented head-only HIRM gradient alignment with ψ-only penalties and
   optional φ freezing via `model.freeze_phi`.
 - Added lightweight training loop and CLI (`tools.quick_run`) powered by
-  `config/hirm.yaml` for rapid experiments and diagnostics.
+  `configs/examples/hirm_minimal.yaml` for rapid experiments and diagnostics.
 - Stream alignment diagnostics to `alignment_head.csv` and documented the
   workflow in `docs/objectives.md` and `docs/devnotes/hirm_head.md`.
 

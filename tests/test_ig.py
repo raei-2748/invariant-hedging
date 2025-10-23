@@ -2,14 +2,19 @@
 
 from typing import Dict
 
+import math
+
 import pytest
 import torch
 
 from src.modules.diagnostics import compute_IG
 
 
-def test_ig_empty_mapping_returns_zero(float_tolerance: Dict[str, float]) -> None:
-    assert compute_IG({}) == pytest.approx(0.0, **float_tolerance)
+def test_ig_empty_mapping_returns_nan(float_tolerance: Dict[str, float]) -> None:
+    result = compute_IG({})
+
+    assert not result["supported"]
+    assert math.isnan(result["IG"])
 
 
 def test_ig_single_environment_returns_zero(float_tolerance: Dict[str, float]) -> None:
@@ -17,7 +22,8 @@ def test_ig_single_environment_returns_zero(float_tolerance: Dict[str, float]) -
 
     result = compute_IG(env2outcome)
 
-    assert result == pytest.approx(0.0, **float_tolerance)
+    assert result["supported"]
+    assert result["IG"] == pytest.approx(0.0, **float_tolerance)
 
 
 def test_ig_mixed_scalars_and_tensors(float_tolerance: Dict[str, float]) -> None:
@@ -30,7 +36,8 @@ def test_ig_mixed_scalars_and_tensors(float_tolerance: Dict[str, float]) -> None
     expected = torch.tensor([2.0, 4.0, 7.0]).std(unbiased=False).item()
     result = compute_IG(env2outcome)
 
-    assert result == pytest.approx(expected, **float_tolerance)
+    assert result["supported"]
+    assert result["IG"] == pytest.approx(expected, **float_tolerance)
 
 
 def test_ig_ignores_empty_tensors(float_tolerance: Dict[str, float]) -> None:
@@ -42,4 +49,5 @@ def test_ig_ignores_empty_tensors(float_tolerance: Dict[str, float]) -> None:
 
     result = compute_IG(env2outcome)
 
-    assert result == pytest.approx(0.0, **float_tolerance)
+    assert result["supported"]
+    assert result["IG"] == pytest.approx(0.0, **float_tolerance)

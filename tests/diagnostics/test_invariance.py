@@ -3,7 +3,7 @@ import math
 import numpy as np
 import pandas as pd
 
-from diagnostics.invariance import compute_IG, compute_ISI
+from src.modules.diagnostics import compute_IG, compute_invariance_spectrum
 
 
 def test_components_match_formulas():
@@ -26,7 +26,7 @@ def test_components_match_formulas():
     )
 
     cfg = {"trim_ratio": 0.0, "tau_risk": 1.0, "tau_cov": 1.0}
-    result = compute_ISI(rep_df, grad_df, risk_df, cfg)
+    result = compute_invariance_spectrum(rep_df, grad_df, risk_df, cfg)
     assert math.isclose(result["C1"], 0.75, rel_tol=1e-6)
     assert math.isclose(result["C2"], 0.65, rel_tol=1e-6)
     assert math.isclose(result["C3"], 0.7, rel_tol=1e-6)
@@ -46,7 +46,7 @@ def test_trimmed_mean_keeps_middle_mass():
     rep_df = pd.DataFrame(columns=["probe_id", "dispersion"])
 
     cfg = {"trim_ratio": 0.1, "tau_risk": 1.0, "weights": {"C1": 1.0}}
-    result = compute_ISI(rep_df, grad_df, risk_df, cfg)
+    result = compute_invariance_spectrum(rep_df, grad_df, risk_df, cfg)
 
     c1_values = [1.0 - variance for variance in np.linspace(0.0, 0.9, 10)]
     sorted_vals = sorted(c1_values)
@@ -77,7 +77,7 @@ def test_weighted_aggregation_matches_config():
     )
 
     cfg = {"trim_ratio": 0.0, "tau_risk": 1.0, "tau_cov": 1.0, "weights": {"C1": 0.2, "C2": 0.3, "C3": 0.5}}
-    result = compute_ISI(rep_df, grad_df, risk_df, cfg)
+    result = compute_invariance_spectrum(rep_df, grad_df, risk_df, cfg)
 
     expected = 0.2 * 0.8 + 0.3 * 0.6 + 0.5 * 0.4
     assert math.isclose(result["ISI"], expected, rel_tol=1e-6)

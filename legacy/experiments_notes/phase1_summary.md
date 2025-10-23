@@ -4,7 +4,7 @@
 
 ## Key Runs
 - Default ERM training via `make train CONFIG=train/erm`
-- Reproduction sweep `scripts/make_reproduce.sh` (ERM, ERM-reg, IRM, GroupDRO, V-REx) stored under `outputs/_baseline_erm_base/`
+- Reproduction sweep `tools/make_reproduce.sh` (ERM, ERM-reg, IRM, GroupDRO, V-REx) stored under `outputs/_baseline_erm_base/`
 
 ## Takeaways
 - Crisis CVaR-95 establishes the benchmark for Phase 2 comparisons.
