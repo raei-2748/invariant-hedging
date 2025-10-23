@@ -1,18 +1,31 @@
 #!/usr/bin/env python3
-"""Visualize the capital-efficiency frontier across methods."""
+"""Plot mean PnL against |CVaR-95| with turnover-encoded markers."""
 from __future__ import annotations
 
 import argparse
 import logging
-import math
 from pathlib import Path
-from typing import List, Sequence, Tuple
+from typing import Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from _plot_utils import ensure_cols, filter_frame, load_csv, save_png_with_meta
+
 LOGGER = logging.getLogger("plot_capital_frontier")
+
+
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--in", dest="input", required=True, help="Path to scoreboard or scorecard CSV")
+    parser.add_argument("--out", required=True, help="Output PNG path")
+    parser.add_argument("--reg", default="crisis", help="Regime filter (scoreboard mode only; default: crisis)")
+    parser.add_argument("--models", nargs="*", help="Optional list of models to include")
+    parser.add_argument("--title", default=None, help="Optional plot title")
+    parser.add_argument("--dpi", type=int, default=200, help="Figure resolution")
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
+    return parser.parse_args(argv)
 
 
 def _setup_logging(verbose: bool) -> None:
@@ -20,104 +33,135 @@ def _setup_logging(verbose: bool) -> None:
     logging.basicConfig(level=level, format="%(levelname)s | %(message)s")
 
 
-def _ensure_outdir(path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+def _compute_sizes(turnover: pd.Series) -> np.ndarray:
+    values = turnover.to_numpy(dtype=float)
+    finite = np.isfinite(values)
+    if not finite.any():
+        return np.full_like(values, 120.0)
+    vals = values[finite]
+    min_val = float(vals.min())
+    max_val = float(vals.max())
+    if max_val - min_val < 1e-12:
+        sizes = np.full_like(values, 180.0)
+    else:
+        scaled = (values - min_val) / (max_val - min_val)
+        sizes = 80.0 + 260.0 * scaled
+    sizes[~finite] = 80.0
+    return sizes
 
 
-def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--scorecard", required=True, help="Path to scorecard.csv")
-    parser.add_argument("--out", required=True, help="Output image path")
-    parser.add_argument("--notional", type=float, default=1.0, help="Notional scaling (unused placeholder)")
-    parser.add_argument("--dpi", type=int, default=200, help="Output figure DPI")
-    parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
-    return parser.parse_args(argv)
+def _prepare_points(
+    frame: pd.DataFrame,
+    *,
+    reg: str | None,
+    models: Sequence[str] | None,
+) -> tuple[pd.DataFrame, str]:
+    """Normalise heterogeneous score inputs to a common plotting schema."""
 
+    scoreboard_cols = {"model", "seed", "reg", "cvar95", "mean_pnl"}
+    scorecard_cols = {"method", "es95_mean", "meanpnl_mean"}
 
-def _load_scorecard(path: Path) -> pd.DataFrame:
-    if not path.exists():
-        raise FileNotFoundError(path)
-    return pd.read_csv(path)
+    if scoreboard_cols.issubset(frame.columns):
+        ensure_cols(frame, scoreboard_cols)
+        ensure_cols(frame, {"turnover"}, soft=True)
+        filtered = filter_frame(frame, reg=reg, models=models)
+        filtered = filtered.copy()
+        if filtered.empty:
+            return filtered, "scoreboard"
+        if "turnover" not in filtered:
+            filtered["turnover"] = np.nan
+        filtered["abs_cvar95"] = filtered["cvar95"].abs()
+        filtered["label"] = [f"{row['model']} (seed {row['seed']})" for _, row in filtered.iterrows()]
+        return filtered[["model", "seed", "reg", "abs_cvar95", "mean_pnl", "turnover", "label"]], "scoreboard"
 
+    if scorecard_cols.issubset(frame.columns):
+        ensure_cols(frame, scorecard_cols)
+        ensure_cols(frame, {"turnover_mean"}, soft=True)
+        working = frame.copy()
+        if models:
+            working = working[working["method"].isin(models)]
+        if reg:
+            LOGGER.warning("Ignoring reg=%s filter for aggregated scorecard input", reg)
+        if working.empty:
+            return working, "scorecard"
+        working["model"] = working["method"]
+        working["seed"] = np.nan
+        working["reg"] = None
+        working["abs_cvar95"] = working["es95_mean"].abs()
+        working["mean_pnl"] = working["meanpnl_mean"]
+        working["turnover"] = working.get("turnover_mean", np.nan)
+        working["label"] = working["method"]
+        return working[["model", "seed", "reg", "abs_cvar95", "mean_pnl", "turnover", "label"]], "scorecard"
 
-def _pareto_front(points: List[Tuple[str, float, float]]) -> List[str]:
-    dominant: List[str] = []
-    for name_i, risk_i, pnl_i in points:
-        if math.isnan(risk_i) or math.isnan(pnl_i):
-            continue
-        dominated = False
-        for name_j, risk_j, pnl_j in points:
-            if name_i == name_j:
-                continue
-            if math.isnan(risk_j) or math.isnan(pnl_j):
-                continue
-            better_or_equal_risk = risk_j <= risk_i + 1e-9
-            better_or_equal_pnl = pnl_j >= pnl_i - 1e-9
-            strictly_better = (risk_j < risk_i - 1e-9) or (pnl_j > pnl_i + 1e-9)
-            if better_or_equal_risk and better_or_equal_pnl and strictly_better:
-                dominated = True
-                break
-        if not dominated:
-            dominant.append(name_i)
-    return dominant
+    raise KeyError(
+        "Input CSV does not contain the expected columns for either scoreboard "
+        "(`model`, `seed`, `reg`, `cvar95`, `mean_pnl`) or scorecard "
+        "(`method`, `es95_mean`, `meanpnl_mean`) inputs."
+    )
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     _setup_logging(args.verbose)
-    df = _load_scorecard(Path(args.scorecard))
-    required = {"method", "es95_mean", "meanpnl_mean", "turnover_mean", "n_seeds"}
-    if not required.issubset(df.columns):
-        raise KeyError("scorecard CSV missing required columns")
-    df = df.copy()
-    df["abs_es95"] = df["es95_mean"].abs()
-    df = df[df["n_seeds"] > 0]
-    if df.empty:
-        LOGGER.error("Scorecard does not contain any methods with valid seeds")
+    df = load_csv(args.input)
+    prepared, schema = _prepare_points(df, reg=args.reg, models=args.models)
+    if prepared.empty:
+        LOGGER.error("No rows remain after applying filters (schema=%s, reg=%s, models=%s)", schema, args.reg, args.models)
         return 1
 
-    methods = df["method"].tolist()
-    risks = df["abs_es95"].to_numpy(dtype=float)
-    pnls = df["meanpnl_mean"].to_numpy(dtype=float)
-    turnovers = df["turnover_mean"].to_numpy(dtype=float)
+    prepared = prepared.dropna(subset=["abs_cvar95", "mean_pnl"])
+    if prepared.empty:
+        LOGGER.error("Filtered data has no finite CVaR-95 / mean_pnl values (schema=%s)", schema)
+        return 1
 
-    pareto = _pareto_front(list(zip(methods, risks, pnls)))
+    sizes = _compute_sizes(prepared["turnover"])
 
-    plt.style.use("seaborn-v0_8")
-    fig, ax = plt.subplots(figsize=(8, 6))
-    cmap = plt.get_cmap("tab10")
-    min_turn = np.nanmin(turnovers)
-    max_turn = np.nanmax(turnovers)
-    turn_range = max(max_turn - min_turn, 1e-6)
+    fig, ax = plt.subplots(figsize=(7.5, 5.5))
+    ax.scatter(
+        prepared["abs_cvar95"],
+        prepared["mean_pnl"],
+        s=sizes,
+        c="#1f77b4",
+        alpha=0.75,
+        edgecolors="black",
+        linewidths=0.6,
+    )
 
-    for idx, method in enumerate(methods):
-        color = cmap(idx % cmap.N)
-        risk = risks[idx]
-        pnl = pnls[idx]
-        turn = turnovers[idx]
-        if math.isnan(risk) or math.isnan(pnl):
-            LOGGER.warning("Skipping method %s due to NaNs", method)
-            continue
-        size = 120 * (1 + (0 if math.isnan(turn) else (turn - min_turn) / turn_range))
-        edgecolor = "black" if method in pareto else color
-        facecolor = color if method in pareto else (*color[:3], 0.5)
-        ax.scatter(risk, pnl, s=size, color=facecolor, edgecolor=edgecolor, linewidths=1.0, alpha=0.85, zorder=3)
-        ax.text(risk, pnl, f" {method}", ha="left", va="center", fontsize=9)
+    sorted_eff = prepared.sort_values(["abs_cvar95", "mean_pnl"], ascending=[True, False]).head(3)
+    for _, row in sorted_eff.iterrows():
+        label = row["label"]
+        ax.annotate(
+            label,
+            xy=(row["abs_cvar95"], row["mean_pnl"]),
+            xytext=(6, 6),
+            textcoords="offset points",
+            fontsize=8,
+        )
 
-    ax.set_xlabel("|ES95 Mean|")
+    ax.set_xlabel("|CVaR-95| (per notional)")
     ax.set_ylabel("Mean PnL")
-    ax.set_title("Capital-Efficiency Frontier")
+    ax.set_title(args.title or "Capital Frontier: Mean PnL vs Risk")
     ax.grid(alpha=0.3)
-    legend_elements = [
-        plt.Line2D([0], [0], marker="o", color="black", label="Pareto-dominant", markerfacecolor="none", markersize=8),
-        plt.Line2D([0], [0], marker="o", color="gray", label="Non-dominant", markerfacecolor="gray", alpha=0.5, markersize=8),
-    ]
-    ax.legend(handles=legend_elements, loc="best", frameon=False)
+
+    # Marker size legend proxy.
+    finite_turn = prepared["turnover"].dropna()
+    if not finite_turn.empty:
+        avg_turn = float(finite_turn.mean())
+        legend_txt = f"Marker size ∝ turnover\nAvg turnover: {avg_turn:.2f}"
+        ax.text(0.98, 0.02, legend_txt, transform=ax.transAxes, fontsize=8, ha="right", va="bottom",
+                bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.6))
+
     fig.tight_layout()
 
     out_path = Path(args.out)
-    _ensure_outdir(out_path)
-    fig.savefig(out_path, dpi=args.dpi)
+    meta = {
+        "input": str(Path(args.input).resolve()),
+        "schema": schema,
+        "filters": {"reg": args.reg, "models": args.models},
+        "points": prepared[["model", "seed", "reg", "abs_cvar95", "mean_pnl", "turnover"]].to_dict(orient="records"),
+        "args": vars(args),
+    }
+    save_png_with_meta(fig, out_path, meta, dpi=args.dpi)
     plt.close(fig)
     LOGGER.info("Saved capital frontier plot to %s", out_path)
     return 0

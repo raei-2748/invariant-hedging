@@ -64,6 +64,17 @@ invariant-hedging/
 | Training engine & orchestration | `src/core/engine.py`, `experiments/run_*.py` |
 
 Legacy utilities (including the original `train/` loop and report builders) now live under `legacy/` and remain importable for provenance-sensitive experiments.
+### Figures
+
+Regenerate the Phase-2 diagnostic figures from either a per-seed scoreboard or the aggregated `scorecard.csv` produced by `make report`:
+
+```bash
+python scripts/plot_cvar_by_method.py --in outputs/_phase2_snapshot/scoreboard.csv --out reports/figs/cvar_by_method.png
+python scripts/plot_diag_correlations.py --in outputs/_phase2_snapshot/scoreboard.csv --out reports/figs/diag_vs_cvar.png
+python scripts/plot_capital_frontier.py --in outputs/_phase2_snapshot/scoreboard.csv --out reports/figs/capital_frontier.png
+```
+
+Outputs are written to `reports/figs/` alongside `.meta.json` files capturing the exact filters and inputs.
 
 2. Provide diagnostic batches (held-out from training) via
    `diagnostics.probe`. Batches are dictionaries containing `risk`, `outcome`,
