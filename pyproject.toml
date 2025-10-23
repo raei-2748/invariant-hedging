@@ -7,7 +7,7 @@ name = "invariant-hedging"
 version = "1.0.0"
 description = "Invariant hedging research codebase"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 authors = [
   { name = "Invariant Hedging Team" }
 ]

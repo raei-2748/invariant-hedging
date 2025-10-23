@@ -1,4 +1,4 @@
-python==3.10.*
+# Requires Python 3.11 or newer
 torch==2.3.*
 numpy==1.26.*
 pandas==2.2.*
