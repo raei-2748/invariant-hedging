@@ -5,8 +5,10 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+for candidate in (ROOT / "src", ROOT):
+    candidate_str = str(candidate)
+    if candidate.exists() and candidate_str not in sys.path:
+        sys.path.insert(0, candidate_str)
 
 from src.core.engine import main as train_main
 

@@ -25,9 +25,14 @@ def _run_process(args: Sequence[str], *, env: dict[str, str]) -> None:
     process_env.update(env)
     pythonpath = process_env.get("PYTHONPATH", "")
     path_entries = [entry for entry in pythonpath.split(os.pathsep) if entry]
-    if str(ROOT) not in path_entries:
-        path_entries.insert(0, str(ROOT))
-    process_env["PYTHONPATH"] = os.pathsep.join(path_entries) if path_entries else str(ROOT)
+    preferred = [ROOT / "src", ROOT]
+    for candidate in preferred:
+        candidate_str = str(candidate)
+        if candidate.exists() and candidate_str not in path_entries:
+            path_entries.insert(0, candidate_str)
+    if not path_entries:
+        path_entries.append(str(ROOT))
+    process_env["PYTHONPATH"] = os.pathsep.join(path_entries)
     subprocess.run(args, check=True, env=process_env)
 
 

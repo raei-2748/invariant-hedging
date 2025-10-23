@@ -29,19 +29,29 @@ jobs:
           ruff format --check .
 
       - name: Unit tests and tiny train
+        env:
+          PYTHONPATH: "${{ github.workspace }}/src"
         run: make ci-smoke
       - name: Paper smoke eval
+        env:
+          PYTHONPATH: "${{ github.workspace }}/src"
         run: |
           RUN_DIR=$(readlink -f runs/latest)
           CKPT=$(python scripts/find_latest_checkpoint.py "$RUN_DIR")
-          python -m src.eval --config-name=train/phase2 eval.report.checkpoint_path="$CKPT" logging.wandb.enabled=false
+          python experiments/run_diagnostics.py --config-name=train/phase2 \
+            eval.report.checkpoint_path="$CKPT" \
+            logging.wandb.enabled=false
 
       - name: Make Figures
+        env:
+          PYTHONPATH: "${{ github.workspace }}/src"
         run: |
           RUN_DIR=$(readlink -f runs/latest)
           python scripts/make_all_figures.py --run_dir "$RUN_DIR"
 
       - name: SPY data-loader checks
+        env:
+          PYTHONPATH: "${{ github.workspace }}/src"
         run: pytest tests/test_spy_loader.py
 
       - name: Upload Figures
