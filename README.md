@@ -1,4 +1,4 @@
-# Version 1.0 — Camera-Ready Public Release
+# HIRM - Hedging with Invariant Risk Minimization
 
 [![CI](https://github.com/raei-2748/invariant-hedging/actions/workflows/ci.yml/badge.svg)](https://github.com/raei-2748/invariant-hedging/actions/workflows/ci.yml)
 [![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org)
