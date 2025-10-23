@@ -5,8 +5,7 @@ from typing import Dict, Sequence
 import pytest
 import torch
 
-from src.objectives import penalties
-from src.objectives.hirm import compute_hirm_penalty
+from src.core.losses import compute_hirm_penalty, irm_penalty, vrex_penalty
 
 
 def test_irm_penalty_matches_polynomial_reference(float_tolerance: Dict[str, float]) -> None:
@@ -17,7 +16,7 @@ def test_irm_penalty_matches_polynomial_reference(float_tolerance: Dict[str, flo
         (2.0 * w * dummy) ** 2,
     ]
 
-    penalty = penalties.irm_penalty(env_losses, dummy)
+    penalty = irm_penalty(env_losses, dummy)
     penalty.backward()
 
     expected_value = 34.0 * (w.detach().item() ** 4)
@@ -31,7 +30,7 @@ def test_vrex_penalty_variance_gradient(float_tolerance: Dict[str, float]) -> No
     w = torch.tensor(0.8, requires_grad=True)
     env_losses = [w, 2.0 * w]
 
-    penalty = penalties.vrex_penalty(env_losses)
+    penalty = vrex_penalty(env_losses)
     penalty.backward()
 
     expected_value = 0.25 * (w.detach().item() ** 2)

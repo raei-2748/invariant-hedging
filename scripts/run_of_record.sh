@@ -254,12 +254,12 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-TRAIN_CMD=("python3" "-m" "src.train" "--config-name=${TRAIN_CONFIG}")
+TRAIN_CMD=("python3" "experiments/run_train.py" "--config-name=${TRAIN_CONFIG}")
 for override in "${TRAIN_OVERRIDES[@]}"; do
     TRAIN_CMD+=("${override}")
 done
 
-EVAL_CMD=("python3" "-m" "src.eval" "--config-name=${EVAL_CONFIG}")
+EVAL_CMD=("python3" "experiments/run_diagnostics.py" "--config-name=${EVAL_CONFIG}")
 for override in "${EVAL_OVERRIDES[@]}"; do
     EVAL_CMD+=("${override}")
 done

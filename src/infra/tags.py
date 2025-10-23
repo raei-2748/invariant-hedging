@@ -23,9 +23,6 @@ def build_episode_tags(
         "stress_jump": bool(stress_jump),
         "stress_liquidity": bool(stress_liquidity),
     }
-"""Canonical tagging helpers for real-market episodes."""
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Mapping, MutableMapping
 

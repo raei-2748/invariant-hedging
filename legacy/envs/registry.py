@@ -5,7 +5,7 @@ import zlib
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Mapping
 
-from ..infra.tags import build_episode_tags
+from src.infra.tags import build_episode_tags
 
 
 def _seed_offset(label: str) -> int:
@@ -80,15 +80,12 @@ class SyntheticRegimeRegistry:
     @property
     def names(self) -> List[str]:
         return list(self._specs.keys())
-"""Registry helpers for deterministic real-market anchors."""
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Iterable, List, Mapping, Optional
 
-from ..data.real.loader import RealAnchorLoader
-from ..data.types import EpisodeBatch
-from ..infra.tags import extract_episode_tags
+from src.data.real.loader import RealAnchorLoader
+from src.data.types import EpisodeBatch
+from src.infra.tags import extract_episode_tags
 
 
 @dataclass(frozen=True)

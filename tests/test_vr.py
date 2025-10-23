@@ -5,7 +5,7 @@ from typing import Dict
 import pytest
 import torch
 
-from src.diagnostics.external import compute_VR
+from src.modules.diagnostics import compute_VR
 
 
 def test_vr_empty_mapping_returns_zero(float_tolerance: Dict[str, float]) -> None:

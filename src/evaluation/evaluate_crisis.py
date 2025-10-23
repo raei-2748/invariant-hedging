@@ -8,7 +8,7 @@ import math
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, TYPE_CHECKING
+from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 import hydra
 import matplotlib.pyplot as plt
@@ -16,17 +16,17 @@ import pandas as pd
 import torch
 from omegaconf import DictConfig, OmegaConf
 
-from .baselines import DeltaBaselinePolicy, DeltaGammaBaselinePolicy
-from .data.features import FeatureEngineer, FeatureScaler
-from .diagnostics.export import DiagnosticsRunContext, gather_and_export
-from .data.types import EpisodeBatch
-from .models.policy_mlp import PolicyMLP
-from .objectives import cvar as cvar_obj
-from .utils import logging as log_utils, stats
-from .utils.configs import build_envs, prepare_data_module, unwrap_experiment_config
+from src.baselines import DeltaBaselinePolicy, DeltaGammaBaselinePolicy
+from src.core.losses import bootstrap_cvar_ci, cvar_from_pnl
+from src.core.utils import logging as log_utils, stats
+from src.data.features import FeatureEngineer, FeatureScaler
+from src.data.types import EpisodeBatch
+from src.evaluation.analyze_diagnostics import DiagnosticsRunContext, gather_and_export
+from src.modules.data_pipeline import build_envs, prepare_data_module, unwrap_experiment_config
+from src.modules.environment import SingleAssetHedgingEnv
+from src.modules.models import PolicyMLP
 
-if TYPE_CHECKING:  # pragma: no cover - typing helper
-    from .envs.single_asset import SingleAssetHedgingEnv
+CONFIG_DIR = Path(__file__).resolve().parents[2] / "configs"
 
 
 _TORCH_THREAD_ENV = os.environ.get("HIRM_TORCH_NUM_THREADS") or os.environ.get("OMP_NUM_THREADS")
@@ -208,12 +208,12 @@ def _evaluate_env(
         key = _es_key(alpha)
         if key in es_values:
             continue
-        es_val = cvar_obj.cvar_from_pnl(pnl, alpha)
+        es_val = cvar_from_pnl(pnl, alpha)
         es_values[key] = float(es_val.item())
     mean_loss = losses.mean()
     sharpe = stats.sharpe_ratio(step_pnl).mean()
     turnover_mean = turnover.mean()
-    cvar_ci = cvar_obj.bootstrap_cvar_ci(pnl, primary_alpha)
+    cvar_ci = bootstrap_cvar_ci(pnl, primary_alpha)
     primary_key = _es_key(primary_alpha)
     record = {
         "cvar": es_values.get(primary_key),
@@ -685,7 +685,7 @@ def _aggregate_records(records: List[Dict]) -> Dict[str, Dict[str, object]]:
     }
 
 
-@hydra.main(config_path="../configs", config_name="experiment", version_base=None)
+@hydra.main(config_path=str(CONFIG_DIR), config_name="experiment", version_base=None)
 def main(cfg: DictConfig) -> None:
     cfg = unwrap_experiment_config(cfg)
     resolved_cfg = OmegaConf.to_container(cfg, resolve=True)

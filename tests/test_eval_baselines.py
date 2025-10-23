@@ -3,10 +3,10 @@ from __future__ import annotations
 
 import torch
 
-from src import eval as eval_module
+from src.evaluation import evaluate_crisis as eval_module
 from src.data.features import FeatureEngineer
 from src.data.types import EpisodeBatch
-from src.envs.single_asset import SingleAssetHedgingEnv
+from src.modules.environment import SingleAssetHedgingEnv
 
 
 def _make_episode_batch() -> EpisodeBatch:

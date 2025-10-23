@@ -1,0 +1,4 @@
+# Default diagnostics configuration wrapper.
+defaults:
+  - diagnostics/default
+

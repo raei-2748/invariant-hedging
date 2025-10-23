@@ -1,32 +1,46 @@
 """Training loop for invariant hedging experiments."""
 from __future__ import annotations
 
-import math
 import os
 import warnings
 from pathlib import Path
-from typing import Dict, List, TYPE_CHECKING
+from typing import Dict, List
 
 import hydra
 import torch
 from omegaconf import DictConfig, OmegaConf
 
-from .data.features import FeatureEngineer
-from .envs.single_asset import SingleAssetHedgingEnv
-from .diagnostics import metrics as diag_metrics
-from .diagnostics import safe_eval_metric
-from .models import PolicyMLP
-from .objectives import cvar as cvar_obj
-from .objectives import penalties
-from .envs.single_asset import SingleAssetHedgingEnv
-from .irm.configs import IRMConfig
-from .irm.head_grads import compute_env_head_grads, freeze_backbone
-from .irm.penalties import cosine_alignment_penalty, varnorm_penalty
-from .utils import checkpoints, logging as log_utils, seed as seed_utils, stats
-from .utils.configs import build_envs, prepare_data_module, unwrap_experiment_config
-
-if TYPE_CHECKING:  # pragma: no cover - import for type checking only
-    from .envs.single_asset import SingleAssetHedgingEnv
+from src.core.losses import (
+    cvar_from_pnl,
+    differentiable_cvar,
+    groupdro_objective,
+    irm_penalty,
+    update_groupdro_weights,
+    vrex_penalty,
+)
+from src.core.optimizers import (
+    lambda_at_step,
+    label_smoothing,
+    setup_optimizer,
+    setup_scheduler,
+)
+from src.core.utils import checkpoints, logging as log_utils, seed as seed_utils, stats
+from src.modules.data_pipeline import (
+    FeatureEngineer,
+    build_envs,
+    prepare_data_module,
+    unwrap_experiment_config,
+)
+from src.modules.diagnostics import invariant_gap, safe_eval_metric, worst_group
+from src.modules.environment import SingleAssetHedgingEnv
+from src.modules.head_invariance import (
+    IRMConfig,
+    compute_env_head_grads,
+    cosine_alignment_penalty,
+    freeze_backbone,
+    varnorm_penalty,
+)
+from src.modules.models import PolicyMLP
 
 
 
@@ -82,7 +96,7 @@ def _evaluate(
             pnl = sim.pnl
             step_pnl = sim.step_pnl
             turnover = sim.turnover
-            cvar = cvar_obj.cvar_from_pnl(pnl, alpha)
+            cvar = cvar_from_pnl(pnl, alpha)
             results[name] = {
                 "cvar": float(cvar.item()),
                 "mean_pnl": float(pnl.mean().item()),
@@ -97,62 +111,21 @@ def _evaluate(
 def _lambda_schedule(step: int, cfg: DictConfig) -> float:
     pretrain = cfg.train.pretrain_steps
     ramp = cfg.irm.get("ramp_steps", cfg.train.irm_ramp_steps)
+    init_weight = cfg.irm.get("lambda_init", 0.0)
+    target_weight = cfg.irm.get("lambda_target", cfg.model.irm.penalty_weight)
     if step < pretrain:
-        return cfg.irm.get("lambda_init", 0.0)
-    if step < pretrain + ramp:
-        progress = (step - pretrain) / max(ramp, 1)
-        return cfg.irm.get("lambda_init", 0.0) + progress * (
-            cfg.irm.get("lambda_target", cfg.model.irm.penalty_weight)
-        )
-    return cfg.irm.get("lambda_target", cfg.model.irm.penalty_weight)
-
-
-def lambda_at_step(step: int, *, target: float, schedule: str, warmup_steps: int) -> float:
-    schedule = schedule.lower()
-    if schedule not in {"none", "linear", "cosine"}:
-        raise ValueError(f"Unsupported IRM schedule: {schedule}")
-    if schedule == "none" or warmup_steps <= 0:
-        return target
-    progress = min(1.0, float(step) / float(max(1, warmup_steps)))
-    if schedule == "linear":
-        return target * progress
-    # cosine warmup
-    cosine = 0.5 * (1.0 - math.cos(math.pi * progress))
-    return target * cosine
-
-
-def _label_smoothing(pnl: torch.Tensor, smoothing: float) -> torch.Tensor:
-    if smoothing <= 0:
-        return pnl
-    mean = pnl.mean()
-    return (1 - smoothing) * pnl + smoothing * mean
-
-
-def _setup_optimizer(policy: torch.nn.Module, cfg: DictConfig, extra_params=None) -> torch.optim.Optimizer:
-    name = cfg.optimizer.name.lower()
-    params = [p for p in policy.parameters() if p.requires_grad]
-    if extra_params is not None:
-        params.extend(param for param in extra_params if param.requires_grad)
-    lr = cfg.optimizer.lr
-    weight_decay = cfg.optimizer.weight_decay
-    if cfg.model.name == "erm_reg":
-        weight_decay = cfg.model.regularization.get("weight_decay", weight_decay)
-    if name == "adamw":
-        return torch.optim.AdamW(params, lr=lr, weight_decay=weight_decay)
-    if name == "adam":
-        return torch.optim.Adam(params, lr=lr, weight_decay=weight_decay)
-    raise ValueError(f"Unsupported optimizer: {cfg.optimizer.name}")
-
-
-def _setup_scheduler(optimizer: torch.optim.Optimizer, cfg: DictConfig):
-    name = cfg.scheduler.name.lower()
-    if name == "cosine":
-        return torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=cfg.train.steps, eta_min=cfg.optimizer.lr * 0.1
-        )
-    if name == "none":
-        return None
-    raise ValueError(f"Unsupported scheduler: {cfg.scheduler.name}")
+        return init_weight
+    remaining = step - pretrain
+    warmup = max(ramp, 1)
+    schedule_name = str(cfg.irm.get("schedule", "linear")) if cfg.irm else "linear"
+    delta = target_weight - init_weight
+    warmed = lambda_at_step(
+        remaining,
+        target=delta,
+        schedule=schedule_name,
+        warmup_steps=warmup,
+    )
+    return init_weight + warmed
 
 
 def _canonical_objective(cfg: DictConfig) -> str:
@@ -245,8 +218,8 @@ def run(cfg: DictConfig) -> Path:
     if objective == "hirm" and irm_settings.enabled and irm_settings.freeze_backbone:
         freeze_backbone(policy)
 
-    optimizer = _setup_optimizer(policy, cfg)
-    scheduler = _setup_scheduler(optimizer, cfg)
+    optimizer = setup_optimizer(policy, cfg)
+    scheduler = setup_scheduler(optimizer, cfg)
     scaler = torch.cuda.amp.GradScaler(enabled=(device.type == "cuda" and cfg.runtime.get("mixed_precision", True)))
 
     run_logger = log_utils.RunLogger(OmegaConf.to_container(cfg.logging, resolve=True), resolved_cfg)
@@ -289,11 +262,11 @@ def run(cfg: DictConfig) -> Path:
                 pnl = sim.pnl
                 if cfg.model.name == "erm_reg":
                     smoothing = cfg.model.regularization.get("label_smoothing", 0.0)
-                    pnl = _label_smoothing(pnl, smoothing)
-                loss = cvar_obj.differentiable_cvar(-pnl, alpha)
+                    pnl = label_smoothing(pnl, smoothing)
+                loss = differentiable_cvar(-pnl, alpha)
                 env_losses.append(loss)
                 metrics_to_log[f"train/{env_name}_mean_pnl"] = float(pnl.mean().item())
-                metrics_to_log[f"train/{env_name}_cvar"] = float(cvar_obj.cvar_from_pnl(pnl, alpha).item())
+                metrics_to_log[f"train/{env_name}_cvar"] = float(cvar_from_pnl(pnl, alpha).item())
                 metrics_to_log[f"train/{env_name}_turnover"] = float(sim.turnover.mean().item())
                 trades = sim.positions[:, 1:] - sim.positions[:, :-1]
                 final_trade = -sim.positions[:, -1:]
@@ -314,7 +287,7 @@ def run(cfg: DictConfig) -> Path:
 
         loss_tensor = torch.stack(env_losses)
         if objective == "groupdro":
-            total_loss = penalties.groupdro_objective(group_weights, env_losses)
+            total_loss = groupdro_objective(group_weights, env_losses)
         else:
             total_loss = loss_tensor.mean()
 
@@ -322,12 +295,12 @@ def run(cfg: DictConfig) -> Path:
         lambda_logged = 0.0
         if objective == "irm":
             lambda_weight = _lambda_schedule(step, cfg)
-            irm_pen = penalties.irm_penalty(env_losses, dummy)
+            irm_pen = irm_penalty(env_losses, dummy)
             total_loss = total_loss + lambda_weight * irm_pen
             penalty_value = float(irm_pen.item())
             lambda_logged = lambda_weight
         elif objective == "vrex":
-            vrex_pen = penalties.vrex_penalty(env_losses)
+            vrex_pen = vrex_penalty(env_losses)
             weight = cfg.model.vrex.penalty_weight
             total_loss = total_loss + weight * vrex_pen
             penalty_value = float(vrex_pen.item())
@@ -396,15 +369,15 @@ def run(cfg: DictConfig) -> Path:
             scheduler.step()
 
         if objective == "groupdro":
-            group_weights = penalties.update_groupdro_weights(
+            group_weights = update_groupdro_weights(
                 group_weights, env_losses, cfg.model.groupdro.step_size
             )
 
         if objective in {"irm", "hirm"}:
             metrics_to_log["train/lambda"] = lambda_logged
         if objective == "hirm" and env_losses:
-            metrics_to_log["train/ig"] = safe_eval_metric(diag_metrics.invariant_gap, env_losses)
-            metrics_to_log["train/wg"] = safe_eval_metric(diag_metrics.worst_group, env_losses)
+            metrics_to_log["train/ig"] = safe_eval_metric(invariant_gap, env_losses)
+            metrics_to_log["train/wg"] = safe_eval_metric(worst_group, env_losses)
 
         if step % log_interval == 0 or step == 1:
             metrics_to_log["train/loss"] = float(total_loss.item())
@@ -440,7 +413,10 @@ def run(cfg: DictConfig) -> Path:
         run_logger.close()
 
 
-@hydra.main(config_path="../configs", config_name="experiment", version_base=None)
+CONFIG_DIR = Path(__file__).resolve().parents[2] / "configs"
+
+
+@hydra.main(config_path=str(CONFIG_DIR), config_name="experiment", version_base=None)
 def main(cfg: DictConfig) -> None:
     run(cfg)
 

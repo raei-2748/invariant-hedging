@@ -31,14 +31,14 @@ ci-unit:
 	pytest -q tests/smoke tests/unit
 
 ci-train-lite:
-	python -m src.train \
-	  training.max_steps=150 \
-	  data.loader=smoke \
-	  logging.wandb.enabled=false \
-	  outputs.dir="runs/ci_smoke"
+        python experiments/run_train.py \
+          training.max_steps=150 \
+          data.loader=smoke \
+          logging.wandb.enabled=false \
+          outputs.dir="runs/ci_smoke"
 
 ci-report-lite:
-	python -m src.report.lite --runs "runs/ci_smoke" --no_figures
+        python -m legacy.report_core.lite --runs "runs/ci_smoke" --no_figures
 
 ci-smoke: ci-unit ci-train-lite ci-report-lite
 data:
@@ -51,15 +51,15 @@ data-mini:
 
 smoke:
 	@set -euo pipefail; \
-	python3 -m src.train --config-name=train/smoke; \
-	LAST_RUN=$$(ls -td runs/*/ 2>/dev/null | head -1); \
-	if [ -z "$$LAST_RUN" ]; then echo "No run directories found" >&2; exit 1; fi; \
-	CHECKPOINT=$$(python3 scripts/find_latest_checkpoint.py "$$LAST_RUN"); \
-	python3 -m src.eval --config-name=eval/smoke eval.report.checkpoint_path=$$CHECKPOINT
+        python3 experiments/run_train.py --config-name=train/smoke; \
+        LAST_RUN=$$(ls -td runs/*/ 2>/dev/null | head -1); \
+        if [ -z "$$LAST_RUN" ]; then echo "No run directories found" >&2; exit 1; fi; \
+        CHECKPOINT=$$(python3 scripts/find_latest_checkpoint.py "$$LAST_RUN"); \
+        python3 experiments/run_diagnostics.py --config-name=eval/smoke eval.report.checkpoint_path=$$CHECKPOINT
 paper:
 	scripts/run_of_record.sh
 phase2:
-	@echo "See experiments/phase2_plan.md for details."
+        @echo "See legacy/experiments_notes/phase2_plan.md for details."
 .PHONY: report
 report:
 	PYTHONPATH=. $(PYTHON) scripts/aggregate.py --config configs/report/default.yaml

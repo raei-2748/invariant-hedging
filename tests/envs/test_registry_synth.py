@@ -1,7 +1,7 @@
 """Tests for the synthetic regime registry."""
 from __future__ import annotations
 
-from src.envs.registry import SyntheticRegimeRegistry
+from src.modules.environment import SyntheticRegimeRegistry
 
 
 CONFIG = {

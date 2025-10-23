@@ -27,7 +27,7 @@ case "${PHASE}" in
     done
     ;;
   phase2)
-    echo "Running Phase-2 reproduce: see experiments/phase2_plan.md for configs and objectives."
+    echo "Running Phase-2 reproduce: see legacy/experiments_notes/phase2_plan.md for configs and objectives."
     ;;
   *)
     echo "Unknown PHASE='${PHASE}'. Supported values: phase1, phase2." >&2

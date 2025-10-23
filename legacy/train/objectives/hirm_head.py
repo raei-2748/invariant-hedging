@@ -9,7 +9,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from src.models import Policy
+from src.modules.models import Policy
 
 
 GradClosure = Callable[[bool], torch.Tensor]
