@@ -149,7 +149,7 @@ def _positions_to_array(positions) -> np.ndarray:
         return data.to_numpy(dtype=np.float64)
     array = _ensure_array(positions)
     if array.ndim == 1:
-        return array.reshape(1, -1)
+        return array.reshape(-1, 1)
     return array
 
 
