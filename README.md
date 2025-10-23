@@ -8,8 +8,8 @@ This repository reproduces all results for *“Robust Generalization for Hedging
 deterministic pipeline that stages data, trains the invariant hedging models, generates diagnostics, and exports the camera-ready
 paper assets.
 
-- 📄 Paper PDF: [Robust Generalization for Hedging under Crisis Regime Shifts](docs/paper.pdf)
-- 📘 Reproduction playbook: [docs/REPRODUCE.md](docs/REPRODUCE.md)
+- Paper PDF: [Robust Generalization for Hedging under Crisis Regime Shifts](docs/paper.pdf)
+- Reproduction playbook: [docs/REPRODUCE.md](docs/REPRODUCE.md)
 
 ## Quickstart
 
