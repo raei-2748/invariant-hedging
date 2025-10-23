@@ -226,4 +226,4 @@ Because IRM is sensitive to the regularization parameter λ, *we will experiment
 * Reporting: `make report` rebuilds the Phase-2 scorecard figures and tables under `outputs/report_assets/` (deprecated `make phase2_scorecard`).
 * Turnover diagnostics: enable `HIRM_DEBUG_PROBE=1` to log structured probes.
 * Trade spike guard: `train.max_trade_warning_factor` logs max-trade metrics.
-* Baselines packaging: run `tools/scripts/run_baseline.py` to refresh ERM baseline; archival snapshots live under `legacy/outputs/_baseline_erm_base/ERM_base_crisis.csv`.
+* Baselines packaging: run `tools/scripts/run_baseline.py` to refresh ERM baseline; archival snapshots live under `src/legacy/outputs/_baseline_erm_base/ERM_base_crisis.csv`.

@@ -14,7 +14,7 @@ from src.report.schema import (
 
 def test_sample_final_metrics_file_validates() -> None:
     sample_path = Path(
-        "legacy/outputs/_baseline_erm_base/artifacts/runs_v1/20250927_231747/final_metrics.json"
+        "src/legacy/outputs/_baseline_erm_base/artifacts/runs_v1/20250927_231747/final_metrics.json"
     )
     payload = load_final_metrics(sample_path)
     assert "test/crisis_cvar" in payload.metrics

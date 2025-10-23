@@ -59,7 +59,7 @@ smoke:
 paper:
 	tools/run_of_record.sh
 phase2:
-	@echo "See legacy/experiments_notes/phase2_plan.md for details."
+	@echo "See src/legacy/experiments_notes/phase2_plan.md for details."
 .PHONY: report
 report:
 	PYTHONPATH=. $(PYTHON) tools/scripts/aggregate.py --config configs/report/default.yaml

@@ -12,5 +12,5 @@
 - Hydra configs anchored at `configs/train/erm.yaml` and evaluation at `configs/eval/daily.yaml`.
 
 ## Next Steps
-- Transition to Phase 2 experiments per `legacy/experiments_notes/phase2_plan.md`.
+- Transition to Phase 2 experiments per `src/legacy/experiments_notes/phase2_plan.md`.
 - Keep Phase 1 artifacts untouched as regression anchor for future phases.

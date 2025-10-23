@@ -93,12 +93,16 @@ for method in "${METHODS[@]}"; do
   for seed in "${SEEDS[@]}"; do
     run_dir="${RUN_ROOT}/${slug}/seed_${seed}"
     train_cmd=("${REPO_ROOT}/tools/run_train.sh" "${method}" "train.seed=${seed}")
-    for override in "${TRAIN_OVERRIDES[@]}"; do
-      train_cmd+=("${override}")
-    done
-    for extra in "${EXTRA_ARGS[@]}"; do
-      train_cmd+=("${extra}")
-    done
+    if [[ ${#TRAIN_OVERRIDES[@]-0} -gt 0 ]]; then
+      for override in "${TRAIN_OVERRIDES[@]}"; do
+        train_cmd+=("${override}")
+      done
+    fi
+    if [[ ${#EXTRA_ARGS[@]-0} -gt 0 ]]; then
+      for extra in "${EXTRA_ARGS[@]}"; do
+        train_cmd+=("${extra}")
+      done
+    fi
 
     echo "[run_of_record] Training ${method} (seed=${seed})"
     echo "  → ${train_cmd[*]}"
@@ -142,12 +146,16 @@ for method in "${METHODS[@]}"; do
           eval_args=("eval=${window}" "${eval_args[@]}")
         fi
         eval_cmd=("${REPO_ROOT}/tools/run_eval.sh" "${eval_config}" "${eval_args[@]}")
-        for override in "${EVAL_OVERRIDES[@]}"; do
-          eval_cmd+=("${override}")
-        done
-        for extra in "${EXTRA_ARGS[@]}"; do
-          eval_cmd+=("${extra}")
-        done
+        if [[ ${#EVAL_OVERRIDES[@]-0} -gt 0 ]]; then
+          for override in "${EVAL_OVERRIDES[@]}"; do
+            eval_cmd+=("${override}")
+          done
+        fi
+        if [[ ${#EXTRA_ARGS[@]-0} -gt 0 ]]; then
+          for extra in "${EXTRA_ARGS[@]}"; do
+            eval_cmd+=("${extra}")
+          done
+        fi
         echo "[run_of_record] Evaluating ${method} (seed=${seed}, window=${window})"
         echo "  → ${eval_cmd[*]}"
         if [[ -d "${eval_dir}" ]]; then

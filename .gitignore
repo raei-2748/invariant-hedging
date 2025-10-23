@@ -121,9 +121,6 @@ Thumbs.db
 conda-meta/
 
 # Project specific
-runs/
-*.log
-smoke.log
 Miniforge3-MacOSX-arm64.sh
 
 # W&B
@@ -132,7 +129,13 @@ wandb/
 data/external/
 data/raw/
 
-# Generated artefacts
+# Generated artifacts
+runs/
 outputs/
-!legacy/outputs/
-
+outputs_*/
+*.log
+*.tmp
+__pycache__/
+smoke.log
+!.gitkeep
+!src/legacy/outputs/

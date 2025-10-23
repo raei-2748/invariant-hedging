@@ -105,7 +105,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.phase == "phase2":
-        print("Phase 2 reproduce requires manual execution; see legacy/experiments_notes/phase2_plan.md.")
+        print("Phase 2 reproduce requires manual execution; see src/legacy/experiments_notes/phase2_plan.md.")
         return 0
 
     reproduce_phase1(args.overrides)

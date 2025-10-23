@@ -51,11 +51,12 @@ invariant-hedging/
 │   ├── core/              # Optimisation engine and reusable losses
 │   ├── modules/           # Invariance, robustness, and data modules
 │   ├── evaluation/        # Crisis evaluation and diagnostics entrypoints
-│   └── visualization/     # Plotting helpers for the manuscript figures
+│   ├── visualization/     # Plotting helpers for the manuscript figures
+│   └── legacy/            # Archived papers' scripts retained for provenance
 ├── experiments/           # Thin CLIs that launch training/diagnostics runs
 ├── configs/               # Hydra configuration tree (defaults, sweeps, methods)
 ├── reports/               # Generated tables/figures/logs from evaluations
-└── legacy/                # Archived scripts retained for provenance
+└── meta/                  # Provenance metadata and archived pre-release bundles
 ```
 
 | Paper concept | Implementation |
@@ -65,7 +66,7 @@ invariant-hedging/
 | Efficiency frontiers & crisis evaluation | `src/evaluation/evaluate_crisis.py`, `src/visualization/` |
 | Training engine & orchestration | `src/core/engine.py`, `experiments/run_*.py` |
 
-Legacy utilities (including the original `train/` loop and report builders) now live under `legacy/` and remain importable for provenance-sensitive experiments.
+Legacy utilities (including the original `train/` loop and report builders) now live under `src/legacy/` and remain importable for provenance-sensitive experiments.
 ### Figures
 
 Regenerate the Phase-2 diagnostic figures from either a per-seed scoreboard or the aggregated `scorecard.csv` produced by `make report`:
@@ -179,7 +180,7 @@ The paper harness automates the full cross-product of methods, seeds, and evalua
   ```bash
   make paper
   ```
-  Results are written under `runs/paper/` with one directory per method/seed plus nested evaluation windows. The directory also captures a consolidated `final_metrics.json` and provenance manifest `paper_provenance.json` describing the git SHA, environment, and resolved config grid.
+  Results are written under `runs/paper/` with one directory per method/seed plus nested evaluation windows. The directory also captures a consolidated `final_metrics.json` and provenance manifest `meta/paper_provenance.json` describing the git SHA, environment, and resolved config grid.
 - For a command preview without execution, use `make paper DRY=1`.
 - For a quick CI-friendly sweep (single seed, smoke configs) run `make paper SMOKE=1`.
 
