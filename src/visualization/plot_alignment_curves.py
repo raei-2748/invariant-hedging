@@ -16,8 +16,8 @@ bootstrap_cli_environment()
 
 import matplotlib.pyplot as plt
 
-from infra.plot_io import append_manifest, apply_style, ensure_out_dir, parse_formats, save_figure
-from infra.tables import maybe_filter_seeds, read_alignment_head
+from src.core.infra.plot_io import append_manifest, apply_style, ensure_out_dir, parse_formats, save_figure
+from src.core.infra.tables import maybe_filter_seeds, read_alignment_head
 
 LOGGER = logging.getLogger(__name__)
 

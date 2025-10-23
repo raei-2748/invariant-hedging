@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from src.report.schema import (
+from src.evaluation.reporting.schema import (
     FinalMetricsValidationError,
     load_final_metrics,
     validate_final_metrics,

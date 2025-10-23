@@ -3,8 +3,8 @@ from __future__ import annotations
 import pytest
 import torch
 
-from src.data.features import FeatureEngineer
-from src.data.synthetic import EpisodeBatch
+from src.modules.data.features import FeatureEngineer
+from src.modules.data.synthetic import EpisodeBatch
 from src.modules.environment import SingleAssetHedgingEnv
 from src.evaluation import evaluate_crisis as eval_module
 

@@ -4,8 +4,8 @@ from __future__ import annotations
 import pandas as pd
 import torch
 
-from src.data.sim import HestonParams, simulate_heston
-from src.data.sim.merton import overlay_merton_jumps
+from src.modules.data.sim import HestonParams, simulate_heston
+from src.modules.data.sim.merton import overlay_merton_jumps
 from src.core.losses import cvar_from_pnl
 
 

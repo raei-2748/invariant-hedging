@@ -13,11 +13,14 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
+SRC_ROOT = REPO_ROOT / "src"
+for candidate in (SRC_ROOT, REPO_ROOT):
+    candidate_str = str(candidate)
+    if candidate.exists() and candidate_str not in sys.path:
+        sys.path.insert(0, candidate_str)
 
-from report import attach_deltas, load_report_inputs
-from report.figures import (
+from src.legacy.report_assets import attach_deltas, load_report_inputs
+from src.legacy.report_assets.figures import (
     plot_capital_frontier,
     plot_cross_regime_heatmap,
     plot_cvar_violin,
@@ -26,10 +29,10 @@ from report.figures import (
     plot_penalty_sweep,
     plot_isi_decomposition,
 )
-from src.report.aggregate import AggregateResult, aggregate_runs, build_table_dataframe, load_report_config
-from src.report.latex import build_table, save_latex_table, write_table_csv
-from src.report.provenance import build_manifest, write_manifest
-from src.report.schema import FinalMetricsValidationError, load_final_metrics
+from src.evaluation.reporting.aggregate import AggregateResult, aggregate_runs, build_table_dataframe, load_report_config
+from src.evaluation.reporting.latex import build_table, save_latex_table, write_table_csv
+from src.evaluation.reporting.provenance import build_manifest, write_manifest
+from src.evaluation.reporting.schema import FinalMetricsValidationError, load_final_metrics
 
 LOGGER = logging.getLogger("report.generate")
 
@@ -296,7 +299,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     if result.selected_seeds:
         final_metrics_paths = [sel.run_dir / "final_metrics.json" for sel in result.selected_seeds]
     else:
-        seed_dirs_raw = report_cfg.get("seed_dirs", ["runs/*"])
+        seed_dirs_raw = report_cfg.get("seed_dirs", ["reports/artifacts/*"])
         if isinstance(seed_dirs_raw, str):
             seed_patterns = [seed_dirs_raw]
         elif isinstance(seed_dirs_raw, Iterable):

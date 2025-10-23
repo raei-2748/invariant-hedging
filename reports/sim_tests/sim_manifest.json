@@ -1,0 +1,38 @@
+{
+  "n_paths": 5000,
+  "steps": 252,
+  "scenarios": [
+    {
+      "label": "calm",
+      "annualized_mean": -0.0031054577595028797,
+      "annualized_variance": 0.04040235507870286,
+      "variance_ac1": 0.971238352575087,
+      "jump_rate": 0.0,
+      "tail_prob_gt_3sigma": 0.009898412698412698
+    },
+    {
+      "label": "calm_with_jumps",
+      "annualized_mean": 0.002253477119964627,
+      "annualized_variance": 0.04017607933860602,
+      "variance_ac1": 0.9709053086699918,
+      "jump_rate": 0.2,
+      "tail_prob_gt_3sigma": 0.010096031746031747
+    },
+    {
+      "label": "crisis",
+      "annualized_mean": -0.0007124865186221305,
+      "annualized_variance": 0.08610054831085294,
+      "variance_ac1": 0.9652999409439857,
+      "jump_rate": 0.0,
+      "tail_prob_gt_3sigma": 0.011546825396825397
+    },
+    {
+      "label": "crisis_with_jumps",
+      "annualized_mean": -0.00011978986898746882,
+      "annualized_variance": 0.09559592603689117,
+      "variance_ac1": 0.9652028484673183,
+      "jump_rate": 0.9978,
+      "tail_prob_gt_3sigma": 0.011096825396825397
+    }
+  ]
+}

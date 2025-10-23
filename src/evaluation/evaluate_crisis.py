@@ -16,11 +16,11 @@ import pandas as pd
 import torch
 from omegaconf import DictConfig, OmegaConf
 
-from src.baselines import DeltaBaselinePolicy, DeltaGammaBaselinePolicy
+from src.modules.baselines import DeltaBaselinePolicy, DeltaGammaBaselinePolicy
 from src.core.losses import bootstrap_cvar_ci, cvar_from_pnl
 from src.core.utils import logging as log_utils, stats
-from src.data.features import FeatureEngineer, FeatureScaler
-from src.data.types import EpisodeBatch
+from src.modules.data.features import FeatureEngineer, FeatureScaler
+from src.modules.data.types import EpisodeBatch
 from src.evaluation.analyze_diagnostics import DiagnosticsRunContext, gather_and_export
 from src.modules.data_pipeline import build_envs, prepare_data_module, unwrap_experiment_config
 from src.modules.environment import SingleAssetHedgingEnv

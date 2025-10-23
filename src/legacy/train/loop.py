@@ -9,7 +9,7 @@ from typing import Callable, Dict, Iterable, Mapping, Sequence
 import torch
 import torch.nn.functional as F
 
-from infra.io import write_alignment_csv
+from src.core.infra.io import write_alignment_csv
 from src.modules.models import PolicyMLP
 from legacy.train.objectives.hirm_head import (
     EnvLossPayload,

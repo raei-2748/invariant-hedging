@@ -19,7 +19,7 @@ Override any of these from the command line:
 python tools/scripts/train.py train=phase2 irm.lambda_target=0.1 train.seed=7
 ```
 
-Hydra resolves the config and writes the final structure to `runs/<timestamp>/config.yaml` for
+Hydra resolves the config and writes the final structure to `reports/artifacts/<timestamp>/config.yaml` for
 post-hoc analysis.
 
 See [`configs/paper/README.md`](configs/paper/README.md) for the paper-aligned defaults (splits, seeds, optimisers, and evaluation windows).

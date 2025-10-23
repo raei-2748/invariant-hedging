@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from src.data.sim.liquidity import LiquidityStressConfig, liquidity_costs
+from src.modules.data.sim.liquidity import LiquidityStressConfig, liquidity_costs
 from src.modules.environment import SyntheticRegimeRegistry
 
 

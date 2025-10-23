@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.report.plots import (
+from src.evaluation.reporting.plots import (
     plot_efficiency_frontier,
     plot_heatmaps,
     plot_qq,

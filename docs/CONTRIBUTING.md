@@ -24,7 +24,7 @@ expected workflow and conventions.
    make smoke
    python tools/scripts/train.py config=train/smoke steps=100 seed=0
    python tools/scripts/train.py config=train/smoke steps=100 seed=0
-   python tools/scripts/diff_metrics.py runs/latest_0/metrics.jsonl runs/latest_1/metrics.jsonl
+   python tools/scripts/diff_metrics.py reports/artifacts/latest_0/metrics.jsonl reports/artifacts/latest_1/metrics.jsonl
    ```
    The diff step should report a mean absolute difference below `1e-6`.
 

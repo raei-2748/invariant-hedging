@@ -68,7 +68,7 @@ def main() -> None:
         nargs="+",
         help=(
             "Run directories, final_metrics.json files, or glob patterns "
-            "(e.g. 'runs/2025*/')"
+            "(e.g. 'reports/artifacts/2025*/')"
         ),
     )
     parser.add_argument(

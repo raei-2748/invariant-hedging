@@ -4,20 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
-- Added figure-generation pipeline converting Track 4 tables into publication-ready plots, CLI entrypoints, and manifest logging.
-- Documented plotting workflow and added CI coverage plus artifact export.
-- Hardened the figure pipeline against schema drift with table-column aliases and defensive skipping for missing diagnostics.
-- Added crisis stress toggles for synthetic simulation, including Heston+Merton jump overlay and volatility-linked liquidity costs with provenance outputs.
-- Added deterministic real-market anchor loader with episode tagging and
-  canonical output paths.
-- Documented data expectations for real-market runs and shipped default
-  `configs/examples/real_anchors.yaml` reference configuration.
-- Implemented head-only HIRM gradient alignment with ψ-only penalties and
-  optional φ freezing via `model.freeze_phi`.
-- Added lightweight training loop and CLI (`tools.quick_run`) powered by
-  `configs/examples/hirm_minimal.yaml` for rapid experiments and diagnostics.
-- Stream alignment diagnostics to `alignment_head.csv` and documented the
-  workflow in `docs/objectives.md` and `docs/devnotes/hirm_head.md`.
+- No unreleased changes. Submit pull requests against `main` to begin the v1.1 cycle.
+
+## v1.0.0 - 2025-10-24
+
+- Finalised repository layout (`src/{core,modules,evaluation,visualization,legacy}` and archival material under `meta/`).
+- Routed all experiment artefacts to `reports/` and ensured `make paper` + `make report-paper` produce camera-ready assets.
+- Added lightweight regression tests for the data pipeline, diagnostics, HGCA penalty, and paper harness provenance.
+- Introduced a streamlined CI workflow running `pytest -m "not heavy"`, `make paper SMOKE=1`, and `make report-paper` with `PYTHONPATH=src`.
+- Published the camera-ready README, paper PDF placeholder, and updated provenance manifest defaults for the 1.0 release.
 
 ## v0.1.0 - 2025-10-04
 
@@ -25,9 +20,3 @@ All notable changes to this project will be documented in this file.
 - Added reproducibility harness (locked requirements, metadata, smoke configs).
 - Introduced CI pipeline with smoke training and reproducibility diff checks.
 - Documented configs, contribution workflow, and Phase 1 metrics.
-
-## Unreleased
-
-- Implemented full diagnostic suite (ISI, IG, WG, VR, ER, TR) with unit tests.
-- Added aggregation script to build consolidated tables for Track 5 figures.
-- Documented diagnostic formulas and outputs in `docs/diagnostics.md`.

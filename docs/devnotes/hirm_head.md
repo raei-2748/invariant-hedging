@@ -25,5 +25,5 @@ features ──► φ (backbone) ──► representation ──┐
 
 During training we freeze φ via `model.freeze_phi` when requested, which simply
 marks all non-ψ parameters as non-trainable. Alignment diagnostics are streamed
-to `runs/<timestamp>_<exp>/seeds/<seed>/train/alignment_head.csv` via
+to `reports/artifacts/<timestamp>_<exp>/seeds/<seed>/train/alignment_head.csv` via
 `infra.io.write_alignment_csv` for downstream analysis.

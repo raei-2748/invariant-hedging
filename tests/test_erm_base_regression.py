@@ -4,6 +4,8 @@ import csv
 import math
 from pathlib import Path
 
+import pytest
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 BASELINE_CSV = PROJECT_ROOT / "legacy" / "outputs" / "_baseline_erm_base" / "artifacts" / "ERM_base_crisis.csv"
 
@@ -44,6 +46,10 @@ def _stat(values):
     return mean, margin
 
 
+@pytest.mark.skipif(
+    not BASELINE_CSV.exists(),
+    reason="Legacy baseline artefact omitted from the public v1.0 release.",
+)
 def test_erm_base_crisis_metrics_stable():
     assert BASELINE_CSV.exists(), f"Baseline CSV missing: {BASELINE_CSV}"
 

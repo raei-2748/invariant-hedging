@@ -5,7 +5,7 @@ import zlib
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Mapping
 
-from src.infra.tags import build_episode_tags
+from src.core.infra.tags import build_episode_tags
 
 
 def _seed_offset(label: str) -> int:
@@ -83,9 +83,9 @@ class SyntheticRegimeRegistry:
 from dataclasses import dataclass
 from typing import Iterable, List, Mapping, Optional
 
-from src.data.real.loader import RealAnchorLoader
-from src.data.types import EpisodeBatch
-from src.infra.tags import extract_episode_tags
+from src.modules.data.real.loader import RealAnchorLoader
+from src.modules.data.types import EpisodeBatch
+from src.core.infra.tags import extract_episode_tags
 
 
 @dataclass(frozen=True)

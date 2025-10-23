@@ -8,7 +8,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from infra.io import write_alignment_csv
+from src.core.infra.io import write_alignment_csv
 from legacy.train.loop import build_config, run_training
 from src.modules.head_invariance import EnvLossPayload, HIRMHeadConfig, hirm_head_loss
 from src.modules.models import Policy

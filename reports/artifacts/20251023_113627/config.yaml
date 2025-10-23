@@ -1,0 +1,79 @@
+data:
+  hourly_episodes: 256
+  name: synthetic
+  rate: 0.01
+  real_data_anchor:
+    enabled: true
+    file: data/spy_sample.csv
+    slippage_bps: 5
+  seed: 0
+  spot_init: 100.0
+  test_episodes: 512
+  train_episodes: 2048
+  use_jumps: false
+  use_liquidity_spread: false
+  val_episodes: 512
+envs:
+  robustness:
+    hours_per_day: 6
+    rebalancing: hourly
+  test:
+  - crisis
+  train:
+  - low
+  - med
+  val:
+  - high
+eval:
+  baselines:
+    include:
+    - no_hedge
+    - delta
+    - delta_gamma
+    table_path: smoke_baselines.csv
+  compute_msi: false
+  compute_per_env_metrics: true
+  msi_batch_size: 512
+  msi_feature_groups:
+    invariants: []
+    spurious: []
+  name: smoke
+  report:
+    alpha: 0.95
+    bootstrap_samples: 64
+    checkpoint_path: /workspace/invariant-hedging/reports/paper_runs/train__erm/seed_0/checkpoints/checkpoint_100.pt
+    include_hourly: false
+    plot_dir: smoke_plots
+    table_path: smoke_results.csv
+  seeds:
+  - 0
+logging:
+  local_mirror:
+    artifacts_dir: artifacts
+    base_dir: reports/artifacts
+    checkpoints_dir: checkpoints
+    config_file: config.yaml
+    enabled: true
+    final_metrics_file: final_metrics.json
+    metrics_file: metrics.jsonl
+    stats_csv: stats.csv
+  wandb:
+    dir: reports/wandb
+    enabled: false
+    entity: null
+    offline_ok: true
+    project: invariant-hedging
+model:
+  adapter_hidden: 16
+  dropout: 0.0
+  hidden_depth: 3
+  hidden_width: 192
+  layer_norm: false
+  max_position: 5.0
+  name: erm
+  objective: erm
+  representation_dim: 64
+  use_prev_position: true
+runtime:
+  device: auto
+  seed: 0

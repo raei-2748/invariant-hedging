@@ -24,10 +24,10 @@ Key sections:
 
 ## Outputs
 
-Running `python -m tools.quick_run --config configs/examples/sim_crisis.yaml` creates artefacts under `runs/<timestamp>_sim_crisis/` with the structure:
+Running `python -m tools.quick_run --config configs/examples/sim_crisis.yaml` creates artefacts under `reports/artifacts/<timestamp>_sim_crisis/` with the structure:
 
 ```
-runs/<timestamp>_sim_crisis/
+reports/artifacts/<timestamp>_sim_crisis/
   seeds/<seed>/<split>/<regime>/
     pnl.csv
     cvar95.json

@@ -1,6 +1,9 @@
 import torch
 
-from src.eval_probes.spurious_vol import SpuriousVolConfig, apply_spurious_vol_probe
+from src.evaluation.probes.spurious_vol import (
+    SpuriousVolConfig,
+    apply_spurious_vol_probe,
+)
 from src.modules.diagnostics import mechanistic_sensitivity
 
 

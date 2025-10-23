@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.data.real.spy_emini import SpyEminiDataModule, WINDOW_DEFINITIONS
+from src.modules.data.real.spy_emini import SpyEminiDataModule, WINDOW_DEFINITIONS
 
 
 def test_each_window_produces_expected_range(tmp_path: Path) -> None:

@@ -7,9 +7,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from src.sim.calibrators import compose_sim_recipe
-from src.sim.params import SimRecipe
-from src.sim.utils import (
+from src.modules.sim.calibrators import compose_sim_recipe
+from src.modules.sim.params import SimRecipe
+from src.modules.sim.utils import (
     SampleMoments,
     aggregate_ac1,
     annualize_mean,
@@ -22,7 +22,7 @@ from .helpers import simulate_heston_qe
 pytestmark = pytest.mark.not_heavy
 
 DATA_DIR = Path("configs/sim")
-RUNS_DIR = Path("runs/sim_tests")
+RUNS_DIR = Path("reports/sim_tests")
 
 
 def _summarise(recipe: SimRecipe, result, steps: int) -> SampleMoments:

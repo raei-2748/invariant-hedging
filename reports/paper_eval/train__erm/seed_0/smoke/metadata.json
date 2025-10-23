@@ -1,0 +1,8 @@
+{
+  "git_commit": "cc076a51a30d0c00f6025d2794978313a6c73c8f",
+  "python": "3.12.10",
+  "platform": "Linux-6.12.13-x86_64-with-glibc2.39",
+  "git_status_clean": false,
+  "torch_version": "2.2.1+cu121",
+  "cuda_available": false
+}

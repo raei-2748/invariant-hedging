@@ -7,12 +7,12 @@ from typing import Any, Dict, List, Optional, Tuple
 from hydra.utils import to_absolute_path
 from omegaconf import DictConfig, OmegaConf
 
-from src.data.features import FeatureEngineer
-from src.data.real.loader import RealAnchorDataModule
-from src.data.real.spy_emini import SpyEminiDataModule
-from src.data.real_spy_loader import RealSpyDataModule
-from src.data.synthetic import SyntheticDataModule
-from src.data.types import EpisodeBatch
+from src.modules.data.features import FeatureEngineer
+from src.modules.data.real.loader import RealAnchorDataModule
+from src.modules.data.real.spy_emini import SpyEminiDataModule
+from src.modules.data.real_spy_loader import RealSpyDataModule
+from src.modules.data.synthetic import SyntheticDataModule
+from src.modules.data.types import EpisodeBatch
 from src.modules.environment import SingleAssetHedgingEnv
 
 

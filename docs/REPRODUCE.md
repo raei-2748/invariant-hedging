@@ -24,9 +24,10 @@ CPU-compatible.
    ```bash
    make data
    ```
-   Copies `data/spy_sample.csv` into `outputs/paper_data/`. Replace the source
-   file with your institutional SPY export before running this step for the
-   full reproduction. *(Expected runtime: <1 s).* 
+   Copies `data/spy_sample.csv` into the staged cache under `data/raw/` and
+   refreshes checksums for provenance. Replace the source file with your
+   institutional SPY export before running this step for the full reproduction.
+   *(Expected runtime: <1 s).* 
 
 2. **Dry-run the orchestration script**
    ```bash
@@ -40,15 +41,15 @@ CPU-compatible.
    make paper
    ```
    Executes `configs/train/paper.yaml` and `configs/eval/paper.yaml`, writing
-   artefacts to `runs/paper/` and `runs/paper_eval/`. Checkpoints, resolved
-   configs, and diagnostics CSV files are created here. *(Expected runtime: ≈3
+   artefacts to `reports/paper_runs/` and `reports/paper_eval/`. Checkpoints,
+   resolved configs, and diagnostics CSV files are created here. *(Expected runtime: ≈3
    min on the reference CPU).* 
 
 4. **Generate publication-ready tables and plots**
    ```bash
    make report-paper
    ```
-   Aggregates the evaluation outputs into `outputs/report_paper/` using
+   Aggregates the evaluation outputs into `reports/paper/` using
    `configs/report/paper.yaml`. Produces LaTeX/CSV tables, scorecard heatmaps,
    and a provenance manifest. *(Expected runtime: ≈2 min on the reference CPU).* 
 
@@ -60,13 +61,13 @@ CPU-compatible.
 
 ## Provenance and artifact tracking
 
-- **Git state.** Record the commit hash from `runs/paper/*/metadata.json` and
-  `runs/paper_eval/*/metadata.json`. The script captures a `git_status_clean`
+- **Git state.** Record the commit hash from `reports/paper_runs/*/metadata.json`
+  and `reports/paper_eval/*/metadata.json`. The script captures a `git_status_clean`
   flag; rerun after committing local patches so the flag is `true`.
 - **Data lineage.** Retain the original SPY export path and acquisition
   agreement. When sharing artefacts, redact raw prices and provide aggregate
   metrics only.
-- **Runtime manifests.** `outputs/report_paper/manifests/aggregate_manifest.json`
+- **Runtime manifests.** `reports/paper/manifests/aggregate_manifest.json`
   contains hashes for every diagnostics CSV included in the report. Archive this
   manifest with the final paper submission.
 - **Hardware notes.** Include CPU model, RAM, and whether a GPU was available in

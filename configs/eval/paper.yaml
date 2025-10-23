@@ -20,7 +20,7 @@ envs:
 
 diagnostics:
   outputs:
-    dir: runs/paper_eval
+    dir: reports/artifacts
 
 eval:
   name: paper
@@ -40,7 +40,7 @@ logging:
   log_interval: 200
   eval_interval: 400
   local_mirror:
-    base_dir: runs/paper_eval
+    base_dir: reports/artifacts
     metrics_file: metrics.jsonl
     final_metrics_file: final_metrics.json
     config_file: config.yaml

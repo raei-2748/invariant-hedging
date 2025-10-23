@@ -8,9 +8,9 @@ import pandas as pd
 import pytest
 from omegaconf import OmegaConf
 
-from src.data import spy_loader
-from src.data.preprocess import load_cboe_series
-from src.data.real_spy_loader import RealSpyDataModule
+from src.modules.data import spy_loader
+from src.modules.data.preprocess import load_cboe_series
+from src.modules.data.real_spy_loader import RealSpyDataModule
 
 
 @pytest.fixture
@@ -127,7 +127,7 @@ notes: "Synthetic CLI validation"
         [
             sys.executable,
             "-m",
-            "src.data.spy_loader",
+            "src.modules.data.spy_loader",
             "--split",
             str(split_path),
             "--csv",

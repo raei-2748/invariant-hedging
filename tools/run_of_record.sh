@@ -30,7 +30,10 @@ while [[ $# -gt 0 ]]; do
 done
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)
-RUN_ROOT="${REPO_ROOT}/runs/paper"
+ARTIFACT_ROOT="${REPO_ROOT}/reports/artifacts"
+RUN_ROOT="${REPO_ROOT}/reports/paper_runs"
+EVAL_ROOT="${REPO_ROOT}/reports/paper_eval"
+FINAL_REPORT_ROOT="${REPO_ROOT}/reports/paper"
 
 if [[ ! -f "${REPO_ROOT}/tools/run_train.sh" ]] || [[ ! -f "${REPO_ROOT}/tools/run_eval.sh" ]]; then
   echo "Expected run scripts not found under tools/." >&2
@@ -86,19 +89,19 @@ for window in "${EVAL_WINDOWS[@]}"; do
   fi
 done
 
-mkdir -p "${RUN_ROOT}"
+mkdir -p "${ARTIFACT_ROOT}" "${RUN_ROOT}" "${EVAL_ROOT}" "${FINAL_REPORT_ROOT}"
 
 for method in "${METHODS[@]}"; do
   slug="${method//\//__}"
   for seed in "${SEEDS[@]}"; do
     run_dir="${RUN_ROOT}/${slug}/seed_${seed}"
     train_cmd=("${REPO_ROOT}/tools/run_train.sh" "${method}" "train.seed=${seed}")
-    if [[ ${#TRAIN_OVERRIDES[@]-0} -gt 0 ]]; then
+    if [[ ${#TRAIN_OVERRIDES[@]} -gt 0 ]]; then
       for override in "${TRAIN_OVERRIDES[@]}"; do
         train_cmd+=("${override}")
       done
     fi
-    if [[ ${#EXTRA_ARGS[@]-0} -gt 0 ]]; then
+    if [[ ${#EXTRA_ARGS[@]} -gt 0 ]]; then
       for extra in "${EXTRA_ARGS[@]}"; do
         train_cmd+=("${extra}")
       done
@@ -111,11 +114,11 @@ for method in "${METHODS[@]}"; do
         echo "  Cleaning existing run directory ${run_dir}" >&2
         rm -rf "${run_dir}"
       fi
-      before_latest=$(ls -td "${REPO_ROOT}/runs"/20*/ 2>/dev/null | head -n1 || true)
+      before_latest=$(ls -td "${ARTIFACT_ROOT}"/20*/ 2>/dev/null | head -n1 || true)
       "${train_cmd[@]}"
-      after_latest=$(ls -td "${REPO_ROOT}/runs"/20*/ 2>/dev/null | head -n1 || true)
+      after_latest=$(ls -td "${ARTIFACT_ROOT}"/20*/ 2>/dev/null | head -n1 || true)
       if [[ -z "${after_latest}" ]]; then
-        echo "No training run directory created under runs/." >&2
+        echo "No training run directory created under reports/artifacts/." >&2
         exit 1
       fi
       if [[ "${after_latest}" == "${before_latest}" ]]; then
@@ -138,6 +141,7 @@ for method in "${METHODS[@]}"; do
 
       for window in "${EVAL_WINDOWS[@]}"; do
         eval_dir="${run_dir}/eval/${window}"
+        mirror_dir="${EVAL_ROOT}/${slug}/seed_${seed}/${window}"
         eval_config="${method}"
         eval_args=("eval.report.checkpoint_path=${checkpoint}")
         if (( SMOKE )) && [[ "${window}" == "smoke" ]]; then
@@ -146,12 +150,12 @@ for method in "${METHODS[@]}"; do
           eval_args=("eval=${window}" "${eval_args[@]}")
         fi
         eval_cmd=("${REPO_ROOT}/tools/run_eval.sh" "${eval_config}" "${eval_args[@]}")
-        if [[ ${#EVAL_OVERRIDES[@]-0} -gt 0 ]]; then
+        if [[ ${#EVAL_OVERRIDES[@]} -gt 0 ]]; then
           for override in "${EVAL_OVERRIDES[@]}"; do
             eval_cmd+=("${override}")
           done
         fi
-        if [[ ${#EXTRA_ARGS[@]-0} -gt 0 ]]; then
+        if [[ ${#EXTRA_ARGS[@]} -gt 0 ]]; then
           for extra in "${EXTRA_ARGS[@]}"; do
             eval_cmd+=("${extra}")
           done
@@ -161,19 +165,43 @@ for method in "${METHODS[@]}"; do
         if [[ -d "${eval_dir}" ]]; then
           rm -rf "${eval_dir}"
         fi
-        before_eval=$(ls -td "${REPO_ROOT}/runs"/20*/ 2>/dev/null | head -n1 || true)
+        before_eval=$(ls -td "${ARTIFACT_ROOT}"/20*/ 2>/dev/null | head -n1 || true)
         "${eval_cmd[@]}"
-        after_eval=$(ls -td "${REPO_ROOT}/runs"/20*/ 2>/dev/null | head -n1 || true)
+        after_eval=$(ls -td "${ARTIFACT_ROOT}"/20*/ 2>/dev/null | head -n1 || true)
         if [[ -z "${after_eval}" ]]; then
-          echo "No evaluation directory created under runs/." >&2
+          echo "No evaluation directory created under reports/artifacts/." >&2
           exit 1
         fi
         if [[ "${after_eval}" == "${before_eval}" ]]; then
           echo "Unable to identify the new evaluation directory." >&2
           exit 1
         fi
-        mkdir -p "${eval_dir}"
+        mkdir -p "${eval_dir}" "${mirror_dir}"
         cp -a "${after_eval%/}/." "${eval_dir}/"
+        cp -a "${after_eval%/}/." "${mirror_dir}/"
+
+        metrics_path="${eval_dir}/final_metrics.json"
+        csv_path="${eval_dir}/diagnostics_seed_${seed}.csv"
+        if [[ -f "${metrics_path}" ]]; then
+          python3 - "${metrics_path}" "${csv_path}" "${window}" <<'PY'
+import csv
+import json
+import sys
+
+metrics_path = sys.argv[1]
+csv_path = sys.argv[2]
+regime = sys.argv[3]
+with open(metrics_path, "r", encoding="utf-8") as fh:
+    data = json.load(fh)
+with open(csv_path, "w", newline="", encoding="utf-8") as fh:
+    writer = csv.writer(fh)
+    writer.writerow(["regime", "metric", "value"])
+    for key in sorted(data):
+        writer.writerow([regime, key, data[key]])
+        writer.writerow(["__overall__", key, data[key]])
+PY
+          cp "${csv_path}" "${mirror_dir}/diagnostics_seed_${seed}.csv"
+        fi
         eval_metrics="${eval_dir}/final_metrics.json"
         if [[ ! -f "${eval_metrics}" ]]; then
           echo "Expected evaluation metrics missing: ${eval_metrics}" >&2
@@ -201,7 +229,7 @@ python3 "${REPO_ROOT}/tools/scripts/paper_provenance.py" \
   --seeds "${seeds_csv}" \
   --eval-windows "${windows_csv}" \
   --run-root "${RUN_ROOT}" \
-  --output "${RUN_ROOT}/paper_provenance.json" \
-  --metrics-output "${RUN_ROOT}/final_metrics.json"
+  --output "${REPO_ROOT}/meta/paper_provenance.json" \
+  --metrics-output "${FINAL_REPORT_ROOT}/final_metrics.json"
 
 echo "[run_of_record] Artifacts stored under ${RUN_ROOT}"

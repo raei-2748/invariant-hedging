@@ -29,7 +29,7 @@ feeds.
 Tagged evaluation artifacts are written under the canonical structure:
 
 ```
-runs/<timestamp>_<experiment>/
+reports/artifacts/<timestamp>_<experiment>/
   seeds/<seed>/<split>/<regime_name>/
     pnl.csv
     cvar95.json

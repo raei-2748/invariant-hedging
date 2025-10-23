@@ -1,1 +1,1 @@
-This folder records provenance metadata and archived pre-release versions for transparency. The active research code lives under `src/`.
+This folder contains provenance archives and pre-v1 history. Active code lives in `src/`.

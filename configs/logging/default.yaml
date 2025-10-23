@@ -3,10 +3,10 @@ wandb:
   project: invariant-hedging
   entity: null
   offline_ok: true
-  dir: runs/wandb
+  dir: reports/wandb
 local_mirror:
   enabled: true
-  base_dir: runs
+  base_dir: reports/artifacts
   metrics_file: metrics.jsonl
   final_metrics_file: final_metrics.json
   config_file: config.yaml

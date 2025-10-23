@@ -2,7 +2,7 @@
 
 This repository exposes a reproducible post-processing pipeline that consumes the
 diagnostic tables produced in Track 4 and emits publication-ready figures. All
-commands operate on a single run directory (`runs/<timestamp>_<expname>/`).
+commands operate on a single run directory (`reports/artifacts/<timestamp>_<expname>/`).
 
 ## Common CLI Flags
 
@@ -42,7 +42,7 @@ Every plotting script shares the same interface:
 Generate all figures for the latest smoke run:
 
 ```bash
-RUN_DIR=$(readlink -f runs/latest)
+RUN_DIR=$(ls -td reports/artifacts/20*/ 2>/dev/null | head -n1)
 python tools/scripts/make_all_figures.py --run_dir "$RUN_DIR"
 ```
 
@@ -50,7 +50,7 @@ Regenerate only the capital-efficiency frontier with a poster layout:
 
 ```bash
 python src/visualization/plot_capital_efficiency_frontier.py \
-  --run_dir runs/20240101_paper \
+  --run_dir reports/artifacts/20240101_paper \
   --style poster \
   --format pdf
 ```
@@ -59,7 +59,7 @@ Create I–R–E small multiples for selected regimes:
 
 ```bash
 python src/visualization/plot_ire_scatter_3d.py \
-  --run_dir runs/20240101_paper \
+  --run_dir reports/artifacts/20240101_paper \
   --regime_filter crisis_a,crisis_b \
   --separate_by_regime
 ```

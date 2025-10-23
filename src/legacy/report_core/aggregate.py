@@ -54,7 +54,9 @@ def resolve_seed_directories(patterns: Sequence[str]) -> List[Path]:
     for pattern in patterns:
         for raw in sorted(glob.glob(pattern)):
             path = Path(raw)
-            if path.is_dir() and (path / "diagnostics_manifest.json").exists():
+            if not path.is_dir():
+                continue
+            if (path / "diagnostics_manifest.json").exists() or (path / "final_metrics.json").exists():
                 paths.append(path)
     return sorted(set(paths))
 
@@ -269,7 +271,7 @@ def aggregate_runs(
     seeds_limit = int(report_cfg.get("seeds", 0) or 0) or None
     if lite:
         seeds_limit = min(seeds_limit or 5, 5)
-    seed_dirs = report_cfg.get("seed_dirs", ["runs/*"])
+    seed_dirs = report_cfg.get("seed_dirs", ["reports/artifacts/*"])
     run_dirs = resolve_seed_directories(seed_dirs)
     selected_seeds = select_seeds(run_dirs, seeds_limit)
     if not selected_seeds:

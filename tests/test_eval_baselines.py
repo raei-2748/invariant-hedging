@@ -4,8 +4,8 @@ from __future__ import annotations
 import torch
 
 from src.evaluation import evaluate_crisis as eval_module
-from src.data.features import FeatureEngineer
-from src.data.types import EpisodeBatch
+from src.modules.data.features import FeatureEngineer
+from src.modules.data.types import EpisodeBatch
 from src.modules.environment import SingleAssetHedgingEnv
 
 

@@ -1,0 +1,69 @@
+{
+  "generated_at": "2025-10-23T11:44:58.191429+00:00",
+  "runs": [
+    {
+      "stage": "train",
+      "method": "train/erm",
+      "seed": 0,
+      "path": "/workspace/invariant-hedging/reports/paper_runs/train__erm/seed_0/final_metrics.json",
+      "metrics": {
+        "test/crisis_cvar": 271.4481201171875,
+        "test/crisis_mean_pnl": -15.442262649536133,
+        "test/crisis_turnover": 10.0,
+        "test/crisis_max_drawdown": 162.7816925048828,
+        "test/crisis_sharpe": -0.36425092816352844
+      }
+    },
+    {
+      "stage": "eval",
+      "method": "train/erm",
+      "seed": 0,
+      "window": "smoke",
+      "path": "/workspace/invariant-hedging/reports/paper_runs/train__erm/seed_0/eval/smoke/final_metrics.json",
+      "metrics": {
+        "test/crisis/ES95": 271.4481201171875,
+        "test/crisis/Mean": 15.442262649536133,
+        "test/crisis/SharpeRisk": 0.36425092816352844,
+        "test/crisis/Turnover": 10.0,
+        "diagnostics/IG/ES95": 77.3884048461914,
+        "diagnostics/IG/Mean": 9.537736415863037,
+        "diagnostics/IG/SharpeRisk": 0.33498600125312805,
+        "diagnostics/IG/Turnover": 0.4522714614868164,
+        "diagnostics/WG/ES95": 117.41670227050781,
+        "diagnostics/WG/Mean": 10.245341777801514,
+        "diagnostics/WG/SharpeRisk": 0.3189503848552704,
+        "diagnostics/WG/Turnover": -1.225907325744629,
+        "baseline/no_hedge/crisis/ES95": 63.17763137817383,
+        "baseline/no_hedge/crisis/Mean": -1.4869006872177124,
+        "baseline/no_hedge/crisis/SharpeRisk": -1.0656417608261108,
+        "baseline/no_hedge/crisis/Turnover": 0.0,
+        "baseline/no_hedge/crisis/mean_pnl": 1.4869006872177124,
+        "baseline/no_hedge/crisis/sharpe": 1.0656417608261108,
+        "baseline/no_hedge/crisis/turnover": 0.0,
+        "baseline/no_hedge/crisis/cvar": 63.17763137817383,
+        "baseline/no_hedge/crisis/cvar_lower": 54.79743404388428,
+        "baseline/no_hedge/crisis/cvar_upper": 70.32937736511231,
+        "baseline/delta/crisis/ES95": 9.841283798217773,
+        "baseline/delta/crisis/Mean": 0.39728665351867676,
+        "baseline/delta/crisis/SharpeRisk": 0.08280383050441742,
+        "baseline/delta/crisis/Turnover": 3.389587879180908,
+        "baseline/delta/crisis/mean_pnl": -0.39728665351867676,
+        "baseline/delta/crisis/sharpe": -0.08280383050441742,
+        "baseline/delta/crisis/turnover": 3.389587879180908,
+        "baseline/delta/crisis/cvar": 9.841283798217773,
+        "baseline/delta/crisis/cvar_lower": 8.53229832649231,
+        "baseline/delta/crisis/cvar_upper": 10.903966212272644,
+        "baseline/delta_gamma/crisis/ES95": 9.93976879119873,
+        "baseline/delta_gamma/crisis/Mean": 0.39596065878868103,
+        "baseline/delta_gamma/crisis/SharpeRisk": 0.07299116253852844,
+        "baseline/delta_gamma/crisis/Turnover": 3.4099767208099365,
+        "baseline/delta_gamma/crisis/mean_pnl": -0.39596065878868103,
+        "baseline/delta_gamma/crisis/sharpe": -0.07299116253852844,
+        "baseline/delta_gamma/crisis/turnover": 3.4099767208099365,
+        "baseline/delta_gamma/crisis/cvar": 9.93976879119873,
+        "baseline/delta_gamma/crisis/cvar_lower": 8.654621863365174,
+        "baseline/delta_gamma/crisis/cvar_upper": 11.05264732837677
+      }
+    }
+  ]
+}

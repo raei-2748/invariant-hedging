@@ -1,7 +1,8 @@
 report:
   seeds: 1
-  seed_dirs: ["runs/paper_eval/*"]
-  outputs_dir: "outputs/report_paper"
+  seed_dirs: ["reports/paper_eval/*/seed_*/*"]
+  outputs_dir: "reports/paper"
+  paper_outputs_dir: "reports/paper"
   regimes_order: ["smoke", "__overall__"]
   confidence_level: 0.95
   include_gfc: false

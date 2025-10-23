@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.report.latex import build_table, save_latex_table, write_table_csv
+from src.evaluation.reporting.latex import build_table, save_latex_table, write_table_csv
 
 
 def test_build_table_with_booktabs(tmp_path: Path) -> None:

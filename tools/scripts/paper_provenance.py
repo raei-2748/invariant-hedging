@@ -121,7 +121,7 @@ def build_grid(methods: Sequence[str], seeds: Sequence[int], eval_windows: Seque
 def _resolve_provenance_functions() -> Tuple[callable, callable]:
     if str(REPO_ROOT) not in sys.path:
         sys.path.insert(0, str(REPO_ROOT))
-    from src.report.paper_provenance import collect_provenance, write_provenance
+    from src.evaluation.reporting.paper_provenance import collect_provenance, write_provenance
 
     return collect_provenance, write_provenance
 

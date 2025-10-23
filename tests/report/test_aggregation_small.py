@@ -6,7 +6,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from src.report.aggregate import AggregateResult, aggregate_runs
+from src.evaluation.reporting.aggregate import AggregateResult, aggregate_runs
 
 def _make_seed_run(base: Path, stamp: str, seed: int, regimes: list[str], metrics: dict[str, dict[str, float]]) -> None:
     run_dir = base / stamp

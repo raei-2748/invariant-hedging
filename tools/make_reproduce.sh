@@ -12,7 +12,7 @@ case "${PHASE}" in
     for cfg in "${MODELS[@]}"; do
       echo "[make_reproduce] Training ${cfg}"
       tools/run_train.sh "${cfg}" "$@"
-      latest_run=$(ls -td runs/20* 2>/dev/null | head -n1)
+      latest_run=$(ls -td reports/artifacts/20* 2>/dev/null | head -n1)
       if [ -z "${latest_run}" ]; then
         echo "No run directory found after training ${cfg}" >&2
         exit 1

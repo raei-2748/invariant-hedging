@@ -1,6 +1,6 @@
 import torch
 
-from src.markets.costs import execution_cost
+from src.modules.markets.costs import execution_cost
 
 
 def test_execution_cost_linear_quadratic():

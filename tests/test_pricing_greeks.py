@@ -1,6 +1,6 @@
 import torch
 
-from src.markets.pricing import (
+from src.modules.markets.pricing import (
     black_scholes_delta,
     black_scholes_gamma,
     black_scholes_price,

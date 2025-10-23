@@ -1,7 +1,7 @@
 report:
   seeds: 30
-  seed_dirs: ["runs/*"]
-  outputs_dir: "outputs/report_assets"
+  seed_dirs: ["reports/artifacts/*"]
+  outputs_dir: "reports/analysis"
   regimes_order: ["train_main", "crisis_2018", "crisis_2020", "crisis_2022", "crisis_2008"]
   confidence_level: 0.95
   include_gfc: true

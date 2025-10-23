@@ -1,0 +1,7 @@
+{
+  "test/crisis_cvar": 271.4481201171875,
+  "test/crisis_mean_pnl": -15.442262649536133,
+  "test/crisis_turnover": 10.0,
+  "test/crisis_max_drawdown": 162.7816925048828,
+  "test/crisis_sharpe": -0.36425092816352844
+}
