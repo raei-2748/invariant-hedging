@@ -1,0 +1,13 @@
+# High-volatility evaluation regime: reuse low/med training envs, retain crisis adapter, test on high.
+train:
+  - low
+  - med
+val:
+  - high
+  - crisis
+test:
+  - high
+
+robustness:
+  rebalancing: hourly
+  hours_per_day: 6
