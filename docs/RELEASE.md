@@ -6,7 +6,7 @@ This project uses lightweight release candidates to capture the exact assets ref
 
 1. Ensure the working tree is clean and that all required changes have landed on the default branch.
 2. Update `configs/paper/` with the final configuration files that reproduce the paper results.
-3. Refresh `meta/paper_provenance.json` so it records the dataset snapshot, training commit, and any caveats for the release.
+3. Refresh `archive/paper_provenance.json` so it records the dataset snapshot, training commit, and any caveats for the release.
 4. Export the representative evaluation metrics (for example `outputs/_phase1_snapshot/final_metrics.json`) so that they reflect the tagged commit.
 5. Review `releases/<tag>/` for any release-specific notes or supplemental artifacts that should accompany the bundle.
 
@@ -26,7 +26,7 @@ Before tagging a release, the following checks must pass:
    - `release_tag`: (optional) set to the intended tag such as `v0.9-paper-rc` so the artifact name matches expectations.
 3. Download the resulting artifact and confirm it contains:
    - The full `configs/paper/` directory.
-   - The updated `meta/paper_provenance.json` file.
+   - The updated `archive/paper_provenance.json` file.
    - Representative metrics such as `outputs/_phase1_snapshot/final_metrics.json` and `outputs/_phase1_snapshot/metrics.jsonl`.
 4. Inspect the ZIP contents to ensure no extraneous files or sensitive data slipped in.
 
@@ -42,7 +42,7 @@ Before tagging a release, the following checks must pass:
 - [ ] Artifact ZIP exists and unzips cleanly.
 - [ ] Configuration files correspond to the release tag and pass a quick sanity check.
 - [ ] Metrics match the values reported in the paper tables.
-- [ ] `meta/paper_provenance.json` is filled in and contains no placeholders.
+- [ ] `archive/paper_provenance.json` is filled in and contains no placeholders.
 - [ ] Release notes reference any supplemental assets stored under `releases/<tag>/`.
 
 Following this process ensures that each tagged release captures the reproducibility assets required for the paper while maintaining a clear audit trail.

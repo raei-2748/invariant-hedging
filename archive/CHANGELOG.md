@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file.
 
 ## v1.0.0 - 2025-10-24
 
-- Finalised repository layout (`src/{core,modules,evaluation,visualization,legacy}` and archival material under `meta/`).
+- Finalised repository layout (`src/{core,modules,evaluation,visualization,legacy}` and archival material under `archive/`).
 - Routed all experiment artefacts to `reports/` and ensured `make paper` + `make report-paper` produce camera-ready assets.
 - Added lightweight regression tests for the data pipeline, diagnostics, HGCA penalty, and paper harness provenance.
 - Introduced a streamlined CI workflow running `pytest -m "not heavy"`, `make paper SMOKE=1`, and `make report-paper` with `PYTHONPATH=src`.

@@ -35,6 +35,8 @@ class TrimmedStats:
 
 
 def _ensure_array(values) -> np.ndarray:
+    """Coerce supported containers into a float64 NumPy array."""
+
     if values is None:
         return np.asarray([], dtype=np.float64)
     if isinstance(values, np.ndarray):
@@ -49,6 +51,8 @@ def _ensure_array(values) -> np.ndarray:
 
 
 def _to_dataframe(data, columns: Sequence[str]) -> pd.DataFrame:
+    """Convert heterogeneous inputs into a Pandas DataFrame with known columns."""
+
     if data is None:
         return pd.DataFrame(columns=columns)
     if isinstance(data, pd.DataFrame):
@@ -64,6 +68,8 @@ def _to_dataframe(data, columns: Sequence[str]) -> pd.DataFrame:
 
 
 def _trimmed_mean(values: Sequence[float], proportion_to_cut: float) -> TrimmedStats:
+    """Compute a symmetric trimmed mean supporting the ISI diagnostics."""
+
     array = np.asarray(list(values), dtype=np.float64)
     if array.size == 0:
         return TrimmedStats(array, array, proportion_to_cut)
@@ -322,6 +328,7 @@ def compute_IG(regime_outcomes, config: Mapping[str, object] | None = None) -> D
             return {"IG": float("nan"), "IG_norm": float("nan"), "supported": False}
         values = np.asarray(env_means, dtype=np.float64)
         ig_value = float(values.std(ddof=0))
+        # Implements Eq. (4): IG = |IG_in - IG_out| / tau_norm as defined in §5.1.
         ig_norm = ig_value / (cfg.tau_norm + cfg.epsilon)
         return {"IG": ig_value, "IG_norm": ig_norm, "supported": values.size >= 1}
     df = _to_dataframe(regime_outcomes, ["env", "value"])
@@ -332,6 +339,7 @@ def compute_IG(regime_outcomes, config: Mapping[str, object] | None = None) -> D
 
     env_stats = df.groupby("env")["value"].mean()
     ig_value = float(env_stats.max() - env_stats.min())
+    # Implements Eq. (4): IG = |IG_in - IG_out| / tau_norm as defined in §5.1.
     ig_norm = ig_value / (cfg.tau_norm + cfg.epsilon)
     return {
         "IG": ig_value,

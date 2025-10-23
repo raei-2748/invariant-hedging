@@ -2,6 +2,7 @@ title: "Robust Generalization for Hedging under Crisis Regime Shifts"
 authors:
   - family-names: Wang
     given-names: Ray
-version: 1.0
+version: 1.0.0
+doi: 10.5281/zenodo.xxxxxx
 date-released: 2025-10-24
 repository-code: https://github.com/raei-2748/invariant-hedging

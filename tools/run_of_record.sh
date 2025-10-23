@@ -229,7 +229,7 @@ python3 "${REPO_ROOT}/tools/scripts/paper_provenance.py" \
   --seeds "${seeds_csv}" \
   --eval-windows "${windows_csv}" \
   --run-root "${RUN_ROOT}" \
-  --output "${REPO_ROOT}/meta/paper_provenance.json" \
+  --output "${REPO_ROOT}/archive/paper_provenance.json" \
   --metrics-output "${FINAL_REPORT_ROOT}/final_metrics.json"
 
 echo "[run_of_record] Artifacts stored under ${RUN_ROOT}"

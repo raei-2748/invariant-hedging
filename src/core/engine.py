@@ -60,6 +60,8 @@ except (TypeError, RuntimeError, AttributeError):
 
 
 def _device(runtime_cfg: DictConfig) -> torch.device:
+    """Resolve the torch device according to §4.1 training setup."""
+
     device_str = runtime_cfg.get("device", "auto") if runtime_cfg else "auto"
     if device_str == "auto":
         return torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -67,6 +69,8 @@ def _device(runtime_cfg: DictConfig) -> torch.device:
 
 
 def _init_policy(cfg: DictConfig, feature_dim: int, num_envs: int):
+    """Instantiate the policy network described in §4 (Eq. 1)."""
+
     return PolicyMLP(
         feature_dim=feature_dim,
         num_envs=num_envs,
@@ -87,6 +91,8 @@ def _evaluate(
     device: torch.device,
     alpha: float,
 ) -> Dict[str, Dict[str, float]]:
+    """Evaluate CVaR, mean PnL, and diagnostics across validation environments."""
+
     policy.eval()
     results: Dict[str, Dict[str, float]] = {}
     with torch.no_grad():
@@ -109,6 +115,8 @@ def _evaluate(
 
 
 def _lambda_schedule(step: int, cfg: DictConfig) -> float:
+    """Schedule the IRM penalty weight following §4.2."""
+
     pretrain = cfg.train.pretrain_steps
     ramp = cfg.irm.get("ramp_steps", cfg.train.irm_ramp_steps)
     init_weight = cfg.irm.get("lambda_init", 0.0)
@@ -129,6 +137,8 @@ def _lambda_schedule(step: int, cfg: DictConfig) -> float:
 
 
 def _canonical_objective(cfg: DictConfig) -> str:
+    """Map config aliases onto the canonical objective names used in the paper."""
+
     raw_obj = cfg.model.get("objective", cfg.model.get("name", "erm"))
     objective = str(raw_obj).lower()
     if objective == "hirm_hybrid":
@@ -144,12 +154,16 @@ def _canonical_objective(cfg: DictConfig) -> str:
 
 
 def _enforce_legacy_flags(cfg: DictConfig) -> None:
+    """Guard rails for deprecated legacy toggles retained in the archive."""
+
     legacy_cfg = cfg.get("legacy")
     if legacy_cfg is not None and bool(getattr(legacy_cfg, "hybrid_enabled", False)):
         raise RuntimeError("Legacy hybrid support has been removed; disable legacy.hybrid_enabled.")
 
 
 def _maybe_patch_method_env() -> None:
+    """Redirect legacy METHOD env vars to the unified HIRM objective."""
+
     method_env = os.environ.get("METHOD")
     if method_env and method_env.lower() == "hirm_head":
         warnings.warn(
@@ -161,6 +175,8 @@ def _maybe_patch_method_env() -> None:
 
 
 def _freeze_policy_components(policy: PolicyMLP, cfg: DictConfig) -> None:
+    """Freeze optional policy submodules when reproducing ablations."""
+
     irm_cfg = cfg.get("irm")
     freeze_cfg = None if irm_cfg is None else irm_cfg.get("freeze")
     if not freeze_cfg:
@@ -187,6 +203,8 @@ def _freeze_policy_components(policy: PolicyMLP, cfg: DictConfig) -> None:
 
 
 def run(cfg: DictConfig) -> Path:
+    """Train HIRM using the experiment recipe specified in §5 of the paper."""
+
     cfg = unwrap_experiment_config(cfg)
     generator = seed_utils.seed_everything(cfg.train.seed)
     resolved_cfg = OmegaConf.to_container(cfg, resolve=True)
@@ -376,6 +394,7 @@ def run(cfg: DictConfig) -> Path:
         if objective in {"irm", "hirm"}:
             metrics_to_log["train/lambda"] = lambda_logged
         if objective == "hirm" and env_losses:
+            # Implements Eq. (4): ISI diagnostic = |IG_in - IG_out| linking to §5.1.
             metrics_to_log["train/ig"] = safe_eval_metric(invariant_gap, env_losses)
             metrics_to_log["train/wg"] = safe_eval_metric(worst_group, env_losses)
 

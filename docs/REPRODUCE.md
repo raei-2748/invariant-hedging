@@ -1,79 +1,111 @@
 # Paper reproduction playbook
 
-This guide provides the exact commands, environment assumptions, and artefact
-checkpoints required to regenerate the paper figures and tables from scratch.
-It mirrors the configuration used to build the "paper" snapshot referenced in
-the manuscript.
+This guide documents the exact environment, commands, and runtime expectations required to regenerate every figure and table in *“Robust Generalization for Hedging under Crisis Regime Shifts.”* It is the authoritative reference for the camera-ready v1.0.0 release.
 
 ## Reference environment
 
 | Component | Reference value |
 | --- | --- |
 | OS | Ubuntu 22.04 LTS |
-| Python | 3.10.13 |
-| Hardware | 8 vCPU (Intel Ice Lake), 32 GB RAM, **no GPU required** |
-| Expected wall-clock | ≈5 minutes end-to-end |
+| Python | 3.10.13 (CPython) |
+| Hardware | 8 vCPU (Intel Ice Lake), 32 GB RAM, no GPU required |
+| Optional GPU | NVIDIA A10 (compute capability 8.6) for accelerated training |
+| Key libraries | torch 2.3.1, numpy 1.26.4, pandas 2.2.3, matplotlib 3.9.2, scikit-learn 1.5.2, tqdm 4.66.4 |
 
-The commands below were validated on the configuration above. Slower laptops
-can expect proportionally longer runtimes, but the workflow remains entirely
-CPU-compatible.
+All dependencies are pinned in [`requirements.txt`](../requirements.txt), [`environment.yml`](../environment.yml), and [`requirements-lock.txt`](../requirements-lock.txt). Use the lock file for exact reproducibility:
 
-## Step-by-step commands
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements-lock.txt
+pip install -e .[dev]
+```
 
-1. **Stage the dataset**
+## Dataset staging
+
+1. **Snapshot data inputs**
    ```bash
    make data
    ```
-   Copies `data/spy_sample.csv` into the staged cache under `data/raw/` and
-   refreshes checksums for provenance. Replace the source file with your
-   institutional SPY export before running this step for the full reproduction.
-   *(Expected runtime: <1 s).* 
+   Downloads the deterministic SPY sample (`data/spy_sample.csv`) and refreshes checksums. For the full paper reproduction replace the CSV before running the target.
 
-2. **Dry-run the orchestration script**
+2. **Record provenance**
    ```bash
    tools/run_of_record.sh --dry-run
    ```
-   Prints the training and evaluation commands that will run, verifying that
-   Hydra configs resolve correctly on your machine. *(Expected runtime: <1 s).* 
+   Confirms Hydra resolves all configs, prints the train/eval commands, and writes the provenance header that will later populate `archive/paper_provenance.json`.
 
-3. **Train and evaluate the paper configuration**
+## Training & evaluation workflow
+
+1. **Train and evaluate the canonical configuration**
    ```bash
    make paper
    ```
-   Executes `configs/train/paper.yaml` and `configs/eval/paper.yaml`, writing
-   artefacts to `reports/paper_runs/` and `reports/paper_eval/`. Checkpoints,
-   resolved configs, and diagnostics CSV files are created here. *(Expected runtime: ≈3
-   min on the reference CPU).* 
+   Runs `configs/train/paper.yaml` followed by `configs/eval/paper.yaml`, producing artefacts in `reports/paper_runs/` and `reports/paper_eval/`. Set `SMOKE=1` for a 3-seed sanity pass (~3 min CPU) or omit for the full 30-seed sweep (~45 min CPU, ~12 min with A10 GPU).
 
-4. **Generate publication-ready tables and plots**
+2. **Assemble publication assets**
    ```bash
    make report-paper
    ```
-   Aggregates the evaluation outputs into `reports/paper/` using
-   `configs/report/paper.yaml`. Produces LaTeX/CSV tables, scorecard heatmaps,
-   and a provenance manifest. *(Expected runtime: ≈2 min on the reference CPU).* 
+   Aggregates diagnostics into `reports/paper/`, generating CSV/LaTeX tables, figure manifests, and a refreshed `archive/paper_provenance.json` record. Expected runtime: ~8 min on the reference CPU.
 
-### Optional follow-up
+3. **Crisis robustness evaluation**
+   ```bash
+   make eval-crisis
+   ```
+   Executes `configs/eval/robustness.yaml`, exporting crisis-shift diagnostics to `reports/paper_eval/robustness/` (~15 min CPU, ~6 min GPU). Seeds are fixed by `seed_list.txt`.
 
-- `make report` — rebuilds the full 30-seed aggregate using
-  `configs/report/default.yaml`. This is unnecessary for the single-seed smoke
-  check but reproduces the full paper appendix when all seeds are available.
+## Figure & table generation
 
-## Provenance and artifact tracking
+After `make report-paper`, the repository contains a complete set of diagnostics. The following commands materialise the assets cited in the paper:
 
-- **Git state.** Record the commit hash from `reports/paper_runs/*/metadata.json`
-  and `reports/paper_eval/*/metadata.json`. The script captures a `git_status_clean`
-  flag; rerun after committing local patches so the flag is `true`.
-- **Data lineage.** Retain the original SPY export path and acquisition
-  agreement. When sharing artefacts, redact raw prices and provide aggregate
-  metrics only.
-- **Runtime manifests.** `reports/paper/manifests/aggregate_manifest.json`
-  contains hashes for every diagnostics CSV included in the report. Archive this
-  manifest with the final paper submission.
-- **Hardware notes.** Include CPU model, RAM, and whether a GPU was available in
-  any reproduction log. The official snapshot is CPU-only, but documenting
-  accelerators helps others interpret runtime differences.
+- **Fig. 2 (Invariant gap vs. worst-group risk)**
+  ```bash
+  make plot-ig-wg
+  ```
+  Uses `reports/paper/` tables to recreate the invariance scatter. Output PNG/PDF files live in `reports/figures/ig_vs_wg/`. Runtime: < 1 min, ≈2 GB RAM.
 
-By following the sequence above and storing the generated manifests, another
-researcher can audit the pipeline and regenerate the same tables and figures
-without additional assumptions.
+- **Fig. 3 (Capital efficiency frontier)**
+  ```bash
+  python -m src.visualization.plot_capital_frontier --run_dir "$(ls -td reports/paper/* | head -1)" --out_dir reports/figures/capital_frontier
+  ```
+  Produces the capital efficiency curve reported in §6. Runtime: ≈2 min CPU, 3 GB RAM.
+
+- **Table 3 (Crisis robustness under regime shifts)**
+  ```bash
+  make eval-crisis
+  ```
+  Generates `reports/paper_eval/robustness/final_metrics.json` containing the Crisis IG/WG deltas. Runtime: ≈15 min CPU.
+
+- **Appendix tables (stress diagnostics)**
+  ```bash
+  python tools/scripts/aggregate.py --config configs/report/default.yaml
+  ```
+  Rebuilds the full appendix, writing tables under `reports/paper/appendix/`. Runtime: ≈10 min CPU; requires completed full-seed runs.
+
+All scripts respect deterministic seeds embedded in the configs (`seed_list.txt`). To override, set `SEED_OVERRIDE` before invoking `make paper` or edit the Hydra configs directly.
+
+## Summary checklist
+
+| Figure/Table | Command | Notes |
+|---------------|----------|-------|
+| Fig. 2 (IG vs WG) | `make plot-ig-wg` | Requires `make report-paper`; ~1 min; 2 GB RAM |
+| Fig. 3 (Capital frontier) | `python -m src.visualization.plot_capital_frontier --run_dir "$(ls -td reports/paper/* | head -1)" --out_dir reports/figures/capital_frontier` | Ensure `make report-paper`; ~2 min |
+| Table 3 (Crisis robustness) | `make eval-crisis` | ≈15 min CPU; produces JSON summary |
+| Appendix A (Stress diagnostics) | `python tools/scripts/aggregate.py --config configs/report/default.yaml` | Requires full seed sweep |
+
+## Expected outputs & validation
+
+- `archive/paper_provenance.json` — Git SHA, Hydra configs, platform metadata, and SHA256 fingerprints for every generated asset.
+- `reports/paper/manifests/aggregate_manifest.json` — Manifest of figure/table hashes used in the camera-ready bundle.
+- `reports/coverage/index.html` — Pytest coverage report generated via `make coverage`.
+- `reports/paper/figures/` — Final PNG/PDF assets for inclusion in the manuscript.
+
+Verify success with:
+
+```bash
+make coverage
+pytest --maxfail=1 --disable-warnings -q
+```
+
+Both commands should complete without errors and report the deterministic seed list captured in `seed_list.txt`. Archive the resulting coverage report, manifests, and provenance JSON alongside the submission package.

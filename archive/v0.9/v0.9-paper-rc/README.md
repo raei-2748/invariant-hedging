@@ -3,7 +3,7 @@
 This directory seeds the structure expected for the `v0.9-paper-rc` artifact bundle. Populate it with the final files before tagging the release:
 
 - Copy the curated configuration files into `configs/paper/`.
-- Update `meta/paper_provenance.json` with the correct metadata.
+- Update `archive/paper_provenance.json` with the correct metadata.
 - Export the final evaluation metrics (e.g., `outputs/_phase1_snapshot/final_metrics.json`).
 - Include any additional documentation or tables required by the paper and link them here.
 

@@ -6,10 +6,12 @@ DRY ?= 0
 SMOKE ?= 0
 DATA_ROOT ?= data
 
-.PHONY: setup train evaluate reproduce lint tests data data-mini smoke paper report report-lite report-paper phase2 phase2_scorecard
+.PHONY: setup train evaluate reproduce lint tests data data-mini smoke paper report report-lite report-paper phase2 phase2_scorecard plot-ig-wg eval-crisis coverage
+
+LAST_PAPER ?= $(shell ls -td reports/paper/* 2>/dev/null | head -1)
 
 setup:
-	$(PYTHON) -m pip install -r requirements.txt
+        $(PYTHON) -m pip install -r requirements-lock.txt
 
 train:
 	tools/run_train.sh $(CONFIG)
@@ -64,8 +66,24 @@ report-lite:
 	PYTHONPATH=. $(PYTHON) tools/scripts/aggregate.py --config configs/report/default.yaml --lite
 
 report-paper:
-	$(PYTHON) tools/report/generate_report.py --config configs/report/paper.yaml --smoke $(ARGS)
+        $(PYTHON) tools/report/generate_report.py --config configs/report/paper.yaml --smoke $(ARGS)
 
 phase2_scorecard:
-	@echo "[DEPRECATED] 'make phase2_scorecard' now forwards to 'make report'." >&2
-	$(PYTHON) tools/scripts/aggregate.py --config configs/report/default.yaml
+        @echo "[DEPRECATED] 'make phase2_scorecard' now forwards to 'make report'." >&2
+        $(PYTHON) tools/scripts/aggregate.py --config configs/report/default.yaml
+
+plot-ig-wg:
+        @set -euo pipefail; \
+        RUN_DIR="$(LAST_PAPER)"; \
+        if [ -z "$$RUN_DIR" ]; then \
+                echo "No paper report found. Run 'make paper' followed by 'make report-paper'." >&2; \
+                exit 1; \
+        fi; \
+        $(PYTHON) -m src.visualization.plot_invariance_vs_ig --run_dir "$$RUN_DIR" --out_dir reports/figures/ig_vs_wg --format png
+
+eval-crisis:
+        @set -euo pipefail; \
+        $(PYTHON) experiments/run_diagnostics.py --config-name=eval/robustness
+
+coverage:
+        $(PYTHON) -m pytest --maxfail=1 --disable-warnings --cov=src --cov-report=term-missing --cov-report=html:reports/coverage
