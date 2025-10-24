@@ -10,6 +10,8 @@ import hydra
 import torch
 from omegaconf import DictConfig, OmegaConf
 
+from hirm.utils import resolve_seed as resolve_runtime_seed, set_seed
+
 from src.core.losses import (
     cvar_from_pnl,
     differentiable_cvar,
@@ -209,6 +211,7 @@ def run(cfg: DictConfig) -> Path:
     """Train HIRM using the experiment recipe specified in §5 of the paper."""
 
     cfg = unwrap_experiment_config(cfg)
+    set_seed(resolve_runtime_seed(cfg))
     generator = seed_utils.seed_everything(cfg.train.seed)
     resolved_cfg = OmegaConf.to_container(cfg, resolve=True)
     _maybe_patch_method_env()

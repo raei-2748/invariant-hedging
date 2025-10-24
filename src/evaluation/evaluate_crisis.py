@@ -16,6 +16,8 @@ import pandas as pd
 import torch
 from omegaconf import DictConfig, OmegaConf
 
+from hirm.utils import resolve_seed as resolve_runtime_seed, set_seed
+
 from src.modules.baselines import DeltaBaselinePolicy, DeltaGammaBaselinePolicy
 from src.core.losses import bootstrap_cvar_ci, cvar_from_pnl
 from src.core.utils import logging as log_utils, resolve_device, stats
@@ -681,6 +683,7 @@ def _aggregate_records(records: List[Dict]) -> Dict[str, Dict[str, object]]:
 @hydra.main(config_path=str(CONFIG_DIR), config_name="experiment", version_base=None)
 def main(cfg: DictConfig) -> None:
     cfg = unwrap_experiment_config(cfg)
+    set_seed(resolve_runtime_seed(cfg))
     resolved_cfg = OmegaConf.to_container(cfg, resolve=True)
     device = resolve_device(cfg.get("runtime", {}), context="eval").device
     data_ctx = prepare_data_module(cfg)
