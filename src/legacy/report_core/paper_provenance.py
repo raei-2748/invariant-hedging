@@ -68,12 +68,20 @@ def _torch_metadata() -> Mapping[str, object]:
         "version": None,
         "cuda_version": None,
         "device_count": 0,
+        "mps_available": False,
+        "mps_built": False,
     }
     if torch is None:
         info["error"] = "torch not installed"
         return info
     info["version"] = torch.__version__
     info["available"] = bool(torch.cuda.is_available())
+    mps_backend = getattr(torch.backends, "mps", None)
+    if mps_backend is not None:
+        available_fn = getattr(mps_backend, "is_available", lambda: False)
+        info["mps_available"] = bool(available_fn())
+        if hasattr(mps_backend, "is_built"):
+            info["mps_built"] = bool(mps_backend.is_built())
     info["cuda_version"] = getattr(torch.version, "cuda", None)
     if info["available"]:
         try:

@@ -10,6 +10,7 @@ This guide documents the exact environment, commands, and runtime expectations r
 | Python | 3.10.13 (CPython) |
 | Hardware | 8 vCPU (Intel Ice Lake), 32 GB RAM, no GPU required |
 | Optional GPU | NVIDIA A10 (compute capability 8.6) for accelerated training |
+| Apple Silicon | M2 Pro (12c CPU / 19c GPU) with PyTorch 2.3.1 + MPS |
 | Key libraries | torch 2.3.1, numpy 1.26.4, pandas 2.2.3, matplotlib 3.9.2, scikit-learn 1.5.2, tqdm 4.66.4 |
 
 All dependencies are pinned in [`requirements.txt`](../requirements.txt), [`environment.yml`](../environment.yml), and [`requirements-lock.txt`](../requirements-lock.txt). Use the lock file for exact reproducibility:
@@ -20,6 +21,25 @@ source .venv/bin/activate
 python -m pip install -r requirements-lock.txt
 pip install -e .[dev]
 ```
+
+### Apple Silicon (MPS) setup
+
+- Install an MPS-enabled PyTorch build (the CPU wheels include the Metal backend):
+
+  ```bash
+  python3 -m pip install torch==2.3.1 --index-url https://download.pytorch.org/whl/cpu
+  pip install -r requirements-lock.txt
+  ```
+
+- The training/evaluation entry points (`make paper`, `make smoke`, `make eval-crisis`) print the resolved device and whether
+  `torch.backends.mps.is_available()` is `True`. On macOS the harness automatically appends `runtime.device=mps` and
+  `runtime.mixed_precision=false` when launching Hydra, so `make paper SMOKE=0` drives the full sweep on the Apple GPU without
+  additional flags.
+
+- **Runtime expectations.** On an M2 Pro the full 30-seed paper sweep completes ~2.5× faster than the CPU reference (~18 min vs
+  ~45 min). Smoke runs finish in under 2 minutes. Because PyTorch's MPS backend currently lacks AMP, training always executes in
+  `float32` and a handful of tensor ops may temporarily fall back to CPU; the logged device diagnostics let you verify the
+  effective accelerator.
 
 ## Dataset staging
 

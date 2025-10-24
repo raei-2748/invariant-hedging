@@ -4,12 +4,17 @@ from __future__ import annotations
 import os
 import warnings
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import hydra
 import torch
 from omegaconf import DictConfig, OmegaConf
 
+from src.core.device import (
+    log_device_diagnostics,
+    resolve_device,
+    should_enable_mixed_precision,
+)
 from src.core.losses import (
     cvar_from_pnl,
     differentiable_cvar,
@@ -59,13 +64,11 @@ except (TypeError, RuntimeError, AttributeError):
     pass
 
 
-def _device(runtime_cfg: DictConfig) -> torch.device:
+def _device(runtime_cfg: Optional[DictConfig]) -> torch.device:
     """Resolve the torch device according to §4.1 training setup."""
 
-    device_str = runtime_cfg.get("device", "auto") if runtime_cfg else "auto"
-    if device_str == "auto":
-        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    return torch.device(device_str)
+    device_str = runtime_cfg.get("device") if runtime_cfg else None
+    return resolve_device(device_str)
 
 
 def _init_policy(cfg: DictConfig, feature_dim: int, num_envs: int):
@@ -210,7 +213,9 @@ def run(cfg: DictConfig) -> Path:
     resolved_cfg = OmegaConf.to_container(cfg, resolve=True)
     _maybe_patch_method_env()
     _enforce_legacy_flags(cfg)
-    device = _device(cfg.get("runtime", {}))
+    runtime_cfg = cfg.get("runtime") if cfg is not None else None
+    device = _device(runtime_cfg)
+    log_device_diagnostics(device)
     data_ctx = prepare_data_module(cfg, seed=cfg.train.seed)
     train_batches = data_ctx.data_module.prepare("train", cfg.envs.train)
     val_batches = data_ctx.data_module.prepare("val", cfg.envs.val)
@@ -238,7 +243,11 @@ def run(cfg: DictConfig) -> Path:
 
     optimizer = setup_optimizer(policy, cfg)
     scheduler = setup_scheduler(optimizer, cfg)
-    scaler = torch.cuda.amp.GradScaler(enabled=(device.type == "cuda" and cfg.runtime.get("mixed_precision", True)))
+    requested_amp = bool(runtime_cfg.get("mixed_precision", True)) if runtime_cfg else True
+    enable_amp = should_enable_mixed_precision(device, requested_amp)
+    if device.type == "mps" and requested_amp and not enable_amp:
+        print("[info] Mixed precision disabled on MPS; using float32 for stability.")
+    scaler = torch.cuda.amp.GradScaler(enabled=enable_amp)
 
     run_logger = log_utils.RunLogger(OmegaConf.to_container(cfg.logging, resolve=True), resolved_cfg)
     final_metrics_path = Path(run_logger.final_metrics_path)
