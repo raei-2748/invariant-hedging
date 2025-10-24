@@ -119,6 +119,14 @@ class RunLogger:
         if torch is not None:
             info["torch_version"] = torch.__version__
             info["cuda_available"] = bool(torch.cuda.is_available())
+            mps_backend = getattr(torch.backends, "mps", None)
+            if mps_backend is not None:
+                available_fn = getattr(mps_backend, "is_available", lambda: False)
+                info["mps_available"] = bool(available_fn())
+                if hasattr(mps_backend, "is_built"):
+                    info["mps_built"] = bool(mps_backend.is_built())
+            else:
+                info["mps_available"] = False
         return info
 
 

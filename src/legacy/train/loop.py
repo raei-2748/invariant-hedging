@@ -9,6 +9,8 @@ from typing import Callable, Dict, Iterable, Mapping, Sequence
 import torch
 import torch.nn.functional as F
 
+from src.core.device import log_device_diagnostics, resolve_device
+
 from src.core.infra.io import write_alignment_csv
 from src.modules.models import PolicyMLP
 from legacy.train.objectives.hirm_head import (
@@ -157,7 +159,8 @@ def run_training(config: ExperimentConfig, *, base_dir: Path | None = None) -> P
     if config.objective != "hirm_head":
         raise ValueError("This training loop only supports objective='hirm_head'.")
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = resolve_device()
+    log_device_diagnostics(device)
     torch.manual_seed(config.train.seed)
 
     model = PolicyMLP(

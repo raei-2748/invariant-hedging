@@ -16,6 +16,7 @@ import pandas as pd
 import torch
 from omegaconf import DictConfig, OmegaConf
 
+from src.core.device import log_device_diagnostics, resolve_device
 from src.modules.baselines import DeltaBaselinePolicy, DeltaGammaBaselinePolicy
 from src.core.losses import bootstrap_cvar_ci, cvar_from_pnl
 from src.core.utils import logging as log_utils, stats
@@ -43,11 +44,9 @@ except (TypeError, RuntimeError, AttributeError):
     pass
 
 
-def _device(runtime_cfg: DictConfig) -> torch.device:
-    device_str = runtime_cfg.get("device", "auto") if runtime_cfg else "auto"
-    if device_str == "auto":
-        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    return torch.device(device_str)
+def _device(runtime_cfg: Optional[DictConfig]) -> torch.device:
+    device_str = runtime_cfg.get("device") if runtime_cfg else None
+    return resolve_device(device_str)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -689,7 +688,9 @@ def _aggregate_records(records: List[Dict]) -> Dict[str, Dict[str, object]]:
 def main(cfg: DictConfig) -> None:
     cfg = unwrap_experiment_config(cfg)
     resolved_cfg = OmegaConf.to_container(cfg, resolve=True)
-    device = _device(cfg.get("runtime", {}))
+    runtime_cfg = cfg.get("runtime") if cfg is not None else None
+    device = _device(runtime_cfg)
+    log_device_diagnostics(device)
     data_ctx = prepare_data_module(cfg)
     feature_engineer = FeatureEngineer()
     method_name = _method_from_cfg(cfg) or str(getattr(cfg.model, "name", "unknown"))

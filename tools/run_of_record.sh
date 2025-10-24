@@ -29,6 +29,19 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+PYTHON_BIN=${PYTHON:-python3}
+
+contains_prefix() {
+  local prefix="$1"
+  shift
+  for arg in "$@"; do
+    if [[ "$arg" == ${prefix}=* ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)
 ARTIFACT_ROOT="${REPO_ROOT}/reports/artifacts"
 RUN_ROOT="${REPO_ROOT}/reports/paper_runs"
@@ -73,6 +86,39 @@ else
   EVAL_OVERRIDES=()
 fi
 
+MPS_AUTODETECT=$($PYTHON_BIN - <<'PY' 2>/dev/null || echo "0")
+import platform
+try:
+    import torch
+except Exception:
+    torch = None
+
+if platform.system() != "Darwin" or torch is None:
+    print("0")
+else:
+    mps = getattr(getattr(torch, "backends", object()), "mps", None)
+    if mps is None:
+        print("0")
+    else:
+        available = getattr(mps, "is_available", lambda: False)()
+        print("1" if available else "0")
+PY
+
+RUNTIME_OVERRIDES=()
+if [[ "$MPS_AUTODETECT" == "1" ]]; then
+  EXISTING_OVERRIDES=("${TRAIN_OVERRIDES[@]}" "${EVAL_OVERRIDES[@]}" "${EXTRA_ARGS[@]}")
+  if contains_prefix "runtime.device" "${EXISTING_OVERRIDES[@]}"; then
+    :
+  else
+    RUNTIME_OVERRIDES+=("runtime.device=mps")
+  fi
+  if contains_prefix "runtime.mixed_precision" "${EXISTING_OVERRIDES[@]}"; then
+    :
+  else
+    RUNTIME_OVERRIDES+=("runtime.mixed_precision=false")
+  fi
+fi
+
 for method in "${METHODS[@]}"; do
   cfg_path="${REPO_ROOT}/configs/${method}.yaml"
   if [[ ! -f "${cfg_path}" ]]; then
@@ -98,6 +144,11 @@ for method in "${METHODS[@]}"; do
     train_cmd=("${REPO_ROOT}/tools/run_train.sh" "${method}" "train.seed=${seed}")
     if [[ ${#TRAIN_OVERRIDES[@]} -gt 0 ]]; then
       for override in "${TRAIN_OVERRIDES[@]}"; do
+        train_cmd+=("${override}")
+      done
+    fi
+    if [[ ${#RUNTIME_OVERRIDES[@]} -gt 0 ]]; then
+      for override in "${RUNTIME_OVERRIDES[@]}"; do
         train_cmd+=("${override}")
       done
     fi
@@ -152,6 +203,11 @@ for method in "${METHODS[@]}"; do
         eval_cmd=("${REPO_ROOT}/tools/run_eval.sh" "${eval_config}" "${eval_args[@]}")
         if [[ ${#EVAL_OVERRIDES[@]} -gt 0 ]]; then
           for override in "${EVAL_OVERRIDES[@]}"; do
+            eval_cmd+=("${override}")
+          done
+        fi
+        if [[ ${#RUNTIME_OVERRIDES[@]} -gt 0 ]]; then
+          for override in "${RUNTIME_OVERRIDES[@]}"; do
             eval_cmd+=("${override}")
           done
         fi
