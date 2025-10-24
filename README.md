@@ -7,7 +7,7 @@
 [![Cite this work](https://img.shields.io/badge/citation-CITATION.cff-orange.svg)](CITATION.cff)
 
 
-This repository reproduces all results for *“Robust Generalization for Hedging under Crisis Regime Shifts.”* The release ships a
+This research introduce a developed hedging framework named "HIRM" (Hedging with IRM). This repository reproduces all results for *“Robust Generalization for Hedging under Crisis Regime Shifts.”* The release ships a
 deterministic pipeline that stages data, trains the invariant hedging models, generates diagnostics, and exports the camera-ready
 paper assets.
 
