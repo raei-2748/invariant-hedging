@@ -6,7 +6,6 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Cite this work](https://img.shields.io/badge/citation-CITATION.cff-orange.svg)](CITATION.cff)
 
-> Version 1.0.0 (Camera-Ready, October 2025)
 
 This repository reproduces all results for *“Robust Generalization for Hedging under Crisis Regime Shifts.”* The release ships a
 deterministic pipeline that stages data, trains the invariant hedging models, generates diagnostics, and exports the camera-ready
