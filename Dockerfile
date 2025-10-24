@@ -12,4 +12,4 @@ RUN pip install --upgrade pip \
  && pip install -r requirements-lock.txt \
  && pip install -e .[dev]
 
-CMD ["bash", "tools/fetch_data.sh", "--data-dir", "data"]
+CMD ["bash", "-lc", "bash tools/fetch_data.sh --data-dir data && make smoke"]
