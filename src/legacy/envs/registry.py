@@ -3,9 +3,12 @@ from __future__ import annotations
 
 import zlib
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Mapping
+from typing import Dict, Iterable, List, Mapping, Optional
 
 from src.core.infra.tags import build_episode_tags
+from src.core.infra.tags import extract_episode_tags
+from src.modules.data.real.loader import RealAnchorLoader
+from src.modules.data.types import EpisodeBatch
 
 
 def _seed_offset(label: str) -> int:
@@ -80,12 +83,6 @@ class SyntheticRegimeRegistry:
     @property
     def names(self) -> List[str]:
         return list(self._specs.keys())
-from dataclasses import dataclass
-from typing import Iterable, List, Mapping, Optional
-
-from src.modules.data.real.loader import RealAnchorLoader
-from src.modules.data.types import EpisodeBatch
-from src.core.infra.tags import extract_episode_tags
 
 
 @dataclass(frozen=True)

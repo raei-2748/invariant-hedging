@@ -9,8 +9,6 @@ from typing import Dict, Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-
 from ._plot_utils import (
     ensure_cols,
     filter_frame,

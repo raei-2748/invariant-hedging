@@ -8,8 +8,6 @@ from pathlib import Path
 from typing import Sequence
 
 import matplotlib.pyplot as plt
-import pandas as pd
-
 from ._plot_utils import compute_ci, ensure_cols, filter_frame, load_csv, save_png_with_meta
 
 LOGGER = logging.getLogger("plot_cvar_by_method")

@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Dict, Sequence
 
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 
 from ._plot_utils import compute_ci, ensure_cols, filter_frame, load_csv, save_png_with_meta
