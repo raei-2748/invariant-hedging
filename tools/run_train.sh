@@ -14,5 +14,7 @@ export CUBLAS_WORKSPACE_CONFIG=${CUBLAS_WORKSPACE_CONFIG:-:4096:8}
 export CUDNN_DETERMINISTIC=${CUDNN_DETERMINISTIC:-1}
 export CUDA_LAUNCH_BLOCKING=${CUDA_LAUNCH_BLOCKING:-1}
 export NUMPY_DEFAULT_DTYPE=${NUMPY_DEFAULT_DTYPE:-float64}
+export WANDB_MODE=${WANDB_MODE:-disabled}
+export WANDB_DISABLED=${WANDB_DISABLED:-true}
 
-WANDB_MODE=${WANDB_MODE:-offline} python3 experiments/run_train.py --config-name="${CONFIG}" "$@"
+python3 experiments/run_train.py --config-name="${CONFIG}" "$@"

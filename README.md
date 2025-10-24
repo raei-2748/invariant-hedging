@@ -16,7 +16,20 @@ paper assets.
 - DOI landing page: [10.5281/zenodo.xxxxxx](https://doi.org/10.5281/zenodo.xxxxxx)
 - Reproduction playbook: [docs/REPRODUCE.md](docs/REPRODUCE.md)
 
-## Quickstart
+## Quickstart (5-minute demo)
+
+```bash
+export DATA_ROOT="${PWD}/data"
+bash tools/fetch_data.sh --data-dir "$DATA_ROOT"
+make tests
+make paper SMOKE=1
+```
+
+The commands above stage the bundled SPY sample, run the hermetic test suite, and reproduce the smoke-sized paper harness without
+needing GPUs. Logging to Weights & Biases is disabled by default so the run is non-interactive; enable it when needed via
+`WANDB_MODE=online WANDB_DISABLED=false logging.wandb.enabled=true make paper`.
+
+## Full workflow
 
 ```bash
 make data
@@ -24,8 +37,8 @@ make paper
 make report-paper
 ```
 
-The commands above download the SPY snapshot, execute the smoke-version of the paper harness (or the full sweep when `SMOKE=0`),
-and compile the publication tables/figures under `reports/`.
+`make data` refreshes the deterministic sample, `make paper` executes either the smoke harness (`SMOKE=1`) or the full 30-seed,
+five-method sweep, and `make report-paper` assembles the publication tables/figures under `reports/`.
 
 ### Apple Silicon (MPS) acceleration
 
@@ -75,10 +88,24 @@ invariant-hedging/
 | §6 Efficiency & crisis evaluation | `src/evaluation/evaluate_crisis.py`, `src/evaluation/reporting/` |
 | Appendix (simulators & baselines) | `src/modules/sim/`, `src/modules/markets/`, `src/modules/baselines/` |
 
+#### Figure & table commands
+
+| Figure / Table | Command |
+| --- | --- |
+| Fig. 2 (Invariant gap vs. worst-group) | `make plot-ig-wg` |
+| Fig. 3 (Capital efficiency frontier) | `python -m src.visualization.plot_capital_frontier --run_dir "$(ls -td reports/paper/* | head -1)" --out_dir reports/figures/capital_frontier` |
+| Table 3 (Crisis robustness) | `make eval-crisis` |
+| Appendix diagnostics package | `python tools/scripts/aggregate.py --config configs/report/default.yaml` |
+
 ## Reproducibility & provenance
 
 - `make paper` orchestrates the full suite and stores canonical outputs under `reports/paper_runs/` and `reports/paper_eval/`.
 - `make report-paper` consumes those artefacts and assembles publication-ready CSV/figure bundles under `reports/paper/`.
+- Every run writes
+  - `metadata.json` files (git SHA, host info, seeds),
+  - the resolved Hydra config (`config.yaml`),
+  - top-k checkpoints (`checkpoints/`),
+  - CSV diagnostics and rendered figures.
 - `archive/paper_provenance.json` is regenerated on every paper run and contains the resolved configs, git SHA, and runtime platform.
 - Historical bundles prior to 1.0 live in `archive/v0.9/` for transparency.
 - Release history is tracked in [CHANGELOG.md](CHANGELOG.md).
@@ -90,6 +117,7 @@ See [docs/REPRODUCE.md](docs/REPRODUCE.md) for hardware notes, runtime expectati
 Smoke CI config (`.github/workflows/ci.yml`) exports `PYTHONPATH=src` and runs:
 
 ```bash
+ruff check --no-fix --output-format=github
 pytest -m "not heavy" --maxfail=1 --disable-warnings
 make paper SMOKE=1
 make report-paper
@@ -100,8 +128,50 @@ are isolated behind `@pytest.mark.heavy` and excluded from CI.
 
 ## Data summary
 
-The repository bundles a deterministic `data/spy_sample.csv` slice sufficient for smoke tests. Full experiments expect the staged
-SPY options dataset retrieved via `make data`, which also snapshots metadata for later auditing.
+### Sample data (default)
+
+- `bash tools/fetch_data.sh --data-dir "$DATA_ROOT"` mirrors the bundled `data/spy_sample.csv` slice into `data/raw/` and
+  verifies checksums.
+- `make data` is a convenience target that wraps the fetch script and ensures cached manifests are refreshed.
+- The sample is self-contained and powers `make tests`, `make paper SMOKE=1`, and CI.
+
+### Full dataset (OptionMetrics + public inputs)
+
+1. `tools/data/fetch_spy.sh` downloads the public Yahoo Finance SPY OHLCV feed and the CBOE VIX history into `data/raw/`.
+2. Acquire the OptionMetrics IvyDB US exports for SPY (e.g. `ivydb_spy_2010.csv`, `ivydb_spy_2017.csv`) and drop them under
+   `data/raw/optionmetrics/`. Each CSV must expose at least `trade_date`, `expiration`, `option_type`, `bid`, `ask`, `mid`, and
+   `implied_vol`.
+3. Run `make paper` (without `SMOKE=1`) to trigger cache generation under `data/cache/real_spy/` and reproduce the full
+   experiments.
+
+> **Warning**: IvyDB is proprietary. Ensure you have a valid licence before copying OptionMetrics files into the repository. The
+> scripts never attempt to download these datasets automatically.
+
+The cached outputs contain `spy_surface.csv`, per-split CSVs (train/validation/test), and a manifest describing checksums for
+auditing.
+
+### Optional: enable Weights & Biases
+
+Logging is disabled by default. To stream metrics to your W&B workspace, pass `logging.wandb.enabled=true` and allow the CLI to
+use the online mode:
+
+```bash
+WANDB_MODE=online WANDB_DISABLED=false \
+logging.wandb.enabled=true make paper
+```
+
+When disabled, the CLI runs with `WANDB_MODE=disabled`/`WANDB_DISABLED=true`, ensuring no login prompts appear.
+
+## Containerized smoke pipeline
+
+Build and run the self-contained Docker image for deterministic smoke tests:
+
+```bash
+docker build -t hirm .
+docker run --rm -v "$(pwd)/data:/app/data" hirm bash -lc "bash tools/fetch_data.sh --data-dir data && make paper SMOKE=1"
+```
+
+The container installs dependencies from `requirements-lock.txt`, uses Python 3.11, and defaults to the offline logging mode.
 
 ## Citation
 

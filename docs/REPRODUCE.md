@@ -7,7 +7,7 @@ This guide documents the exact environment, commands, and runtime expectations r
 | Component | Reference value |
 | --- | --- |
 | OS | Ubuntu 22.04 LTS |
-| Python | 3.10.13 (CPython) |
+| Python | 3.11.9 (CPython) |
 | Hardware | 8 vCPU (Intel Ice Lake), 32 GB RAM, no GPU required |
 | Optional GPU | NVIDIA A10 (compute capability 8.6) for accelerated training |
 | Apple Silicon | M2 Pro (12c CPU / 19c GPU, 32 GB unified memory) running macOS 14.6 |

@@ -1,8 +1,37 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+USER_DATA_DIR=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --data-dir)
+      shift
+      USER_DATA_DIR=${1:-}
+      ;;
+    --data-dir=*)
+      USER_DATA_DIR=${1#*=}
+      ;;
+    --help|-h)
+      cat <<'USAGE'
+Usage: tools/fetch_data.sh [--data-dir <path>]
+
+Mirrors the bundled SPY sample dataset into the requested directory.
+USAGE
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      exit 1
+      ;;
+  esac
+  shift || true
+done
+
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd "${SCRIPT_DIR}/.." && pwd)
+if [[ -n "${USER_DATA_DIR}" ]]; then
+  DATA_DIR="${USER_DATA_DIR}"
+fi
 DATA_ROOT=${DATA_DIR:-${REPO_ROOT}/data}
 if [[ "${DATA_ROOT}" != /* ]]; then
   DATA_ROOT="${REPO_ROOT}/${DATA_ROOT}"
