@@ -24,7 +24,13 @@ from src.core.optimizers import (
     setup_optimizer,
     setup_scheduler,
 )
-from src.core.utils import checkpoints, logging as log_utils, seed as seed_utils, stats
+from src.core.utils import (
+    checkpoints,
+    logging as log_utils,
+    resolve_device,
+    seed as seed_utils,
+    stats,
+)
 from src.modules.data_pipeline import (
     FeatureEngineer,
     build_envs,
@@ -60,12 +66,9 @@ except (TypeError, RuntimeError, AttributeError):
 
 
 def _device(runtime_cfg: DictConfig) -> torch.device:
-    """Resolve the torch device according to §4.1 training setup."""
+    """Backwards-compatible device resolver (legacy entry points)."""
 
-    device_str = runtime_cfg.get("device", "auto") if runtime_cfg else "auto"
-    if device_str == "auto":
-        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    return torch.device(device_str)
+    return resolve_device(runtime_cfg, context="legacy").device
 
 
 def _init_policy(cfg: DictConfig, feature_dim: int, num_envs: int):
@@ -210,7 +213,8 @@ def run(cfg: DictConfig) -> Path:
     resolved_cfg = OmegaConf.to_container(cfg, resolve=True)
     _maybe_patch_method_env()
     _enforce_legacy_flags(cfg)
-    device = _device(cfg.get("runtime", {}))
+    device_setup = resolve_device(cfg.get("runtime", {}), context="train")
+    device = device_setup.device
     data_ctx = prepare_data_module(cfg, seed=cfg.train.seed)
     train_batches = data_ctx.data_module.prepare("train", cfg.envs.train)
     val_batches = data_ctx.data_module.prepare("val", cfg.envs.val)
@@ -238,7 +242,9 @@ def run(cfg: DictConfig) -> Path:
 
     optimizer = setup_optimizer(policy, cfg)
     scheduler = setup_scheduler(optimizer, cfg)
-    scaler = torch.cuda.amp.GradScaler(enabled=(device.type == "cuda" and cfg.runtime.get("mixed_precision", True)))
+    scaler = torch.cuda.amp.GradScaler(
+        enabled=(device.type == "cuda" and device_setup.use_mixed_precision)
+    )
 
     run_logger = log_utils.RunLogger(OmegaConf.to_container(cfg.logging, resolve=True), resolved_cfg)
     final_metrics_path = Path(run_logger.final_metrics_path)

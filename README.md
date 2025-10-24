@@ -27,6 +27,27 @@ make report-paper
 The commands above download the SPY snapshot, execute the smoke-version of the paper harness (or the full sweep when `SMOKE=0`),
 and compile the publication tables/figures under `reports/`.
 
+### Apple Silicon (MPS) acceleration
+
+The training and evaluation pipelines auto-detect Apple Silicon GPUs via PyTorch's Metal Performance Shaders (MPS) backend. On
+macOS, the launcher prints the resolved device plus CUDA/MPS availability before the first batch executes. If an MPS-capable
+PyTorch build is missing, the run falls back to CPU and emits a warning describing how to enable GPU acceleration.
+
+Install the PyTorch wheel that bundles the Metal backend inside your virtual environment (Apple ships the GPU kernels with the CPU
+wheel):
+
+```bash
+python3 -m pip install torch==2.3.1 --index-url https://download.pytorch.org/whl/cpu
+```
+
+Recreate the environment afterwards with `pip install -r requirements-lock.txt` to ensure every dependency matches the archival
+release. When `torch.backends.mps.is_available()` reports `True`, running `make paper SMOKE=0` automatically selects the `mps`
+device and disables mixed precision (AMP) for numerical stability. Expect a 2–3× speed-up relative to CPU-only runs on an M2
+Pro/Max for the full 30-seed sweep, though individual ops may still fall back to CPU if the Metal kernels are unavailable.
+
+> **Limitations.** PyTorch's MPS backend does not currently support `torch.cuda.amp`, so training always executes in `float32`.
+> CUDA-based systems continue to operate unchanged and still deliver the fastest wall-clock reproduction.
+
 ## Repository layout
 
 ```

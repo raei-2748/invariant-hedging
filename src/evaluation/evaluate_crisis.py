@@ -18,7 +18,7 @@ from omegaconf import DictConfig, OmegaConf
 
 from src.modules.baselines import DeltaBaselinePolicy, DeltaGammaBaselinePolicy
 from src.core.losses import bootstrap_cvar_ci, cvar_from_pnl
-from src.core.utils import logging as log_utils, stats
+from src.core.utils import logging as log_utils, resolve_device, stats
 from src.modules.data.features import FeatureEngineer, FeatureScaler
 from src.modules.data.types import EpisodeBatch
 from src.evaluation.analyze_diagnostics import DiagnosticsRunContext, gather_and_export
@@ -41,13 +41,6 @@ try:
     torch.set_num_interop_threads(1)
 except (TypeError, RuntimeError, AttributeError):
     pass
-
-
-def _device(runtime_cfg: DictConfig) -> torch.device:
-    device_str = runtime_cfg.get("device", "auto") if runtime_cfg else "auto"
-    if device_str == "auto":
-        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    return torch.device(device_str)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -689,7 +682,7 @@ def _aggregate_records(records: List[Dict]) -> Dict[str, Dict[str, object]]:
 def main(cfg: DictConfig) -> None:
     cfg = unwrap_experiment_config(cfg)
     resolved_cfg = OmegaConf.to_container(cfg, resolve=True)
-    device = _device(cfg.get("runtime", {}))
+    device = resolve_device(cfg.get("runtime", {}), context="eval").device
     data_ctx = prepare_data_module(cfg)
     feature_engineer = FeatureEngineer()
     method_name = _method_from_cfg(cfg) or str(getattr(cfg.model, "name", "unknown"))

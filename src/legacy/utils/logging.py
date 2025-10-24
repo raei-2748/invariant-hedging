@@ -119,6 +119,16 @@ class RunLogger:
         if torch is not None:
             info["torch_version"] = torch.__version__
             info["cuda_available"] = bool(torch.cuda.is_available())
+            backend = getattr(torch.backends, "mps", None)
+            if backend is not None:
+                try:
+                    info["mps_built"] = bool(getattr(backend, "is_built", lambda: True)())
+                except Exception:  # pragma: no cover - defensive
+                    info["mps_built"] = False
+                try:
+                    info["mps_available"] = bool(backend.is_available())
+                except Exception:  # pragma: no cover - defensive
+                    info["mps_available"] = False
         return info
 
 

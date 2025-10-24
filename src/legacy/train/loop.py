@@ -10,6 +10,7 @@ import torch
 import torch.nn.functional as F
 
 from src.core.infra.io import write_alignment_csv
+from src.core.utils import resolve_device
 from src.modules.models import PolicyMLP
 from legacy.train.objectives.hirm_head import (
     EnvLossPayload,
@@ -157,7 +158,7 @@ def run_training(config: ExperimentConfig, *, base_dir: Path | None = None) -> P
     if config.objective != "hirm_head":
         raise ValueError("This training loop only supports objective='hirm_head'.")
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = resolve_device({"device": "auto", "mixed_precision": False}, context="legacy-train").device
     torch.manual_seed(config.train.seed)
 
     model = PolicyMLP(

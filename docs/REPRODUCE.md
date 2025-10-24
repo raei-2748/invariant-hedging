@@ -10,6 +10,7 @@ This guide documents the exact environment, commands, and runtime expectations r
 | Python | 3.10.13 (CPython) |
 | Hardware | 8 vCPU (Intel Ice Lake), 32 GB RAM, no GPU required |
 | Optional GPU | NVIDIA A10 (compute capability 8.6) for accelerated training |
+| Apple Silicon | M2 Pro (12c CPU / 19c GPU, 32 GB unified memory) running macOS 14.6 |
 | Key libraries | torch 2.3.1, numpy 1.26.4, pandas 2.2.3, matplotlib 3.9.2, scikit-learn 1.5.2, tqdm 4.66.4 |
 
 All dependencies are pinned in [`requirements.txt`](../requirements.txt), [`environment.yml`](../environment.yml), and [`requirements-lock.txt`](../requirements-lock.txt). Use the lock file for exact reproducibility:
@@ -41,7 +42,7 @@ pip install -e .[dev]
    ```bash
    make paper
    ```
-   Runs `configs/train/paper.yaml` followed by `configs/eval/paper.yaml`, producing artefacts in `reports/paper_runs/` and `reports/paper_eval/`. Set `SMOKE=1` for a 3-seed sanity pass (~3 min CPU) or omit for the full 30-seed sweep (~45 min CPU, ~12 min with A10 GPU).
+Runs `configs/train/paper.yaml` followed by `configs/eval/paper.yaml`, producing artefacts in `reports/paper_runs/` and `reports/paper_eval/`. Set `SMOKE=1` for a 3-seed sanity pass (~3 min CPU) or omit for the full 30-seed sweep (~45 min CPU, ~12 min with A10 GPU).
 
 2. **Assemble publication assets**
    ```bash
@@ -53,7 +54,20 @@ pip install -e .[dev]
    ```bash
    make eval-crisis
    ```
-   Executes `configs/eval/robustness.yaml`, exporting crisis-shift diagnostics to `reports/paper_eval/robustness/` (~15 min CPU, ~6 min GPU). Seeds are fixed by `seed_list.txt`.
+Executes `configs/eval/robustness.yaml`, exporting crisis-shift diagnostics to `reports/paper_eval/robustness/` (~15 min CPU, ~6 min GPU). Seeds are fixed by `seed_list.txt`.
+
+### Apple Silicon notes
+
+- Install the Metal-enabled PyTorch wheel (bundled with the CPU whl) in your venv:
+  ```bash
+  python3 -m pip install torch==2.3.1 --index-url https://download.pytorch.org/whl/cpu
+  ```
+- `make paper` now prints the resolved device plus CUDA/MPS availability. When `torch.backends.mps.is_available()` returns `True`,
+  the launcher automatically adds `runtime.device=mps runtime.mixed_precision=false` so the full 30-seed sweep runs on the GPU.
+- AMP is disabled on MPS for numerical stability. Expect roughly 2–3× faster wall-clock time compared to CPU-only runs on an
+  M2 Pro/Max, though certain operators may still fall back to CPU when no Metal kernel exists.
+- If the runtime warns that it selected CPU on macOS, verify the PyTorch install and rerun `make data && make paper` once the
+  Metal backend is available.
 
 ## Figure & table generation
 

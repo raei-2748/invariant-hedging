@@ -29,6 +29,19 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+PYTHON_BIN=${PYTHON:-python3}
+
+contains_prefix() {
+  local prefix="$1"
+  shift
+  for arg in "$@"; do
+    if [[ "$arg" == ${prefix}=* ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)
 ARTIFACT_ROOT="${REPO_ROOT}/reports/artifacts"
 RUN_ROOT="${REPO_ROOT}/reports/paper_runs"
@@ -73,6 +86,35 @@ else
   EVAL_OVERRIDES=()
 fi
 
+MPS_AUTODETECT=$("$PYTHON_BIN" - <<'PY' 2>/dev/null || echo "0")
+import platform
+try:
+    import torch
+except Exception:
+    torch = None
+
+if platform.system() != "Darwin" or torch is None:
+    print("0")
+else:
+    mps = getattr(getattr(torch, "backends", object()), "mps", None)
+    if mps is None:
+        print("0")
+    else:
+        available = getattr(mps, "is_available", lambda: False)()
+        print("1" if available else "0")
+PY
+
+RUNTIME_OVERRIDES=()
+if [[ "$MPS_AUTODETECT" == "1" ]]; then
+  EXISTING_OVERRIDES=("${TRAIN_OVERRIDES[@]}" "${EVAL_OVERRIDES[@]}" "${EXTRA_ARGS[@]}")
+  if ! contains_prefix "runtime.device" "${EXISTING_OVERRIDES[@]}"; then
+    RUNTIME_OVERRIDES+=("runtime.device=mps")
+  fi
+  if ! contains_prefix "runtime.mixed_precision" "${EXISTING_OVERRIDES[@]}"; then
+    RUNTIME_OVERRIDES+=("runtime.mixed_precision=false")
+  fi
+fi
+
 for method in "${METHODS[@]}"; do
   cfg_path="${REPO_ROOT}/configs/${method}.yaml"
   if [[ ! -f "${cfg_path}" ]]; then
@@ -101,11 +143,17 @@ for method in "${METHODS[@]}"; do
         train_cmd+=("${override}")
       done
     fi
+    if [[ ${#RUNTIME_OVERRIDES[@]} -gt 0 ]]; then
+      for override in "${RUNTIME_OVERRIDES[@]}"; do
+        train_cmd+=("${override}")
+      done
+    fi
     if [[ ${#EXTRA_ARGS[@]} -gt 0 ]]; then
       for extra in "${EXTRA_ARGS[@]}"; do
         train_cmd+=("${extra}")
       done
     fi
+    train_cmd+=("hydra.run.dir=${run_dir}/logs" "hydra.output_subdir=null")
 
     echo "[run_of_record] Training ${method} (seed=${seed})"
     echo "  → ${train_cmd[*]}"
@@ -155,11 +203,17 @@ for method in "${METHODS[@]}"; do
             eval_cmd+=("${override}")
           done
         fi
+        if [[ ${#RUNTIME_OVERRIDES[@]} -gt 0 ]]; then
+          for override in "${RUNTIME_OVERRIDES[@]}"; do
+            eval_cmd+=("${override}")
+          done
+        fi
         if [[ ${#EXTRA_ARGS[@]} -gt 0 ]]; then
           for extra in "${EXTRA_ARGS[@]}"; do
             eval_cmd+=("${extra}")
           done
         fi
+        eval_cmd+=("hydra.run.dir=${eval_dir}/logs" "hydra.output_subdir=null")
         echo "[run_of_record] Evaluating ${method} (seed=${seed}, window=${window})"
         echo "  → ${eval_cmd[*]}"
         if [[ -d "${eval_dir}" ]]; then
@@ -179,6 +233,10 @@ for method in "${METHODS[@]}"; do
         mkdir -p "${eval_dir}" "${mirror_dir}"
         cp -a "${after_eval%/}/." "${eval_dir}/"
         cp -a "${after_eval%/}/." "${mirror_dir}/"
+        if [[ -d "${eval_dir}/logs" ]]; then
+          mkdir -p "${mirror_dir}/logs"
+          cp -a "${eval_dir}/logs/." "${mirror_dir}/logs/"
+        fi
 
         metrics_path="${eval_dir}/final_metrics.json"
         csv_path="${eval_dir}/diagnostics_seed_${seed}.csv"

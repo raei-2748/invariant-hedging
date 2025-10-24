@@ -65,6 +65,9 @@ def _pip_freeze() -> List[str]:
 def _torch_metadata() -> Mapping[str, object]:
     info: MutableMapping[str, object] = {
         "available": False,
+        "cuda_available": False,
+        "mps_built": False,
+        "mps_available": False,
         "version": None,
         "cuda_version": None,
         "device_count": 0,
@@ -74,6 +77,7 @@ def _torch_metadata() -> Mapping[str, object]:
         return info
     info["version"] = torch.__version__
     info["available"] = bool(torch.cuda.is_available())
+    info["cuda_available"] = info["available"]
     info["cuda_version"] = getattr(torch.version, "cuda", None)
     if info["available"]:
         try:
@@ -82,6 +86,16 @@ def _torch_metadata() -> Mapping[str, object]:
             info["devices"] = [torch.cuda.get_device_name(i) for i in range(count)]
         except Exception as exc:  # pragma: no cover - cuda optional
             info["device_error"] = str(exc)
+    backend = getattr(torch.backends, "mps", None)
+    if backend is not None:
+        try:
+            info["mps_built"] = bool(getattr(backend, "is_built", lambda: True)())
+        except Exception:  # pragma: no cover - defensive
+            info["mps_built"] = False
+        try:
+            info["mps_available"] = bool(backend.is_available())
+        except Exception as exc:  # pragma: no cover - defensive
+            info["mps_error"] = str(exc)
     return info
 
 
