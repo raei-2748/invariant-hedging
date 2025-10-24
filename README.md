@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/raei-2748/invariant-hedging/actions/workflows/ci.yml/badge.svg)](https://github.com/raei-2748/invariant-hedging/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-85%25-brightgreen.svg)](reports/coverage/index.html)
-[![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org)
+[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Cite this work](https://img.shields.io/badge/citation-CITATION.cff-orange.svg)](CITATION.cff)
 
@@ -27,6 +27,19 @@ make paper SMOKE=1
 The commands above stage the bundled SPY sample, run the hermetic test suite, and reproduce the smoke-sized paper harness without
 needing GPUs. Logging to Weights & Biases is disabled by default so the run is non-interactive; enable it when needed via
 `WANDB_MODE=online WANDB_DISABLED=false logging.wandb.enabled=true make paper`.
+
+## Installation (Python 3.11 only)
+
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements-lock.txt
+pip install -e .[dev]
+```
+
+The repository officially supports CPython `>=3.11,<3.12`. The pinned lock file guarantees binary-compatible wheels on Linux,
+macOS (Intel/Apple Silicon), and the slim Docker image described below.
 
 ## Full workflow
 
@@ -91,10 +104,20 @@ invariant-hedging/
 
 | Figure / Table | Command |
 | --- | --- |
-| Fig. 2 (Invariant gap vs. worst-group) | `make plot-ig-wg` |
+| Fig. 2 (Invariant gap vs. worst-group) | `make plot-ig-wg` (consumes `reports/paper/manifests/figures.yaml`) |
 | Fig. 3 (Capital efficiency frontier) | `python -m src.visualization.plot_capital_frontier --run_dir "$(ls -td reports/paper/* | head -1)" --out_dir reports/figures/capital_frontier` |
-| Table 3 (Crisis robustness) | `make eval-crisis` |
+| Table 3 (Crisis robustness) | `make eval-crisis` (uses `configs/eval/robustness.yaml`) |
 | Appendix diagnostics package | `python tools/scripts/aggregate.py --config configs/report/default.yaml` |
+
+## Reproducing Figures and Tables in the Paper
+
+1. **Train & aggregate** – `make paper SMOKE=0` followed by `make report-paper`. This produces the canonical `reports/paper_runs/` and
+   `reports/paper/` bundles containing metrics, figures, and manifests.
+2. **Figure commands** – the table above lists each make/CLI command plus the config file feeding it (e.g., `configs/eval/robustness.yaml`).
+3. **Seeds & provenance** – every run copies `config.yaml`, `metadata.json`, top-k checkpoints, final metrics, and rendered plots into
+   `runs/<timestamp>/` so the mapping between git SHA, Hydra config, and figure/table artifacts is explicit.
+4. **Deterministic smoke audit** – `make smoke-check` runs the CPU-only training recipe twice (logging to `runs/test_smoke/`) and fails if
+   the resulting `final_metrics.json` payloads differ.
 
 ## Reproducibility & provenance
 
@@ -132,6 +155,7 @@ are isolated behind `@pytest.mark.heavy` and excluded from CI.
 - `bash tools/fetch_data.sh --data-dir "$DATA_ROOT"` mirrors the bundled `data/spy_sample.csv` slice into `data/raw/` and
   verifies checksums.
 - `make data` is a convenience target that wraps the fetch script and ensures cached manifests are refreshed.
+- `make data-check` runs `tools/scripts/check_data_integrity.py` to validate schema, NaNs, and date ranges for the staged sample.
 - The sample is self-contained and powers `make tests`, `make paper SMOKE=1`, and CI.
 
 ### Full dataset (OptionMetrics + public inputs)
@@ -167,7 +191,7 @@ Build and run the self-contained Docker image for deterministic smoke tests:
 
 ```bash
 docker build -t hirm .
-docker run --rm -v "$(pwd)/data:/app/data" hirm bash -lc "bash tools/fetch_data.sh --data-dir data && make paper SMOKE=1"
+docker run --rm -v "$(pwd)/data:/app/data" hirm bash -lc "bash tools/fetch_data.sh --data-dir data && make smoke"
 ```
 
 The container installs dependencies from `requirements-lock.txt`, uses Python 3.11, and defaults to the offline logging mode.

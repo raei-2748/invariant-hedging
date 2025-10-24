@@ -7,16 +7,16 @@ This guide documents the exact environment, commands, and runtime expectations r
 | Component | Reference value |
 | --- | --- |
 | OS | Ubuntu 22.04 LTS |
-| Python | 3.11.9 (CPython) |
+| Python | 3.11.x (CPython) |
 | Hardware | 8 vCPU (Intel Ice Lake), 32 GB RAM, no GPU required |
 | Optional GPU | NVIDIA A10 (compute capability 8.6) for accelerated training |
 | Apple Silicon | M2 Pro (12c CPU / 19c GPU, 32 GB unified memory) running macOS 14.6 |
 | Key libraries | torch 2.3.1, numpy 1.26.4, pandas 2.2.3, matplotlib 3.9.2, scikit-learn 1.5.2, tqdm 4.66.4 |
 
-All dependencies are pinned in [`requirements.txt`](../requirements.txt), [`environment.yml`](../environment.yml), and [`requirements-lock.txt`](../requirements-lock.txt). Use the lock file for exact reproducibility:
+All dependencies are pinned in [`pyproject.toml`](../pyproject.toml), [`environment.yml`](../environment.yml), and [`requirements-lock.txt`](../requirements-lock.txt). Use the lock file for exact reproducibility:
 
 ```bash
-python -m venv .venv
+python3.11 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements-lock.txt
 pip install -e .[dev]
@@ -30,7 +30,13 @@ pip install -e .[dev]
    ```
    Downloads the deterministic SPY sample (`data/spy_sample.csv`) and refreshes checksums. For the full paper reproduction replace the CSV before running the target.
 
-2. **Record provenance**
+2. **Validate staging (optional but recommended)**
+   ```bash
+   make data-check
+   ```
+   Runs schema/NaN/date-range sanity checks on the sample or real OptionMetrics exports before training.
+
+3. **Record provenance**
    ```bash
    tools/run_of_record.sh --dry-run
    ```
@@ -120,6 +126,7 @@ Verify success with:
 ```bash
 make coverage
 pytest --maxfail=1 --disable-warnings -q
+make smoke-check
 ```
 
 Both commands should complete without errors and report the deterministic seed list captured in `seed_list.txt`. Archive the resulting coverage report, manifests, and provenance JSON alongside the submission package.

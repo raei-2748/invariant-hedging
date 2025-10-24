@@ -82,7 +82,8 @@ celerybeat-schedule
 
 # Environments
 .env
-.venv
+.venv/
+.hirm_env/
 env/
 venv/
 ENV/
@@ -130,7 +131,15 @@ Miniforge3-MacOSX-arm64.sh
 
 # W&B
 wandb/
-# Data artefacts
+
+# Model / data artefacts
+*.pt
+*.ckpt
+data/*
+!data/sample/
+!data/sample/**
+!data/spy_sample.csv
+!data/DATA_LICENSE.md
 data/external/
 data/raw/
 
@@ -140,7 +149,6 @@ outputs/
 outputs_*/
 *.log
 *.tmp
-__pycache__/
 smoke.log
 !.gitkeep
 !src/legacy/outputs/
