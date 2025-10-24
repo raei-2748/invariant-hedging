@@ -24,6 +24,8 @@ jobs:
         run: ruff check src tests --no-fix --output-format=github
       - name: Run unit tests
         run: pytest -m "not heavy" --maxfail=1 --disable-warnings --cov=src --cov-report=xml
+      - name: Deterministic smoke check
+        run: make smoke-check
       - name: Upload coverage summary
         uses: actions/upload-artifact@v4
         with:

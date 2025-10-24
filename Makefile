@@ -32,6 +32,9 @@ lint:
 tests:
 	$(PYTHON) -m pytest
 
+smoke-check:
+	$(PYTHON) tools/scripts/check_smoke_determinism.py
+
 clean:
 	rm -rf runs outputs outputs_* htmlcov .pytest_cache .coverage .coverage.* coverage.xml reports/coverage data/raw data/external
 	find . -type d -name '__pycache__' -prune -exec rm -rf {} +
