@@ -21,7 +21,7 @@ jobs:
           pip install -r requirements-lock.txt
           pip install -e .[dev]
       - name: Lint (ruff)
-        run: ruff check src tests --no-fix --output-format=github
+        run: ruff check src tests scripts --no-fix --output-format=github
       - name: Run unit tests
         run: pytest -m "not heavy" --maxfail=1 --disable-warnings --cov=src --cov-report=xml
       - name: Deterministic smoke check

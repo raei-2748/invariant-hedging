@@ -27,7 +27,7 @@ reproduce:
 	tools/make_reproduce.sh
 
 lint:
-	$(PYTHON) -m ruff check src
+	$(PYTHON) -m ruff check src tests scripts
 
 tests:
 	$(PYTHON) -m pytest
@@ -37,6 +37,29 @@ smoke-check:
 
 data-check:
 	$(PYTHON) tools/scripts/check_data_integrity.py --data-root $(DATA_ROOT)
+
+sanity-test:
+	@set -euo pipefail; \
+	ROOT="experiments/sanity"; \
+	rm -rf "$$ROOT"; \
+	for method in erm hirm; do \
+		CFG="sanity/$${method}_sanity"; \
+		OUT="$$ROOT/$${method}"; \
+		TRAIN_DIR="$$OUT/train"; \
+		mkdir -p "$$TRAIN_DIR"; \
+		$(PYTHON) tools/run_train.sh "$$CFG" logging.local_mirror.base_dir="$$TRAIN_DIR" runtime.output_dir="$$TRAIN_DIR/runs"; \
+		CKPT=$$($(PYTHON) tools/scripts/find_latest_checkpoint.py "$$TRAIN_DIR"); \
+		for window in daily robustness; do \
+			EVAL_DIR="$$OUT/eval/$${window}"; \
+			mkdir -p "$$EVAL_DIR"; \
+		$(PYTHON) tools/run_eval.sh "eval/$${window}" \
+			'eval.seeds=[0]' \
+			eval.compute_msi=true \
+			eval.report.checkpoint_path="$$CKPT" \
+			logging.local_mirror.base_dir="$$EVAL_DIR"; \
+		done; \
+	done; \
+	$(PYTHON) scripts/compare_sanity.py --root "$$ROOT"
 
 clean:
 	rm -rf runs outputs outputs_* htmlcov .pytest_cache .coverage .coverage.* coverage.xml reports/coverage data/raw data/external

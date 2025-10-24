@@ -196,6 +196,24 @@ docker run --rm -v "$(pwd)/data:/app/data" hirm bash -lc "bash tools/fetch_data.
 
 The container installs dependencies from `requirements-lock.txt`, uses Python 3.11, and defaults to the offline logging mode.
 
+## Sanity test workflow
+
+Before launching the long multi-seed sweeps, run a single-seed ERM vs. HIRM sanity check on the staged real dataset:
+
+```bash
+make sanity-test
+```
+
+The target:
+
+- Trains ERM and HIRM with `configs/sanity/*` (seed 0) on the real SPY cache.
+- Runs daily + crisis evaluations (with IG/ISI diagnostics) for each method.
+- Stores all artifacts under `experiments/sanity/{erm,hirm}/...`.
+- Invokes `scripts/compare_sanity.py`, which prints a side-by-side table (CVaR-95, IG, ISI, MaxDD, TR) and emits a ✅ PASS or ❌ FAIL verdict.
+- Writes the verdict to `experiments/sanity/sanity_summary.{json,csv}` for downstream automation.
+
+The sanity check fails if HIRM fails to improve crisis CVaR-95, ISI, or IG relative to ERM, ensuring robustness regressions are caught before 30-seed sweeps.
+
 ## Citation
 
 Please cite the accompanying paper and software release if you build upon this code base:

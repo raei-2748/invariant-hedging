@@ -6,6 +6,7 @@
 - Deterministic smoke audit (`make smoke-check`) that logs to `runs/test_smoke/` and fails CI when metrics diverge.
 - Data integrity validation (`make data-check`) to guard OptionMetrics/IvyDB staging issues before long training jobs.
 - Dockerfile + README quickstart covering the CPU-only smoke pipeline and data licensing guidance.
+- Sanity harness (`make sanity-test`) that trains ERM/HIRM on the staged real dataset, runs diagnostics, and emits a PASS/FAIL verdict via `scripts/compare_sanity.py`.
 
 ### Changed
 - Dependencies are now pinned via `pyproject.toml`/`requirements-lock.txt` with Python constrained to `>=3.11,<3.12`.

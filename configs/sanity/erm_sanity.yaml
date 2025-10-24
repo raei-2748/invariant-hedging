@@ -1,0 +1,47 @@
+# @package _global_
+
+defaults:
+  - /data: real_spy_paper
+  - /envs: daily
+  - /model: erm
+  - /eval: daily
+  - /logging: default
+  - _self_
+
+runtime:
+  seed: 0
+  device: auto
+  mixed_precision: true
+
+envs:
+  train: [spy_train]
+  val: [spy_val]
+  test: [spy_test_2018, spy_test_2020]
+
+train:
+  steps: 5000
+  batch_size: 64
+  grad_clip: 1.0
+  seed: 0
+  pretrain_steps: 0
+  irm_ramp_steps: 0
+  eval_interval: 500
+  checkpoint_topk: 1
+  max_trade_warning_factor: 1.0
+
+loss:
+  name: cvar
+  cvar_alpha: 0.95
+
+optimizer:
+  name: adamw
+  lr: 5.0e-4
+  weight_decay: 1.0e-6
+
+scheduler:
+  name: cosine
+  warmup_steps: 200
+
+logging:
+  log_interval: 200
+  eval_interval: 500

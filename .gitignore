@@ -147,6 +147,7 @@ data/raw/
 runs/
 outputs/
 outputs_*/
+experiments/sanity/
 *.log
 *.tmp
 smoke.log
