@@ -312,131 +312,134 @@ def run(cfg: DictConfig) -> Path:
                 if objective == "hirm" and irm_settings.enabled:
                     irm_batches.append({"loss": loss, "name": env_name})
 
-        loss_tensor = torch.stack(env_losses)
-        if objective == "groupdro":
-            total_loss = groupdro_objective(group_weights, env_losses)
-        else:
-            total_loss = loss_tensor.mean()
+            loss_tensor = torch.stack(env_losses)
+            if objective == "groupdro":
+                total_loss = groupdro_objective(group_weights, env_losses)
+            else:
+                total_loss = loss_tensor.mean()
 
-        penalty_value = 0.0
-        lambda_logged = 0.0
-        if objective == "irm":
-            lambda_weight = _lambda_schedule(step, cfg)
-            irm_pen = irm_penalty(env_losses, dummy)
-            total_loss = total_loss + lambda_weight * irm_pen
-            penalty_value = float(irm_pen.item())
-            lambda_logged = lambda_weight
-        elif objective == "vrex":
-            vrex_pen = vrex_penalty(env_losses)
-            weight = cfg.model.vrex.penalty_weight
-            total_loss = total_loss + weight * vrex_pen
-            penalty_value = float(vrex_pen.item())
-        elif objective == "hirm":
-            lambda_logged = float(irm_settings.lambda_weight if irm_settings.enabled else 0.0)
-            irm_pen = loss_tensor.new_zeros(())
-            grad_list: List[torch.Tensor] = []
-            compute_penalty = (
-                irm_settings.enabled
-                and len(irm_batches) >= irm_settings.env_min
-                and (
-                    irm_settings.lambda_weight > 0.0
-                    or irm_settings.logging.log_irm_grads
+            penalty_value = 0.0
+            lambda_logged = 0.0
+            if objective == "irm":
+                lambda_weight = _lambda_schedule(step, cfg)
+                irm_pen = irm_penalty(env_losses, dummy)
+                total_loss = total_loss + lambda_weight * irm_pen
+                penalty_value = float(irm_pen.item())
+                lambda_logged = lambda_weight
+            elif objective == "vrex":
+                vrex_pen = vrex_penalty(env_losses)
+                weight = cfg.model.vrex.penalty_weight
+                total_loss = total_loss + weight * vrex_pen
+                penalty_value = float(vrex_pen.item())
+            elif objective == "hirm":
+                lambda_logged = float(irm_settings.lambda_weight if irm_settings.enabled else 0.0)
+                irm_pen = loss_tensor.new_zeros(())
+                grad_list: List[torch.Tensor] = []
+                compute_penalty = (
+                    irm_settings.enabled
+                    and len(irm_batches) >= irm_settings.env_min
+                    and (
+                        irm_settings.lambda_weight > 0.0
+                        or irm_settings.logging.log_irm_grads
+                    )
                 )
-            )
-            if compute_penalty:
-                grad_list = compute_env_head_grads(
-                    policy,
-                    lambda _model, payload: payload["loss"],
-                    irm_batches,
-                    create_graph=True,
+                if compute_penalty:
+                    grad_list = compute_env_head_grads(
+                        policy,
+                        lambda _model, payload: payload["loss"],
+                        irm_batches,
+                        create_graph=True,
+                    )
+                    if irm_settings.type == "cosine":
+                        irm_pen = cosine_alignment_penalty(grad_list, eps=irm_settings.eps)
+                    else:
+                        irm_pen = varnorm_penalty(grad_list, eps=irm_settings.eps)
+                    total_loss = total_loss + irm_settings.lambda_weight * irm_pen
+                    penalty_value = float(irm_pen.detach().item())
+                    metrics_to_log["train/irm_penalty"] = penalty_value
+                    metrics_to_log["train/irm_penalty_weighted"] = float(
+                        (irm_settings.lambda_weight * irm_pen).detach().item()
+                    )
+                if not compute_penalty:
+                    metrics_to_log.setdefault("train/irm_penalty", 0.0)
+                    metrics_to_log.setdefault("train/irm_penalty_weighted", 0.0)
+                if irm_settings.logging.log_irm_grads and grad_list:
+                    detached_grads = [g.detach() for g in grad_list]
+                    with torch.no_grad():
+                        norms = [grad.norm() for grad in detached_grads]
+                        if norms:
+                            stacked_norms = torch.stack(norms)
+                            metrics_to_log["train/irm_grad_norm_min"] = float(stacked_norms.min().item())
+                            metrics_to_log["train/irm_grad_norm_mean"] = float(stacked_norms.mean().item())
+                            metrics_to_log["train/irm_grad_norm_max"] = float(stacked_norms.max().item())
+                        if len(detached_grads) >= 2:
+                            normalised = []
+                            for grad in detached_grads:
+                                norm = grad.norm()
+                                if norm <= irm_settings.eps:
+                                    normalised.append(torch.zeros_like(grad))
+                                else:
+                                    normalised.append(grad / norm.clamp_min(irm_settings.eps))
+                            stacked = torch.stack(normalised)
+                            cos_matrix = stacked @ stacked.T
+                            idx = torch.triu_indices(cos_matrix.shape[0], cos_matrix.shape[1], offset=1)
+                            pairwise_cos = cos_matrix[idx[0], idx[1]]
+                            metrics_to_log["train/irm_grad_cosine_mean"] = float(pairwise_cos.mean().item())
+                            metrics_to_log["train/irm_grad_cosine_min"] = float(pairwise_cos.min().item())
+                            metrics_to_log["train/irm_grad_cosine_max"] = float(pairwise_cos.max().item())
+
+            scaler.scale(total_loss).backward()
+            torch.nn.utils.clip_grad_norm_(policy.parameters(), cfg.train.grad_clip)
+            scaler.step(optimizer)
+            scaler.update()
+            if scheduler is not None:
+                scheduler.step()
+
+            if objective == "groupdro":
+                group_weights = update_groupdro_weights(
+                    group_weights, env_losses, cfg.model.groupdro.step_size
                 )
-                if irm_settings.type == "cosine":
-                    irm_pen = cosine_alignment_penalty(grad_list, eps=irm_settings.eps)
-                else:
-                    irm_pen = varnorm_penalty(grad_list, eps=irm_settings.eps)
-                total_loss = total_loss + irm_settings.lambda_weight * irm_pen
-                penalty_value = float(irm_pen.detach().item())
-                metrics_to_log["train/irm_penalty"] = penalty_value
-                metrics_to_log["train/irm_penalty_weighted"] = float(
-                    (irm_settings.lambda_weight * irm_pen).detach().item()
+
+            if objective in {"irm", "hirm"}:
+                metrics_to_log["train/lambda"] = lambda_logged
+            if objective == "hirm" and env_losses:
+                # Implements Eq. (4): ISI diagnostic = |IG_in - IG_out| linking to §5.1.
+                metrics_to_log["train/ig"] = safe_eval_metric(invariant_gap, env_losses)
+                metrics_to_log["train/wg"] = safe_eval_metric(worst_group, env_losses)
+
+            if step % log_interval == 0 or step == 1:
+                metrics_to_log["train/loss"] = float(total_loss.item())
+                metrics_to_log["train/penalty"] = penalty_value
+                metrics_to_log["train/lr"] = float(optimizer.param_groups[0]["lr"])
+                run_logger.log_metrics(metrics_to_log, step=step)
+
+            if step % eval_interval == 0 or step == cfg.train.steps:
+                val_metrics = _evaluate(policy, val_envs, device, alpha)
+                log_payload = {f"val/{k}_{m}": v for k, metrics in val_metrics.items() for m, v in metrics.items()}
+                run_logger.log_metrics(log_payload, step=step)
+                primary_env = cfg.envs.val[0]
+                score = -val_metrics[primary_env]["cvar"]
+                ckpt_payload = {
+                    "model": policy.state_dict(),
+                    "optimizer": optimizer.state_dict(),
+                    "step": step,
+                    "score": score,
+                    "scaler": {
+                        "mean": feature_engineer.scaler.mean.cpu(),
+                        "std": feature_engineer.scaler.std.cpu(),
+                    },
+                }
+                ckpt_manager.save(
+                    step,
+                    score,
+                    ckpt_payload,
                 )
-            if not compute_penalty:
-                metrics_to_log.setdefault("train/irm_penalty", 0.0)
-                metrics_to_log.setdefault("train/irm_penalty_weighted", 0.0)
-            if irm_settings.logging.log_irm_grads and grad_list:
-                detached_grads = [g.detach() for g in grad_list]
-                with torch.no_grad():
-                    norms = [grad.norm() for grad in detached_grads]
-                    if norms:
-                        stacked_norms = torch.stack(norms)
-                        metrics_to_log["train/irm_grad_norm_min"] = float(stacked_norms.min().item())
-                        metrics_to_log["train/irm_grad_norm_mean"] = float(stacked_norms.mean().item())
-                        metrics_to_log["train/irm_grad_norm_max"] = float(stacked_norms.max().item())
-                    if len(detached_grads) >= 2:
-                        normalised = []
-                        for grad in detached_grads:
-                            norm = grad.norm()
-                            if norm <= irm_settings.eps:
-                                normalised.append(torch.zeros_like(grad))
-                            else:
-                                normalised.append(grad / norm.clamp_min(irm_settings.eps))
-                        stacked = torch.stack(normalised)
-                        cos_matrix = stacked @ stacked.T
-                        idx = torch.triu_indices(cos_matrix.shape[0], cos_matrix.shape[1], offset=1)
-                        pairwise_cos = cos_matrix[idx[0], idx[1]]
-                        metrics_to_log["train/irm_grad_cosine_mean"] = float(pairwise_cos.mean().item())
-                        metrics_to_log["train/irm_grad_cosine_min"] = float(pairwise_cos.min().item())
-                        metrics_to_log["train/irm_grad_cosine_max"] = float(pairwise_cos.max().item())
-
-        scaler.scale(total_loss).backward()
-        torch.nn.utils.clip_grad_norm_(policy.parameters(), cfg.train.grad_clip)
-        scaler.step(optimizer)
-        scaler.update()
-        if scheduler is not None:
-            scheduler.step()
-
-        if objective == "groupdro":
-            group_weights = update_groupdro_weights(
-                group_weights, env_losses, cfg.model.groupdro.step_size
-            )
-
-        if objective in {"irm", "hirm"}:
-            metrics_to_log["train/lambda"] = lambda_logged
-        if objective == "hirm" and env_losses:
-            # Implements Eq. (4): ISI diagnostic = |IG_in - IG_out| linking to §5.1.
-            metrics_to_log["train/ig"] = safe_eval_metric(invariant_gap, env_losses)
-            metrics_to_log["train/wg"] = safe_eval_metric(worst_group, env_losses)
-
-        if step % log_interval == 0 or step == 1:
-            metrics_to_log["train/loss"] = float(total_loss.item())
-            metrics_to_log["train/penalty"] = penalty_value
-            metrics_to_log["train/lr"] = float(optimizer.param_groups[0]["lr"])
-            run_logger.log_metrics(metrics_to_log, step=step)
-
-        if step % eval_interval == 0 or step == cfg.train.steps:
-            val_metrics = _evaluate(policy, val_envs, device, alpha)
-            log_payload = {f"val/{k}_{m}": v for k, metrics in val_metrics.items() for m, v in metrics.items()}
-            run_logger.log_metrics(log_payload, step=step)
-            primary_env = cfg.envs.val[0]
-            score = -val_metrics[primary_env]["cvar"]
-            ckpt_payload = {
-                "model": policy.state_dict(),
-                "optimizer": optimizer.state_dict(),
-                "step": step,
-                "score": score,
-                "scaler": {
-                    "mean": feature_engineer.scaler.mean.cpu(),
-                    "std": feature_engineer.scaler.std.cpu(),
-                },
-            }
-            ckpt_manager.save(
-                step,
-                score,
-                ckpt_payload,
-            )
-        test_metrics = _evaluate(policy, test_envs, device, alpha)
-        run_logger.log_final({f"test/{k}_{m}": v for k, metrics in test_metrics.items() for m, v in metrics.items()})
-        return final_metrics_path
+            if step == cfg.train.steps:
+                test_metrics = _evaluate(policy, test_envs, device, alpha)
+                run_logger.log_final(
+                    {f"test/{k}_{m}": v for k, metrics in test_metrics.items() for m, v in metrics.items()}
+                )
+                return final_metrics_path
     finally:
         run_logger.close()
 
