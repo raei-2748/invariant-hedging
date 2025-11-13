@@ -6,7 +6,7 @@ from pathlib import Path
 
 import torch
 
-from src.evaluation.analyze_diagnostics import DiagnosticsRunContext, gather_and_export
+from invariant_hedging.evaluation.analyze_diagnostics import DiagnosticsRunContext, gather_and_export
 
 
 def _make_batch(risk, outcome, positions, grad, representation):

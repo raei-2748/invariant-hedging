@@ -210,7 +210,7 @@ Because IRM is sensitive to the regularization parameter λ, *we will experiment
 
 ### Reproducibility Archive
 
-* `requirements.txt` with pinned versions
+* `requirements-lock.txt` with pinned wheels (mirrors `pyproject.toml`)
 * Hydra configuration files
 * `seed_list.txt` with 30 seeds
 * `make reproduce` command for evaluation with seed 0
@@ -226,4 +226,4 @@ Because IRM is sensitive to the regularization parameter λ, *we will experiment
 * Reporting: `make report` rebuilds the Phase-2 scorecard figures and tables under `outputs/report_assets/` (deprecated `make phase2_scorecard`).
 * Turnover diagnostics: enable `HIRM_DEBUG_PROBE=1` to log structured probes.
 * Trade spike guard: `train.max_trade_warning_factor` logs max-trade metrics.
-* Baselines packaging: run `tools/scripts/run_baseline.py` to refresh ERM baseline; archival snapshots live under `src/legacy/outputs/_baseline_erm_base/ERM_base_crisis.csv`.
+* Baselines packaging: run `tools/scripts/run_baseline.py` to refresh ERM baseline; archival snapshots live under `src/invariant_hedging/legacy/outputs/_baseline_erm_base/ERM_base_crisis.csv`.

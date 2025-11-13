@@ -2,7 +2,7 @@ import math
 
 import pandas as pd
 
-from src.modules.diagnostics import (
+from invariant_hedging.modules.diagnostics import (
     compute_ER,
     compute_TR,
     compute_VR,

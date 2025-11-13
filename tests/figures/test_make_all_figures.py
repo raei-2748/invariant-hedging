@@ -1,14 +1,29 @@
 from __future__ import annotations
 
 import json
+import sys
+from importlib import util
 from pathlib import Path
 
 import matplotlib
 
-from tools.scripts import make_all_figures
+from invariant_hedging import get_repo_root
 from tests.figures.utils import make_run_directory
 
 matplotlib.use("Agg")
+
+
+def _load_make_all_figures():
+    script_path = get_repo_root() / "tools/scripts/make_all_figures.py"
+    spec = util.spec_from_file_location("tools.scripts.make_all_figures", script_path)
+    module = util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)  # type: ignore[misc]
+    return module
+
+
+make_all_figures = _load_make_all_figures()
 
 
 def test_make_all_figures_end_to_end(tmp_path: Path) -> None:
@@ -48,4 +63,3 @@ def test_make_all_figures_end_to_end(tmp_path: Path) -> None:
         "fig_alignment_curves",
     }
     assert expected_manifest_names <= manifest_names
-

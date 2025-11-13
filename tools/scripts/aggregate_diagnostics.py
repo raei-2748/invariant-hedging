@@ -11,7 +11,7 @@ from typing import Dict, Iterable, List, Mapping
 
 import pandas as pd
 
-from src.modules.diagnostics import (
+from invariant_hedging.modules.diagnostics import (
     compute_ER,
     compute_IG,
     compute_TR,

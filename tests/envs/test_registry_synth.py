@@ -1,7 +1,7 @@
 """Tests for the synthetic regime registry."""
 from __future__ import annotations
 
-from src.modules.environment import SyntheticRegimeRegistry
+from invariant_hedging.modules.environment import SyntheticRegimeRegistry
 
 
 CONFIG = {

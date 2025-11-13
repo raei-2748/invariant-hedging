@@ -8,7 +8,8 @@ expected workflow and conventions.
 1. Fork the repository and create a feature branch named `feature/<summary>` or `fix/<summary>`.
 2. Install the pinned dependencies:
    ```bash
-   python3 -m pip install -r requirements.txt
+   python3 -m pip install -r requirements-lock.txt
+   python3 -m pip install -e .[dev]
    ```
    Conda users can replicate the environment with:
    ```bash
@@ -16,17 +17,16 @@ expected workflow and conventions.
    ```
 3. Format and lint using Ruff before sending a PR:
    ```bash
-   python3 -m ruff check src tests
+   python3 -m ruff check src tests tools experiments
    ```
 4. Run the full test matrix locally:
    ```bash
    make tests
-   make smoke
-   python tools/scripts/train.py config=train/smoke steps=100 seed=0
-   python tools/scripts/train.py config=train/smoke steps=100 seed=0
-   python tools/scripts/diff_metrics.py reports/artifacts/latest_0/metrics.jsonl reports/artifacts/latest_1/metrics.jsonl
+   make smoke-check
+   make paper SMOKE=1
+   make report-paper ARGS="--smoke"
    ```
-   The diff step should report a mean absolute difference below `1e-6`.
+   The smoke harness compares metrics with numerical tolerances (`atol=1e-7`, `rtol=1e-5`) and should not report any drift.
 
 ## Code style
 
@@ -38,9 +38,7 @@ expected workflow and conventions.
 
 - Reference the GitHub issue when applicable.
 - Summarise user-facing changes and include relevant metrics or screenshots.
-- CI must pass before requesting review. Branch protection requires the following
-  workflows to succeed on every pull request:
-  - **CI Smoke** — linting, unit tests, paper-config smoke train/eval, and the SPY
-    data-loader checks.
-  - **CI Dependencies** — captures the package environment, CUDA metadata, and the
-    `paper_provenance.py` manifest used for reproducibility verification.
+- CI must pass before requesting review. Branch protection requires the **Lint**
+  and **Tests** workflows to succeed on every pull request. The nightly **Pipeline
+  Smoke** workflow exercises `make paper SMOKE=1` and `make report-paper` for
+  end-to-end regression coverage.

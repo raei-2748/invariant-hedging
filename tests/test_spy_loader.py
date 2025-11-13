@@ -8,9 +8,9 @@ import pandas as pd
 import pytest
 from omegaconf import OmegaConf
 
-from src.modules.data import spy_loader
-from src.modules.data.preprocess import load_cboe_series
-from src.modules.data.real_spy_loader import RealSpyDataModule
+from invariant_hedging.modules.data import spy_loader
+from invariant_hedging.modules.data.preprocess import load_cboe_series
+from invariant_hedging.modules.data.real_spy_loader import RealSpyDataModule
 
 
 @pytest.fixture
@@ -127,7 +127,7 @@ notes: "Synthetic CLI validation"
         [
             sys.executable,
             "-m",
-            "src.modules.data.spy_loader",
+            "invariant_hedging.modules.data.spy_loader",
             "--split",
             str(split_path),
             "--csv",
@@ -165,29 +165,40 @@ def test_real_spy_module_train_val_test_splits(tmp_path: Path) -> None:
 
     module = RealSpyDataModule(OmegaConf.to_container(data_cfg, resolve=True))
 
-    expected_order = [
+    split_sequence = [
         "spy_train",
-        "spy_val_2018q4",
+        "spy_val",
         "spy_test_2018",
         "spy_test_2020",
         "spy_test_2022",
         "spy_test_2008",
     ]
+
+    def _resolve_split_name(stem: str) -> str:
+        split_cfg = OmegaConf.load(Path("configs/splits") / f"{stem}.yaml")
+        return str(split_cfg.get("name", stem))
+
+    resolved_names = {stem: _resolve_split_name(stem) for stem in split_sequence}
+    expected_order = [resolved_names[stem] for stem in split_sequence]
     assert module.env_order == expected_order
 
     train_envs = module.split_envs("train")
-    assert train_envs == ["spy_train"]
+    assert train_envs == [resolved_names["spy_train"]]
     train_batches = module.prepare("train", train_envs)
-    assert set(train_batches.keys()) == {"spy_train"}
-    assert train_batches["spy_train"].spot.shape[1] > 1
+    assert set(train_batches.keys()) == set(train_envs)
+    assert train_batches[train_envs[0]].spot.shape[1] > 1
 
     val_envs = module.split_envs("val")
-    assert val_envs == ["spy_val_2018q4"]
+    assert val_envs == [resolved_names["spy_val"]]
     val_batches = module.prepare("val", val_envs)
-    assert set(val_batches.keys()) == {"spy_val_2018q4"}
+    assert set(val_batches.keys()) == set(val_envs)
 
     test_envs = module.split_envs("test")
-    assert test_envs == ["spy_test_2018", "spy_test_2020", "spy_test_2022"]
+    assert test_envs == [
+        resolved_names["spy_test_2018"],
+        resolved_names["spy_test_2020"],
+        resolved_names["spy_test_2022"],
+    ]
     test_batches = module.prepare("test", test_envs)
     assert set(test_batches.keys()) == set(test_envs)
     for batch in test_batches.values():
@@ -195,12 +206,12 @@ def test_real_spy_module_train_val_test_splits(tmp_path: Path) -> None:
 
     # Optional split can be requested via the "extra" group or by name when testing
     extra_envs = module.split_envs("extra")
-    assert extra_envs == ["spy_test_2008"]
-    extra_batch = module.prepare("test", extra_envs)["spy_test_2008"]
+    assert extra_envs == [resolved_names["spy_test_2008"]]
+    extra_batch = module.prepare("test", extra_envs)[extra_envs[0]]
     assert extra_batch.meta["start_date"] == "2008-09-01"
     assert extra_batch.meta["end_date"] == "2009-03-31"
 
     # Caches were written to the temporary directory
     splits_dir = tmp_path / "cache" / "splits"
-    assert (splits_dir / "spy_train.csv").exists()
-    assert (splits_dir / "spy_val_2018q4.csv").exists()
+    for name in expected_order:
+        assert (splits_dir / f"{name}.csv").exists()

@@ -136,17 +136,18 @@ See [docs/REPRODUCE.md](docs/REPRODUCE.md) for hardware notes, runtime expectati
 
 ## Continuous integration & tests
 
-Smoke CI config (`.github/workflows/ci.yml`) exports `PYTHONPATH=src` and runs:
+Two blocking workflows gate pull requests:
 
-```bash
-ruff check --no-fix --output-format=github
-pytest -m "not heavy" --maxfail=1 --disable-warnings
-make paper SMOKE=1
-make report-paper
-```
+- `.github/workflows/lint.yml` (`Lint`) installs the package via `pip install -r requirements-lock.txt && pip install -e .[dev]`
+  and runs `ruff check` across `invariant_hedging/`, `tests/`, `tools/`, and `experiments/`.
+- `.github/workflows/tests.yml` (`Tests`) provisions the same environment, executes `pytest -m "not heavy" --maxfail=1`, and
+  reruns the deterministic `make smoke-check` harness with tolerant comparisons.
 
-Local developers can mirror those checks with `make tests` or invoke `pytest -m "not heavy"` directly. Heavy calibration suites
-are isolated behind `@pytest.mark.heavy` and excluded from CI.
+A separate `.github/workflows/pipeline-smoke.yml` workflow runs `make paper SMOKE=1` and `make report-paper` on a nightly
+schedule (and via `workflow_dispatch`) to guard the end-to-end pipeline without blocking day-to-day iteration.
+
+Local developers can mirror the blocking checks with `make tests` or `pytest -m "not heavy"`; heavy calibration suites remain
+isolated behind `@pytest.mark.heavy`.
 
 ## Data summary
 
@@ -191,7 +192,7 @@ Build and run the self-contained Docker image for deterministic smoke tests:
 
 ```bash
 docker build -t hirm .
-docker run --rm -v "$(pwd)/data:/app/data" hirm bash -lc "bash tools/fetch_data.sh --data-dir data && make smoke"
+docker run --rm -v "$(pwd)/data:/app/data" hirm bash -lc "bash tools/fetch_data.sh --data-dir data && make synthetic"
 ```
 
 The container installs dependencies from `requirements-lock.txt`, uses Python 3.11, and defaults to the offline logging mode.
@@ -201,7 +202,7 @@ The container installs dependencies from `requirements-lock.txt`, uses Python 3.
 Before launching the long multi-seed sweeps, run a single-seed ERM vs. HIRM sanity check on the staged real dataset:
 
 ```bash
-make sanity-test
+make real
 ```
 
 The target:

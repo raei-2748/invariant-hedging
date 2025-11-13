@@ -1,6 +1,6 @@
 import torch
 
-from src.modules.markets.pricing import (
+from invariant_hedging.modules.markets.pricing import (
     black_scholes_delta,
     black_scholes_gamma,
     black_scholes_price,

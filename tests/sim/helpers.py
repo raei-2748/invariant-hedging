@@ -5,8 +5,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from src.modules.sim.params import SimRecipe
-from src.modules.sim.utils import make_rng
+from invariant_hedging.modules.sim.params import SimRecipe
+from invariant_hedging.modules.sim.utils import make_rng
 
 
 @dataclass

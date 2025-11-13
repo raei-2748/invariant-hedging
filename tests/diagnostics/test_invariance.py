@@ -3,7 +3,7 @@ import math
 import numpy as np
 import pandas as pd
 
-from src.modules.diagnostics import compute_IG, compute_invariance_spectrum
+from invariant_hedging.modules.diagnostics import compute_IG, compute_invariance_spectrum
 
 
 def test_components_match_formulas():

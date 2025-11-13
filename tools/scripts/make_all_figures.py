@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 from typing import Sequence
 
-from src.visualization._cli import (
+from invariant_hedging.visualization._cli import (
     bootstrap_cli_environment,
     env_override,
     parse_regime_filter,
@@ -16,8 +16,8 @@ from src.visualization._cli import (
 
 bootstrap_cli_environment()
 
-from src.core.infra.plot_io import ensure_out_dir, parse_formats
-from src.visualization import (
+from invariant_hedging.core.infra.plot_io import ensure_out_dir, parse_formats
+from invariant_hedging.visualization import (
     plot_alignment_curves,
     plot_capital_efficiency_frontier,
     plot_invariance_vs_ig,

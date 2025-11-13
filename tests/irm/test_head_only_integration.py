@@ -2,7 +2,7 @@ import pytest
 import torch
 from torch import nn
 
-from src.modules.head_invariance import (
+from invariant_hedging.modules.head_invariance import (
     compute_env_head_grads,
     cosine_alignment_penalty,
     freeze_backbone,

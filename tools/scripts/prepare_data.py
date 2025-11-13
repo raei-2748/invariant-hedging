@@ -6,9 +6,11 @@ import shutil
 import sys
 from pathlib import Path
 
+from invariant_hedging import get_repo_root
+
 
 def main() -> int:
-    repo_root = Path(__file__).resolve().parents[1]
+    repo_root = get_repo_root()
     source = repo_root / "data" / "spy_sample.csv"
     if not source.exists():
         print(

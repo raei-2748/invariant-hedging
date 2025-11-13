@@ -12,7 +12,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Iterable, List, Sequence, Tuple
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+from invariant_hedging import get_repo_root
+
+REPO_ROOT = get_repo_root()
 DEFAULT_RUN_DIR = REPO_ROOT / "runs"
 DEFAULT_EVAL_DIR = REPO_ROOT / "runs_eval"
 DEFAULT_SUMMARY = REPO_ROOT / "outputs" / "_baseline_erm_base" / "ERM_base_crisis.csv"

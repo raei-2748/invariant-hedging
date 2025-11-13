@@ -12,7 +12,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, List, Optional, Sequence, Tuple
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+from invariant_hedging import get_repo_root
+
+REPO_ROOT = get_repo_root()
 
 
 def _split_csv(raw: str) -> List[str]:
@@ -119,9 +121,7 @@ def build_grid(methods: Sequence[str], seeds: Sequence[int], eval_windows: Seque
 
 
 def _resolve_provenance_functions() -> Tuple[callable, callable]:
-    if str(REPO_ROOT) not in sys.path:
-        sys.path.insert(0, str(REPO_ROOT))
-    from src.evaluation.reporting.paper_provenance import collect_provenance, write_provenance
+    from invariant_hedging.evaluation.reporting.paper_provenance import collect_provenance, write_provenance
 
     return collect_provenance, write_provenance
 

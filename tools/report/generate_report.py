@@ -5,22 +5,14 @@ from __future__ import annotations
 import argparse
 import glob
 import logging
-import sys
 from pathlib import Path
 from typing import Iterable, Mapping, MutableMapping
 
 import matplotlib.pyplot as plt
 import pandas as pd
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SRC_ROOT = REPO_ROOT / "src"
-for candidate in (SRC_ROOT, REPO_ROOT):
-    candidate_str = str(candidate)
-    if candidate.exists() and candidate_str not in sys.path:
-        sys.path.insert(0, candidate_str)
-
-from src.legacy.report_assets import attach_deltas, load_report_inputs
-from src.legacy.report_assets.figures import (
+from invariant_hedging import get_repo_root
+from invariant_hedging.legacy.report_assets import attach_deltas, load_report_inputs
+from invariant_hedging.legacy.report_assets.figures import (
     plot_capital_frontier,
     plot_cross_regime_heatmap,
     plot_cvar_violin,
@@ -29,11 +21,13 @@ from src.legacy.report_assets.figures import (
     plot_penalty_sweep,
     plot_isi_decomposition,
 )
-from src.evaluation.reporting.aggregate import AggregateResult, aggregate_runs, build_table_dataframe, load_report_config
-from src.evaluation.reporting.latex import build_table, save_latex_table, write_table_csv
-from src.evaluation.reporting.provenance import build_manifest, write_manifest
-from src.evaluation.reporting.schema import FinalMetricsValidationError, load_final_metrics
+from invariant_hedging.evaluation.reporting.aggregate import AggregateResult, aggregate_runs, build_table_dataframe, load_report_config
+from invariant_hedging.evaluation.reporting.latex import build_table, save_latex_table, write_table_csv
+from invariant_hedging.evaluation.reporting.provenance import build_manifest, write_manifest
+from invariant_hedging.evaluation.reporting.schema import FinalMetricsValidationError, load_final_metrics
 
+DEFAULT_CONFIG = get_repo_root() / "configs/report/default.yaml"
+DEFAULT_OUTPUT_ROOT = get_repo_root() / "outputs/report_paper"
 LOGGER = logging.getLogger("report.generate")
 
 
@@ -241,7 +235,7 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--config",
         type=Path,
-        default=Path("configs/report/default.yaml"),
+        default=DEFAULT_CONFIG,
         help="Report aggregation configuration",
     )
     parser.add_argument(
@@ -275,7 +269,7 @@ def main(argv: Iterable[str] | None = None) -> int:
 
     config = load_report_config(Path(args.config))
     report_cfg = dict(config.get("report", {}))
-    outputs_root = Path(args.out) if args.out else Path(report_cfg.get("paper_outputs_dir", "outputs/report_paper"))
+    outputs_root = Path(args.out) if args.out else Path(report_cfg.get("paper_outputs_dir", DEFAULT_OUTPUT_ROOT))
     outputs_root.mkdir(parents=True, exist_ok=True)
     directories = _ensure_directories(outputs_root)
 

@@ -15,12 +15,12 @@ import pandas as pd
 import yaml
 import torch
 
-from src.modules.data.sim import HestonParams, simulate_heston
-from src.modules.data.sim.liquidity import LiquidityStressConfig, liquidity_costs
-from src.modules.data.sim.merton import JumpSummary, overlay_merton_jumps
-from src.envs.registry import SyntheticRegimeRegistry
-from src.core.infra.io import write_sim_params_json, write_stress_summary_json
-from src.core.losses import cvar_from_pnl
+from invariant_hedging.modules.data.sim import HestonParams, simulate_heston
+from invariant_hedging.modules.data.sim.liquidity import LiquidityStressConfig, liquidity_costs
+from invariant_hedging.modules.data.sim.merton import JumpSummary, overlay_merton_jumps
+from invariant_hedging.envs.registry import SyntheticRegimeRegistry
+from invariant_hedging.core.infra.io import write_sim_params_json, write_stress_summary_json
+from invariant_hedging.core.losses import cvar_from_pnl
 
 
 def _extract_heston(cfg: Mapping[str, object]) -> HestonParams:
@@ -255,10 +255,10 @@ import numpy as np
 import pandas as pd
 from omegaconf import OmegaConf
 
-from src.modules.data.real.anchors import AnchorSpec
-from src.modules.data.real.loader import RealAnchorLoader
-from src.core.infra.paths import canonical_run_dir, episode_file_path
-from src.core.infra.tags import extract_episode_tags
+from invariant_hedging.modules.data.real.anchors import AnchorSpec
+from invariant_hedging.modules.data.real.loader import RealAnchorLoader
+from invariant_hedging.core.infra.paths import canonical_run_dir, episode_file_path
+from invariant_hedging.core.infra.tags import extract_episode_tags
 
 
 @dataclass(frozen=True)

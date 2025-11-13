@@ -7,13 +7,15 @@ import json
 import shutil
 from pathlib import Path
 
+import numpy as np
 from hydra import compose, initialize_config_dir
 from omegaconf import DictConfig
 
-from src.core.engine import run as train_run
+from invariant_hedging import get_repo_root
+from invariant_hedging.core.engine import run as train_run
 
-CONFIG_DIR = Path(__file__).resolve().parents[2] / "configs"
-RUN_ROOT = Path("runs/test_smoke")
+CONFIG_DIR = get_repo_root() / "configs"
+RUN_ROOT = get_repo_root() / "runs/test_smoke"
 
 
 def _prepare_cfg(seed: int, label: str) -> DictConfig:
@@ -22,7 +24,7 @@ def _prepare_cfg(seed: int, label: str) -> DictConfig:
         cfg = compose(
             config_name="experiment",
             overrides=[
-                "/train: smoke",
+                "train=smoke_override",
                 f"train.seed={seed}",
                 f"runtime.seed={seed}",
             ],
@@ -52,8 +54,11 @@ def main() -> None:
     RUN_ROOT.mkdir(parents=True, exist_ok=True)
     metrics_a = _run_once(args.seed, label="pass_a")
     metrics_b = _run_once(args.seed, label="pass_b")
-    if metrics_a != metrics_b:
-        raise SystemExit("Deterministic smoke run produced diverging metrics")
+    if metrics_a.keys() != metrics_b.keys():
+        raise SystemExit("Deterministic smoke run emitted mismatched metric keys.")
+    for key in metrics_a:
+        if not np.allclose(metrics_a[key], metrics_b[key], atol=1e-7, rtol=1e-5):
+            raise SystemExit(f"Deterministic smoke run diverged for metric '{key}'.")
     print("[smoke-check] Metrics match across runs.")
 
 

@@ -6,12 +6,13 @@ DRY ?= 0
 SMOKE ?= 0
 DATA_ROOT ?= data
 
-.PHONY: setup train evaluate reproduce lint tests clean data data-mini smoke paper report report-lite report-paper phase2 phase2_scorecard plot-ig-wg eval-crisis coverage
+.PHONY: setup train evaluate reproduce lint tests clean data data-mini synthetic paper report report-lite report-paper phase2 phase2_scorecard plot-ig-wg eval-crisis coverage real
 
 LAST_PAPER ?= $(shell ls -td reports/paper/* 2>/dev/null | head -1)
 
 setup:
 	$(PYTHON) -m pip install -r requirements-lock.txt
+	$(PYTHON) -m pip install -e .[dev]
 
 train:
 	tools/run_train.sh $(CONFIG)
@@ -38,28 +39,32 @@ smoke-check:
 data-check:
 	$(PYTHON) tools/scripts/check_data_integrity.py --data-root $(DATA_ROOT)
 
-sanity-test:
+real:
 	@set -euo pipefail; \
 	ROOT="experiments/sanity"; \
 	rm -rf "$$ROOT"; \
 	for method in erm hirm; do \
 		CFG="sanity/$${method}_sanity"; \
-		OUT="$$ROOT/$${method}"; \
-		TRAIN_DIR="$$OUT/train"; \
-		mkdir -p "$$TRAIN_DIR"; \
-		$(PYTHON) tools/run_train.sh "$$CFG" logging.local_mirror.base_dir="$$TRAIN_DIR" runtime.output_dir="$$TRAIN_DIR/runs"; \
-		CKPT=$$($(PYTHON) tools/scripts/find_latest_checkpoint.py "$$TRAIN_DIR"); \
+		RUN_DIR="$$ROOT/$${method}/train"; \
+		mkdir -p "$${RUN_DIR}"; \
+		bash tools/run_train.sh "$$CFG" \
+			logging.local_mirror.base_dir="$$RUN_DIR"; \
+		TRAINED_RUN=$$(ls -td "$$RUN_DIR"/*/ 2>/dev/null | head -1); \
+		if [ -z "$$TRAINED_RUN" ]; then echo "No trained run found under $$RUN_DIR" >&2; exit 1; fi; \
+		CKPT=$$($(PYTHON) tools/scripts/find_latest_checkpoint.py "$$TRAINED_RUN"); \
 		for window in daily robustness; do \
-			EVAL_DIR="$$OUT/eval/$${window}"; \
+			EVAL_DIR="$$ROOT/$${method}/eval/$${window}"; \
 			mkdir -p "$$EVAL_DIR"; \
-		$(PYTHON) tools/run_eval.sh "eval/$${window}" \
-			'eval.seeds=[0]' \
-			eval.compute_msi=true \
-			eval.report.checkpoint_path="$$CKPT" \
-			logging.local_mirror.base_dir="$$EVAL_DIR"; \
+			bash tools/run_eval.sh "eval/$${window}" \
+				'eval.seeds=[0]' \
+				eval.compute_msi=true \
+				eval.report.checkpoint_path="$$CKPT" \
+				logging.local_mirror.base_dir="$$EVAL_DIR"; \
 		done; \
 	done; \
 	$(PYTHON) scripts/compare_sanity.py --root "$$ROOT"
+
+
 
 clean:
 	rm -rf runs outputs outputs_* htmlcov .pytest_cache .coverage .coverage.* coverage.xml reports/coverage data/raw data/external
@@ -74,13 +79,13 @@ data-mini:
 	DATA_DIR=$(DATA_ROOT) tools/fetch_data.sh
 	DATA_DIR=$(DATA_ROOT) $(PYTHON) tools/make_data_snapshot.py --mode mini
 
-smoke:
+synthetic:
 	@set -euo pipefail; \
-	python3 experiments/run_train.py --config-name=train/smoke; \
+	$(PYTHON) experiments/run_train.py --config-name=train/smoke; \
 	LAST_RUN=$$(ls -td reports/artifacts/*/ 2>/dev/null | head -1); \
 	if [ -z "$$LAST_RUN" ]; then echo "No run directories found" >&2; exit 1; fi; \
-	CHECKPOINT=$$(python3 tools/scripts/find_latest_checkpoint.py "$$LAST_RUN"); \
-	python3 experiments/run_diagnostics.py --config-name=eval/smoke eval.report.checkpoint_path=$$CHECKPOINT
+	CHECKPOINT=$$($(PYTHON) tools/scripts/find_latest_checkpoint.py "$$LAST_RUN"); \
+	$(PYTHON) experiments/run_diagnostics.py --config-name=eval/smoke eval.report.checkpoint_path=$$CHECKPOINT
 
 paper:
 	@set -euo pipefail; \
@@ -91,13 +96,13 @@ paper:
 	$$CMD
 
 phase2:
-	@echo "See src/legacy/experiments_notes/phase2_plan.md for details."
+	@echo "See src/invariant_hedging/legacy/experiments_notes/phase2_plan.md for details."
 
 report:
-	PYTHONPATH=. $(PYTHON) tools/scripts/aggregate.py --config configs/report/default.yaml
+	$(PYTHON) tools/scripts/aggregate.py --config configs/report/default.yaml
 
 report-lite:
-	PYTHONPATH=. $(PYTHON) tools/scripts/aggregate.py --config configs/report/default.yaml --lite
+	$(PYTHON) tools/scripts/aggregate.py --config configs/report/default.yaml --lite
 
 report-paper:
 	$(PYTHON) tools/report/generate_report.py --config configs/report/paper.yaml --smoke $(ARGS)
@@ -113,11 +118,11 @@ plot-ig-wg:
 		echo "No paper report found. Run 'make paper' followed by 'make report-paper'." >&2; \
 		exit 1; \
 	fi; \
-	$(PYTHON) -m src.visualization.plot_invariance_vs_ig --run_dir "$$RUN_DIR" --out_dir reports/figures/ig_vs_wg --format png
+	$(PYTHON) -m invariant_hedging.visualization.plot_invariance_vs_ig --run_dir "$$RUN_DIR" --out_dir reports/figures/ig_vs_wg --format png
 
 eval-crisis:
 	@set -euo pipefail; \
 	$(PYTHON) experiments/run_diagnostics.py --config-name=eval/robustness
 
 coverage:
-	$(PYTHON) -m pytest --maxfail=1 --disable-warnings --cov=src --cov-report=term-missing --cov-report=html:reports/coverage
+	$(PYTHON) -m pytest --maxfail=1 --disable-warnings --cov=invariant_hedging --cov-report=term-missing --cov-report=html:reports/coverage

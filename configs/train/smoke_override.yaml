@@ -1,0 +1,28 @@
+# @package _global_
+
+train:
+  steps: 100
+  batch_size: 16
+  grad_clip: 1.0
+  seed: 0
+  pretrain_steps: 20
+  irm_ramp_steps: 20
+  eval_interval: 100
+  checkpoint_topk: 1
+  max_trade_warning_factor: 0.0
+
+loss:
+  name: cvar
+  cvar_alpha: 0.95
+
+optimizer:
+  name: adam
+  lr: 5.0e-4
+  weight_decay: 1.0e-6
+
+scheduler:
+  name: none
+
+logging:
+  log_interval: 50
+  eval_interval: 100

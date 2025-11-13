@@ -1,4 +1,4 @@
-name: spy_val_2018q4
+name: spy_val
 instrument: SPY
 start_date: "2018-10-01"
 end_date: "2018-12-31"

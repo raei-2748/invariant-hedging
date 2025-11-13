@@ -10,7 +10,9 @@ import shutil
 from pathlib import Path
 from typing import Iterable
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+from invariant_hedging import get_repo_root
+
+REPO_ROOT = get_repo_root()
 DEFAULT_DATA_DIR = os.environ.get("DATA_DIR", REPO_ROOT / "data")
 
 

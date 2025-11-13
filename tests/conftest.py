@@ -1,7 +1,6 @@
 """Global pytest fixtures and configuration hooks."""
 import os
 import re
-import sys
 from pathlib import Path
 from typing import Dict
 
@@ -10,11 +9,12 @@ import yaml
 import omegaconf._utils as oc_utils
 import pytest
 
-os.environ.setdefault("OMEGACONF_ALLOW_DUPLICATE_KEYS", "true")
+from invariant_hedging import get_repo_root
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+os.environ.setdefault("OMEGACONF_ALLOW_DUPLICATE_KEYS", "true")
+os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
+
+PROJECT_ROOT = get_repo_root()
 
 
 def _allow_duplicate_loader():

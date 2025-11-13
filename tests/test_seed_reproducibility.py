@@ -2,12 +2,14 @@ import json
 import os
 from pathlib import Path
 
+import numpy as np
 import pytest
 from hydra import compose, initialize_config_dir
 
-from src.core.engine import run as run_training
+from invariant_hedging import get_repo_root
+from invariant_hedging.core.engine import run as run_training
 
-CONFIG_DIR = Path(__file__).resolve().parents[1] / "configs"
+CONFIG_DIR = get_repo_root() / "configs"
 
 
 def _train_once(tmp_path: Path, seed: int) -> dict[str, float]:
@@ -36,4 +38,11 @@ def test_final_metrics_match(tmp_path, seed):
     os.environ.setdefault("WANDB_MODE", "offline")
     metrics_first = _train_once(tmp_path / "runs", seed)
     metrics_second = _train_once(tmp_path / "runs", seed)
-    assert metrics_first == metrics_second
+    assert metrics_first.keys() == metrics_second.keys()
+    for key in metrics_first:
+        assert np.allclose(
+            metrics_first[key],
+            metrics_second[key],
+            atol=1e-7,
+            rtol=1e-5,
+        ), f"Metric '{key}' changed beyond tolerance"

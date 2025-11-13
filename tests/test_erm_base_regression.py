@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import csv
 import math
-from pathlib import Path
-
 import pytest
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+from invariant_hedging import get_repo_root
+
+PROJECT_ROOT = get_repo_root()
 BASELINE_CSV = PROJECT_ROOT / "legacy" / "outputs" / "_baseline_erm_base" / "artifacts" / "ERM_base_crisis.csv"
 
 EXPECTED_MEAN = {
@@ -71,4 +71,3 @@ def test_erm_base_crisis_metrics_stable():
         assert margin <= expected_margin + 1e-4, (
             f"Spread for {metric} widened: {margin:.4f} vs {expected_margin:.4f}"
         )
-

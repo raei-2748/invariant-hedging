@@ -1,9 +1,24 @@
 import json
+import sys
+from importlib import util
 
 import pandas as pd
 import pytest
 
-from tools.scripts.aggregate_diagnostics import aggregate_run
+from invariant_hedging import get_repo_root
+
+
+def _load_aggregate_module():
+    script_path = get_repo_root() / "tools/scripts/aggregate_diagnostics.py"
+    spec = util.spec_from_file_location("tools.scripts.aggregate_diagnostics", script_path)
+    module = util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)  # type: ignore[misc]
+    return module
+
+
+aggregate_run = _load_aggregate_module().aggregate_run
 
 
 def test_aggregate_diagnostics_creates_tables(tmp_path):

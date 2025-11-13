@@ -1,3 +1,3 @@
-"""Utility scripts for invariant hedging."""
-"""Utility scripts for quick experiment workflows."""
-"""CLI helpers for running lightweight experiments."""
+"""Utility CLI modules exposed for test imports."""
+
+__all__: list[str] = []

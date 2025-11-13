@@ -1,3 +1,0 @@
-# Dependencies are declared in pyproject.toml.
-# Install the package (including dev extras) via:
--e .[dev]

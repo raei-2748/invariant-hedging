@@ -94,7 +94,7 @@ def main(argv: List[str] | None = None) -> int:
     parser.add_argument(
         "overrides",
         nargs=argparse.REMAINDER,
-        help="Hydra overrides (e.g. train=smoke)",
+        help="Hydra overrides (e.g. train=smoke_override)",
     )
     parsed = parser.parse_args(argv)
     overrides, tag, config_name = _rewrite_overrides(parsed.overrides)

@@ -1,0 +1,35 @@
+name: Pipeline Smoke
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * *"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-lock.txt
+          pip install -e .[dev]
+      - name: Run smoke paper pipeline
+        env:
+          WANDB_MODE: offline
+        run: |
+          make paper SMOKE=1
+          make report-paper
+      - name: Upload reports bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-reports
+          path: |
+            reports/
+            runs/
+            outputs/
+          if-no-files-found: ignore

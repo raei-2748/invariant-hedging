@@ -8,9 +8,6 @@ import sys
 from pathlib import Path
 from typing import Iterable, Sequence
 
-
-ROOT = Path(__file__).resolve().parents[1]
-
 PHASE1_MODELS: Sequence[str] = (
     "train/erm",
     "train/erm_reg",
@@ -23,16 +20,6 @@ PHASE1_MODELS: Sequence[str] = (
 def _run_process(args: Sequence[str], *, env: dict[str, str]) -> None:
     process_env = os.environ.copy()
     process_env.update(env)
-    pythonpath = process_env.get("PYTHONPATH", "")
-    path_entries = [entry for entry in pythonpath.split(os.pathsep) if entry]
-    preferred = [ROOT / "src", ROOT]
-    for candidate in preferred:
-        candidate_str = str(candidate)
-        if candidate.exists() and candidate_str not in path_entries:
-            path_entries.insert(0, candidate_str)
-    if not path_entries:
-        path_entries.append(str(ROOT))
-    process_env["PYTHONPATH"] = os.pathsep.join(path_entries)
     subprocess.run(args, check=True, env=process_env)
 
 
@@ -105,7 +92,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.phase == "phase2":
-        print("Phase 2 reproduce requires manual execution; see src/legacy/experiments_notes/phase2_plan.md.")
+        print("Phase 2 reproduce requires manual execution; see src/invariant_hedging/legacy/experiments_notes/phase2_plan.md.")
         return 0
 
     reproduce_phase1(args.overrides)

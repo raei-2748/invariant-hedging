@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from src.evaluation.reporting.ire3d import build_ire_coordinates, write_ire_assets
+from invariant_hedging.evaluation.reporting.ire3d import build_ire_coordinates, write_ire_assets
 
 
 def _make_raw() -> pd.DataFrame:

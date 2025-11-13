@@ -5,8 +5,8 @@ from pathlib import Path
 
 import matplotlib
 
-from src.core.infra.plot_io import parse_formats
-from src.visualization import (
+from invariant_hedging.core.infra.plot_io import parse_formats
+from invariant_hedging.visualization import (
     plot_alignment_curves,
     plot_capital_efficiency_frontier,
     plot_invariance_vs_ig,
