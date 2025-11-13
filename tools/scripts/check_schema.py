@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import csv
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -140,7 +139,6 @@ def main() -> int:
             else:
                 # Append only the table rows (skip header) to avoid duplication.
                 rows = markdown.splitlines()[2:]
-                writer = csv.writer(fh)
                 for row in rows:
                     fh.write(row + "\n")
     return 0

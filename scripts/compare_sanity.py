@@ -40,7 +40,7 @@ def _load_crisis_row(csv_path: Path) -> Dict[str, float]:
 
 
 def _extract_metrics(root: Path, method: str) -> Dict[str, float]:
-    daily_eval = root / method / "eval" / "daily"
+    crisis_eval = root / method / "eval" / "crisis"
     final_metrics = _load_json(crisis_eval / "final_metrics.json")
     diag_summary = _load_json(crisis_eval / "artifacts" / "diagnostics_summary.json")
     crisis_row = _load_crisis_row(crisis_eval / "artifacts" / "smoke_results.csv")

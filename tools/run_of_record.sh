@@ -30,6 +30,13 @@ while [[ $# -gt 0 ]]; do
 done
 
 PYTHON_BIN=${PYTHON:-python3}
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)
+SRC_PATH="${REPO_ROOT}/src"
+if [[ -z "${PYTHONPATH:-}" ]]; then
+  export PYTHONPATH="${SRC_PATH}"
+else
+  export PYTHONPATH="${SRC_PATH}:${PYTHONPATH}"
+fi
 
 contains_prefix() {
   local prefix="$1"
@@ -86,7 +93,7 @@ else
   EVAL_OVERRIDES=()
 fi
 
-MPS_AUTODETECT=$("$PYTHON_BIN" - <<'PY' 2>/dev/null || echo "0")
+MPS_AUTODETECT=$("$PYTHON_BIN" - <<'PY' 2>/dev/null || echo "0"
 import platform
 try:
     import torch
@@ -103,6 +110,7 @@ else:
         available = getattr(mps, "is_available", lambda: False)()
         print("1" if available else "0")
 PY
+)
 
 RUNTIME_OVERRIDES=()
 if [[ "$MPS_AUTODETECT" == "1" ]]; then

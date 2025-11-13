@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from invariant_hedging.evaluation.reporting import paper_provenance
+from invariant_hedging.reporting.legacy import paper_provenance
 
 
 @pytest.fixture()

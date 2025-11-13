@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from invariant_hedging.evaluation.reporting.schema import (
+from invariant_hedging.reporting.legacy.schema import (
     FinalMetricsValidationError,
     load_final_metrics,
     validate_final_metrics,
@@ -13,9 +13,7 @@ from invariant_hedging.evaluation.reporting.schema import (
 
 
 def test_sample_final_metrics_file_validates() -> None:
-    sample_path = Path(
-        "src/invariant_hedging/legacy/outputs/_baseline_erm_base/artifacts/runs_v1/20250927_231747/final_metrics.json"
-    )
+    sample_path = Path("tests/data/report/final_metrics.json")
     payload = load_final_metrics(sample_path)
     assert "test/crisis_cvar" in payload.metrics
     assert payload.metrics["test/crisis_turnover"] == pytest.approx(10.0)

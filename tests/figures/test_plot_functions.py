@@ -5,7 +5,7 @@ from pathlib import Path
 
 import matplotlib
 
-from invariant_hedging.core.infra.plot_io import parse_formats
+from invariant_hedging.reporting.infra.plot_io import parse_formats
 from invariant_hedging.visualization import (
     plot_alignment_curves,
     plot_capital_efficiency_frontier,

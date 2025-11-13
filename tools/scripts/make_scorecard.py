@@ -17,7 +17,7 @@ from typing import Dict, Iterable, Iterator, List, Mapping, MutableMapping, Opti
 
 try:  # pragma: no cover - optional dependency
     import yaml
-except ImportError as exc:  # pragma: no cover - provide helpful error later
+except ImportError:  # pragma: no cover - provide helpful error later
     yaml = None  # type: ignore
 
 LOGGER = logging.getLogger("make_scorecard")

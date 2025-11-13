@@ -7,7 +7,7 @@ import math
 import pytest
 import torch
 
-from invariant_hedging.modules.diagnostics import compute_IG
+from invariant_hedging.diagnostics.robustness import compute_IG
 
 
 def test_ig_empty_mapping_returns_nan(float_tolerance: Dict[str, float]) -> None:

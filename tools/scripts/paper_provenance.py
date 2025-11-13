@@ -121,7 +121,7 @@ def build_grid(methods: Sequence[str], seeds: Sequence[int], eval_windows: Seque
 
 
 def _resolve_provenance_functions() -> Tuple[callable, callable]:
-    from invariant_hedging.evaluation.reporting.paper_provenance import collect_provenance, write_provenance
+    from invariant_hedging.reporting.legacy.paper_provenance import collect_provenance, write_provenance
 
     return collect_provenance, write_provenance
 
@@ -175,7 +175,7 @@ def _manifest_from_grid(args: argparse.Namespace) -> None:
     print(f"Final metrics summary written to {metrics_path}")
 
 
-def _legacy_manifest(args: argparse.Namespace) -> None:
+def _report_manifest(args: argparse.Namespace) -> None:
     collect_provenance, write_provenance = _resolve_provenance_functions()
     data = collect_provenance(args.run_dir)
     indent = 2 if args.pretty or args.output else None
@@ -202,7 +202,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             raise SystemExit("--methods, --seeds, and --eval-windows must be provided together")
         _manifest_from_grid(args)
     else:
-        _legacy_manifest(args)
+        _report_manifest(args)
     return 0
 
 

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from invariant_hedging.evaluation.reporting.plots import (
+from invariant_hedging.reporting.legacy.plots import (
     plot_efficiency_frontier,
     plot_heatmaps,
     plot_qq,

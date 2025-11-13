@@ -28,8 +28,8 @@ bootstrap_cli_environment()
 import matplotlib.pyplot as plt
 import numpy as np
 
-from invariant_hedging.core.infra.plot_io import append_manifest, apply_style, ensure_out_dir, parse_formats, save_figure
-from invariant_hedging.core.infra.tables import (
+from invariant_hedging.reporting.infra.plot_io import append_manifest, apply_style, ensure_out_dir, parse_formats, save_figure
+from invariant_hedging.reporting.infra.tables import (
     maybe_filter_regimes,
     maybe_filter_seeds,
     read_diagnostics_summary,

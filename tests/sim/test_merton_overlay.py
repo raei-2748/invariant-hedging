@@ -4,9 +4,9 @@ from __future__ import annotations
 import pandas as pd
 import torch
 
-from invariant_hedging.modules.data.sim import HestonParams, simulate_heston
-from invariant_hedging.modules.data.sim.merton import overlay_merton_jumps
-from invariant_hedging.core.losses import cvar_from_pnl
+from invariant_hedging.data.sim import HestonParams, simulate_heston
+from invariant_hedging.data.sim.merton import overlay_merton_jumps
+from invariant_hedging.training.losses import cvar_from_pnl
 
 
 def _pnl_from_path(df: pd.DataFrame) -> float:

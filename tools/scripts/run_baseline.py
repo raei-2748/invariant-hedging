@@ -8,9 +8,8 @@ import json
 import os
 import subprocess
 import sys
-from datetime import datetime
 from pathlib import Path
-from typing import Iterable, List, Sequence, Tuple
+from typing import List, Sequence
 
 from invariant_hedging import get_repo_root
 

@@ -5,6 +5,8 @@ CONFIG ?= configs/experiment.yaml
 DRY ?= 0
 SMOKE ?= 0
 DATA_ROOT ?= data
+PYTHONPATH ?=
+export PYTHONPATH := src$(if $(PYTHONPATH),:$(PYTHONPATH))
 
 .PHONY: setup train evaluate reproduce lint tests clean data data-mini synthetic paper report report-lite report-paper phase2 phase2_scorecard plot-ig-wg eval-crisis coverage real
 

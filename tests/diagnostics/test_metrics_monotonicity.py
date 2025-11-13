@@ -3,7 +3,7 @@
 import pytest
 import torch
 
-from invariant_hedging.modules.diagnostics import compute_IG, compute_TR, compute_VR, compute_WG
+from invariant_hedging.diagnostics.robustness import compute_IG, compute_TR, compute_VR, compute_WG
 
 
 def test_worst_group_matches_max():

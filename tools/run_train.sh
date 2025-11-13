@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)
+SRC_PATH="${REPO_ROOT}/src"
+if [[ -z "${PYTHONPATH:-}" ]]; then
+  export PYTHONPATH="${SRC_PATH}"
+else
+  export PYTHONPATH="${SRC_PATH}:${PYTHONPATH}"
+fi
+
 CONFIG=${1:-train/erm}
 shift || true
 

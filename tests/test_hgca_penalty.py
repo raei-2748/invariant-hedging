@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from invariant_hedging.modules.head_invariance import cosine_alignment_penalty
+from invariant_hedging.training.head_invariance import cosine_alignment_penalty
 
 
 def test_cosine_alignment_penalty_is_zero_for_aligned_vectors() -> None:

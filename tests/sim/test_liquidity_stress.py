@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from invariant_hedging.modules.data.sim.liquidity import LiquidityStressConfig, liquidity_costs
-from invariant_hedging.modules.environment import SyntheticRegimeRegistry
+from invariant_hedging.data.sim.liquidity import LiquidityStressConfig, liquidity_costs
+from invariant_hedging.data.environment import SyntheticRegimeRegistry
 
 
 def test_cost_monotonicity() -> None:

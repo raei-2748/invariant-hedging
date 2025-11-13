@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from invariant_hedging.modules.environment import register_real_anchors
+from invariant_hedging.data.environment import register_real_anchors
 
 
 @pytest.fixture

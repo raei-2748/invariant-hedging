@@ -11,8 +11,8 @@ from typing import Iterable, Mapping, MutableMapping
 import matplotlib.pyplot as plt
 import pandas as pd
 from invariant_hedging import get_repo_root
-from invariant_hedging.legacy.report_assets import attach_deltas, load_report_inputs
-from invariant_hedging.legacy.report_assets.figures import (
+from invariant_hedging.reporting.assets import attach_deltas, load_report_inputs
+from invariant_hedging.reporting.assets.figures import (
     plot_capital_frontier,
     plot_cross_regime_heatmap,
     plot_cvar_violin,
@@ -21,10 +21,10 @@ from invariant_hedging.legacy.report_assets.figures import (
     plot_penalty_sweep,
     plot_isi_decomposition,
 )
-from invariant_hedging.evaluation.reporting.aggregate import AggregateResult, aggregate_runs, build_table_dataframe, load_report_config
-from invariant_hedging.evaluation.reporting.latex import build_table, save_latex_table, write_table_csv
-from invariant_hedging.evaluation.reporting.provenance import build_manifest, write_manifest
-from invariant_hedging.evaluation.reporting.schema import FinalMetricsValidationError, load_final_metrics
+from invariant_hedging.reporting.legacy.aggregate import AggregateResult, aggregate_runs, build_table_dataframe, load_report_config
+from invariant_hedging.reporting.legacy.latex import build_table, save_latex_table, write_table_csv
+from invariant_hedging.reporting.legacy.provenance import build_manifest, write_manifest
+from invariant_hedging.reporting.legacy.schema import FinalMetricsValidationError, load_final_metrics
 
 DEFAULT_CONFIG = get_repo_root() / "configs/report/default.yaml"
 DEFAULT_OUTPUT_ROOT = get_repo_root() / "outputs/report_paper"
@@ -176,7 +176,10 @@ def _generate_figures(
         try:
             success = fn(out_path)
         except Exception as exc:  # pragma: no cover - defensive
-            LOGGER.warning("Failed to generate %s: %s", filename, exc)
+            if smoke:
+                LOGGER.info("Skipping %s in smoke mode: %s", filename, exc)
+            else:
+                LOGGER.warning("Failed to generate %s: %s", filename, exc)
             success = False
         if success:
             produced.append(out_path)
@@ -205,7 +208,10 @@ def _validate_final_metrics(paths: Iterable[Path], smoke: bool) -> list[dict[str
         if not path.exists():
             entry["status"] = "missing"
             results.append(entry)
-            LOGGER.warning("Missing final_metrics.json at %s", path)
+            if smoke:
+                LOGGER.info("Missing final_metrics.json at %s (smoke mode)", path)
+            else:
+                LOGGER.warning("Missing final_metrics.json at %s", path)
             if not smoke:
                 raise FileNotFoundError(path)
             continue
@@ -283,7 +289,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     except Exception as exc:
         if not args.smoke:
             raise
-        LOGGER.warning("Aggregation failed in smoke mode: %s", exc)
+        LOGGER.info("Aggregation failed in smoke mode: %s", exc)
         result = _placeholder_result(config)
 
     tables = _generate_tables(result, directories["tables"], smoke=args.smoke)

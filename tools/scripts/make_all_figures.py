@@ -16,7 +16,7 @@ from invariant_hedging.visualization._cli import (
 
 bootstrap_cli_environment()
 
-from invariant_hedging.core.infra.plot_io import ensure_out_dir, parse_formats
+from invariant_hedging.reporting.infra.plot_io import ensure_out_dir, parse_formats
 from invariant_hedging.visualization import (
     plot_alignment_curves,
     plot_capital_efficiency_frontier,

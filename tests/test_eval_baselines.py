@@ -3,10 +3,10 @@ from __future__ import annotations
 
 import torch
 
-from invariant_hedging.evaluation import evaluate_crisis as eval_module
-from invariant_hedging.modules.data.features import FeatureEngineer
-from invariant_hedging.modules.data.types import EpisodeBatch
-from invariant_hedging.modules.environment import SingleAssetHedgingEnv
+from invariant_hedging.evaluation import runner as eval_module
+from invariant_hedging.data.features import FeatureEngineer
+from invariant_hedging.data.types import EpisodeBatch
+from invariant_hedging.data.environment import SingleAssetHedgingEnv
 
 
 def _make_episode_batch() -> EpisodeBatch:

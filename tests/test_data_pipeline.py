@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from omegaconf import DictConfig, OmegaConf
 
-from invariant_hedging.modules.data_pipeline import FeatureEngineer, unwrap_experiment_config
+from invariant_hedging.data.pipeline import FeatureEngineer, unwrap_experiment_config
 
 
 def test_unwrap_experiment_config_returns_train_block() -> None:

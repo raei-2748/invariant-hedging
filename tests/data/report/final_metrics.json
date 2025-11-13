@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0.0",
+  "metrics": {
+    "test/crisis_cvar": {
+      "value": -12.0,
+      "units": "USD"
+    },
+    "test/crisis_turnover": {
+      "value": 10.0
+    }
+  },
+  "experiment": {
+    "id": "sample"
+  }
+}

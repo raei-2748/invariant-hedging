@@ -7,9 +7,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from invariant_hedging.modules.sim.calibrators import compose_sim_recipe
-from invariant_hedging.modules.sim.params import SimRecipe
-from invariant_hedging.modules.sim.utils import (
+from invariant_hedging.data.sim.calibrators import compose_sim_recipe
+from invariant_hedging.data.sim.params import SimRecipe
+from invariant_hedging.data.sim.utils import (
     SampleMoments,
     aggregate_ac1,
     annualize_mean,
