@@ -1,9 +1,9 @@
 defaults:
-  - model: hedger
-  - data: regimes
-  - evaluation: default
-  - logging: wandb
   - _self_
+  - override model: hedger
+  - override data: regimes
+  - override evaluation: default
+  - override logging: wandb
 
 project:
   name: hirm_experiment

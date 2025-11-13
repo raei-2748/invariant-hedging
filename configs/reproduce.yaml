@@ -1,11 +1,11 @@
 defaults:
-  - model: hedger
-  - data: regimes
-  - algorithm: irm
-  - training: default
-  - evaluation: default
-  - logging: wandb
   - _self_
+  - override model: hedger
+  - override data: regimes
+  - override algorithm: irm
+  - override training: default
+  - override evaluation: default
+  - override logging: wandb
 
 project:
   name: hirm_experiment
