@@ -1,13 +1,13 @@
 # @package _global_
 
 defaults:
-  - /data: real_spy
-  - /envs: daily
-  - /model: irm
-  - /eval: daily
-  - /diagnostics: default
-  - /logging: default
   - _self_
+  - override /data: real_spy
+  - override /envs: daily
+  - override /model: irm
+  - override /eval: daily
+  - /diagnostics: default
+  - override /logging: default
 
 runtime:
   seed: 0

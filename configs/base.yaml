@@ -1,4 +1,5 @@
 # Canonical entrypoint for training and evaluation experiments.
 defaults:
+  - _self_
   - experiment
 

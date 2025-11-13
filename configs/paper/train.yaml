@@ -1,8 +1,8 @@
 # @package _global_
 
 defaults:
-  - /train: erm
   - _self_
+  - override /train: erm
 
 runtime:
   seed: 0

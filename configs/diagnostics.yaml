@@ -1,4 +1,5 @@
 # Default diagnostics configuration wrapper.
 defaults:
+  - _self_
   - diagnostics/default
 

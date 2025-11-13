@@ -1,12 +1,12 @@
 # @package _global_
 
 defaults:
-  - /data: synthetic
-  - /envs: daily
-  - /model: erm
-  - /eval: daily
-  - /logging: default
   - _self_
+  - override /data: synthetic
+  - override /envs: daily
+  - override /model: erm
+  - override /eval: daily
+  - override /logging: default
 
 train:
   steps: 150000

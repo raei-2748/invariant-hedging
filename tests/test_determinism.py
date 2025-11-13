@@ -16,7 +16,7 @@ def _run_smoke(tmp_path: Path, seed: int) -> dict:
         cfg = compose(
             config_name="experiment",
             overrides=[
-                "/train: smoke",
+                "train=smoke",
                 f"train.seed={seed}",
                 f"runtime.seed={seed}",
             ],

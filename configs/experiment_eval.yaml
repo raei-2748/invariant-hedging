@@ -1,9 +1,9 @@
 defaults:
+  - _self_
   - model: hedger
   - data: regimes
   - evaluation: default
   - logging: wandb
-  - _self_
 
 project:
   name: hirm_experiment
