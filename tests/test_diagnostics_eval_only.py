@@ -4,8 +4,8 @@ from __future__ import annotations
 import torch
 from torch import nn
 
-from invariant_hedging.core.losses import compute_hirm_penalty, hirm_loss
-from invariant_hedging.modules.diagnostics import detach_diagnostics, invariant_gap, safe_eval_metric, worst_group
+from invariant_hedging.training.losses import compute_hirm_penalty, hirm_loss
+from invariant_hedging.diagnostics.invariance import detach_diagnostics, invariant_gap, safe_eval_metric, worst_group
 
 
 def _build_model() -> nn.Module:

@@ -148,8 +148,10 @@ runs/
 outputs/
 outputs_*/
 experiments/sanity/
+reports/artifacts/*
 *.log
 *.tmp
 smoke.log
 !.gitkeep
+!reports/artifacts/.gitkeep
 !src/legacy/outputs/

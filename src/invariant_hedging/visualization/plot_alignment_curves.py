@@ -16,8 +16,8 @@ bootstrap_cli_environment()
 
 import matplotlib.pyplot as plt
 
-from invariant_hedging.core.infra.plot_io import append_manifest, apply_style, ensure_out_dir, parse_formats, save_figure
-from invariant_hedging.core.infra.tables import maybe_filter_seeds, read_alignment_head
+from invariant_hedging.reporting.plot_io import append_manifest, apply_style, ensure_out_dir, parse_formats, save_figure
+from invariant_hedging.reporting.tables import maybe_filter_seeds, read_alignment_head
 
 LOGGER = logging.getLogger(__name__)
 

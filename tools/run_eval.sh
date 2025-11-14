@@ -11,5 +11,6 @@ export KMP_INIT_AT_FORK=${KMP_INIT_AT_FORK:-FALSE}
 export HIRM_TORCH_NUM_THREADS=${HIRM_TORCH_NUM_THREADS:-$OMP_NUM_THREADS}
 export WANDB_MODE=${WANDB_MODE:-disabled}
 export WANDB_DISABLED=${WANDB_DISABLED:-true}
+export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
 
 python3 experiments/run_diagnostics.py --config-name="${CONFIG}" "$@"

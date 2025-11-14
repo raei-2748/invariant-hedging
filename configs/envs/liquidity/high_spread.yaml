@@ -1,4 +1,0 @@
-description: High spread liquidity stress scenario
-linear_bps: 3.0
-quadratic: 0.0
-slippage_multiplier: 2.0

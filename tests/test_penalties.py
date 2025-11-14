@@ -1,5 +1,5 @@
 import torch
-from invariant_hedging.core.losses import irm_penalty, vrex_penalty
+from invariant_hedging.training.losses import irm_penalty, vrex_penalty
 
 
 def _env_losses(param: torch.Tensor) -> torch.Tensor:

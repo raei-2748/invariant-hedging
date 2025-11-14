@@ -17,5 +17,6 @@ export NUMPY_DEFAULT_DTYPE=${NUMPY_DEFAULT_DTYPE:-float64}
 export PYTORCH_ENABLE_MPS_FALLBACK=${PYTORCH_ENABLE_MPS_FALLBACK:-1}
 export WANDB_MODE=${WANDB_MODE:-disabled}
 export WANDB_DISABLED=${WANDB_DISABLED:-true}
+export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
 
 python3 experiments/run_train.py --config-name="${CONFIG}" "$@"

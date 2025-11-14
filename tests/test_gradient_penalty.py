@@ -5,7 +5,7 @@ from typing import Dict, Sequence
 import pytest
 import torch
 
-from invariant_hedging.core.losses import compute_hirm_penalty, irm_penalty, vrex_penalty
+from invariant_hedging.training.losses import compute_hirm_penalty, irm_penalty, vrex_penalty
 
 
 def test_irm_penalty_matches_polynomial_reference(float_tolerance: Dict[str, float]) -> None:

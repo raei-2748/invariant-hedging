@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from invariant_hedging.modules.head_invariance import cosine_alignment_penalty, varnorm_penalty
+from invariant_hedging.training.head_invariance import cosine_alignment_penalty, varnorm_penalty
 
 
 def test_cosine_penalty_zero_for_identical_grads():

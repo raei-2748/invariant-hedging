@@ -3,7 +3,7 @@
 import pytest
 import torch
 
-from invariant_hedging.modules.diagnostics import (
+from invariant_hedging.diagnostics.invariance import (
     compute_C1_global_stability,
     compute_C2_mechanistic_stability,
     compute_C3_structural_stability,

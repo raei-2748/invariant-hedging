@@ -1,1 +1,1 @@
-from invariant_hedging.legacy.report_core.provenance import *  # noqa: F401,F403
+from invariant_hedging.reporting.core.provenance import *  # noqa: F401,F403

@@ -1,6 +1,0 @@
-enabled: true
-mode: offline
-entity: null
-project: ${project.name}
-group: default
-tags: []

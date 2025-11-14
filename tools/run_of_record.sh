@@ -4,6 +4,7 @@ set -euo pipefail
 DRY_RUN=0
 SMOKE=0
 EXTRA_ARGS=()
+export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -86,7 +87,8 @@ else
   EVAL_OVERRIDES=()
 fi
 
-MPS_AUTODETECT=$("$PYTHON_BIN" - <<'PY' 2>/dev/null || echo "0")
+if ! MPS_AUTODETECT="$(
+  "$PYTHON_BIN" - <<'PY' 2>/dev/null
 import platform
 try:
     import torch
@@ -103,6 +105,9 @@ else:
         available = getattr(mps, "is_available", lambda: False)()
         print("1" if available else "0")
 PY
+)"; then
+  MPS_AUTODETECT="0"
+fi
 
 RUNTIME_OVERRIDES=()
 if [[ "$MPS_AUTODETECT" == "1" ]]; then

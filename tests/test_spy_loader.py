@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -8,9 +9,9 @@ import pandas as pd
 import pytest
 from omegaconf import OmegaConf
 
-from invariant_hedging.modules.data import spy_loader
-from invariant_hedging.modules.data.preprocess import load_cboe_series
-from invariant_hedging.modules.data.real_spy_loader import RealSpyDataModule
+from invariant_hedging.data import spy_loader
+from invariant_hedging.data.preprocess import load_cboe_series
+from invariant_hedging.data.real_spy_loader import RealSpyDataModule
 
 
 @pytest.fixture
@@ -123,11 +124,17 @@ notes: "Synthetic CLI validation"
     )
 
     runs_dir = tmp_path / "runs"
+    project_root = Path(__file__).resolve().parent
+    while project_root != project_root.parent:
+        if (project_root / "pyproject.toml").exists():
+            break
+        project_root = project_root.parent
+    env = {**os.environ, "PYTHONPATH": str(project_root / "src")}
     result = subprocess.run(
         [
             sys.executable,
             "-m",
-            "invariant_hedging.modules.data.spy_loader",
+            "invariant_hedging.data.spy_loader",
             "--split",
             str(split_path),
             "--csv",
@@ -138,6 +145,8 @@ notes: "Synthetic CLI validation"
         check=True,
         capture_output=True,
         text=True,
+        env=env,
+        cwd=str(project_root),
     )
 
     assert "cli_split" in result.stdout

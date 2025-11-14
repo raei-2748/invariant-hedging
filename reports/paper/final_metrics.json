@@ -1,11 +1,11 @@
 {
-  "generated_at": "2025-10-23T11:44:58.191429+00:00",
+  "generated_at": "2025-11-13T14:39:39.792609+00:00",
   "runs": [
     {
       "stage": "train",
       "method": "train/erm",
       "seed": 0,
-      "path": "/workspace/invariant-hedging/reports/paper_runs/train__erm/seed_0/final_metrics.json",
+      "path": "reports/paper_runs/train__erm/seed_0/final_metrics.json",
       "metrics": {
         "test/crisis_cvar": 271.4481201171875,
         "test/crisis_mean_pnl": -15.442262649536133,
@@ -19,7 +19,7 @@
       "method": "train/erm",
       "seed": 0,
       "window": "smoke",
-      "path": "/workspace/invariant-hedging/reports/paper_runs/train__erm/seed_0/eval/smoke/final_metrics.json",
+      "path": "reports/paper_runs/train__erm/seed_0/eval/smoke/final_metrics.json",
       "metrics": {
         "test/crisis/ES95": 271.4481201171875,
         "test/crisis/Mean": 15.442262649536133,

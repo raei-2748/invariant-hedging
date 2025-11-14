@@ -1,8 +1,0 @@
-name: irm_v1
-objective: mean_squared_pnl
-risk_measure: invariant
-lambda_initial: 0.0
-lambda_target: 10.0
-pretrain_steps: 20000
-ramp_steps: 10000
-penalty_anneal_iters: 0

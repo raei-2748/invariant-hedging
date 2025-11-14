@@ -4,7 +4,7 @@ from invariant_hedging.evaluation.probes.spurious_vol import (
     SpuriousVolConfig,
     apply_spurious_vol_probe,
 )
-from invariant_hedging.modules.diagnostics import mechanistic_sensitivity
+from invariant_hedging.diagnostics.invariance import mechanistic_sensitivity
 
 
 def test_spurious_probe_amplify_increases_msi_and_limits_hirm_delta():

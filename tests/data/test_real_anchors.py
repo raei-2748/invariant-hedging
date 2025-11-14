@@ -8,8 +8,8 @@ import pandas as pd
 import pytest
 import torch
 
-from invariant_hedging.modules.data.real.loader import RealAnchorLoader
-from invariant_hedging.core.infra.paths import canonical_run_dir, episode_file_path
+from invariant_hedging.data.real.loader import RealAnchorLoader
+from invariant_hedging.runtime.paths import canonical_run_dir, episode_file_path
 
 
 @pytest.fixture

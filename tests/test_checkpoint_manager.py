@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from invariant_hedging.core.utils import checkpoints
+from invariant_hedging.runtime import checkpoints
 
 
 def _collect_manifest(path: Path) -> list[dict]:

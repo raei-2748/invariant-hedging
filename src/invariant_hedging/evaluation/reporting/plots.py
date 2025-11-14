@@ -1,1 +1,1 @@
-from invariant_hedging.legacy.report_core.plots import *  # noqa: F401,F403
+from invariant_hedging.reporting.core.plots import *  # noqa: F401,F403

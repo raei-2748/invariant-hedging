@@ -6,7 +6,7 @@ from typing import Dict
 import pytest
 import torch
 
-from invariant_hedging.modules.diagnostics import (
+from invariant_hedging.diagnostics.invariance import (
     ISINormalizationConfig,
     compute_C1_global_stability,
     compute_C2_mechanistic_stability,

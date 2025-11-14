@@ -7,7 +7,7 @@ import math
 import pytest
 import torch
 
-from invariant_hedging.modules.diagnostics import compute_VR
+from invariant_hedging.diagnostics.invariance import compute_VR
 
 
 def test_vr_empty_mapping_returns_nan(float_tolerance: Dict[str, float]) -> None:

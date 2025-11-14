@@ -1,8 +1,0 @@
-name: hedger_mlp
-input_dim: 5
-hidden_dims: [128, 128, 64]
-activation: relu
-dropout: 0.0
-output_dim: 1
-bounded_output: true
-output_scale: 1.0

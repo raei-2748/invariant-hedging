@@ -7,7 +7,7 @@ import pytest
 from hydra import compose, initialize_config_dir
 
 from invariant_hedging import get_repo_root
-from invariant_hedging.core.engine import run as run_training
+from invariant_hedging.training.engine import run as run_training
 
 CONFIG_DIR = get_repo_root() / "configs"
 

@@ -1,7 +1,0 @@
-metrics: [cvar_95, mean_pnl, turnover, max_drawdown, sharpe]
-seeds_file: seed_list.txt
-num_episodes: ${data.test_episodes}
-confidence: 0.95
-stress_tests:
-  spreads: [0.002, 0.01]
-  liquidity: [baseline, stressed]

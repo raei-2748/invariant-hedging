@@ -1,6 +1,6 @@
 import torch
 
-from invariant_hedging.core.losses import env_variance, normalized_head_grads, pairwise_cosine
+from invariant_hedging.training.losses import env_variance, normalized_head_grads, pairwise_cosine
 
 
 def test_normalized_head_grads_preserve_shape_and_scale():

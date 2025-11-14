@@ -121,7 +121,7 @@ def build_grid(methods: Sequence[str], seeds: Sequence[int], eval_windows: Seque
 
 
 def _resolve_provenance_functions() -> Tuple[callable, callable]:
-    from invariant_hedging.evaluation.reporting.paper_provenance import collect_provenance, write_provenance
+    from invariant_hedging.reporting.core.paper_provenance import collect_provenance, write_provenance
 
     return collect_provenance, write_provenance
 

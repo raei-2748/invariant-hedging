@@ -1,6 +1,6 @@
 import torch
 
-from invariant_hedging.core.losses import CVaRResult, bootstrap_cvar_ci, cvar_from_pnl, cvar_loss
+from invariant_hedging.training.losses import CVaRResult, bootstrap_cvar_ci, cvar_from_pnl, cvar_loss
 
 
 def test_cvar_matches_numpy_quantile():

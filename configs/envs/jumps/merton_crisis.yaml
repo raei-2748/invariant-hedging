@@ -1,4 +1,0 @@
-description: Crisis jump-diffusion stress with elevated jump intensity
-jump_intensity: 0.5
-jump_mean: -0.1
-jump_std: 0.2

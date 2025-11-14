@@ -2,7 +2,7 @@ import os
 
 import torch
 
-from invariant_hedging.core.utils import seed
+from invariant_hedging.runtime import seed
 
 
 def test_seed_everything_deterministic():

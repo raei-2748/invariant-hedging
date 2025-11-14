@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from invariant_hedging.core.infra.tables import (
+from invariant_hedging.reporting.tables import (
     maybe_filter_regimes,
     maybe_filter_seeds,
     read_alignment_head,

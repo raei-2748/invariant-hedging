@@ -12,7 +12,7 @@ from hydra import compose, initialize_config_dir
 from omegaconf import DictConfig
 
 from invariant_hedging import get_repo_root
-from invariant_hedging.core.engine import run as train_run
+from invariant_hedging.training.engine import run as train_run
 
 CONFIG_DIR = get_repo_root() / "configs"
 RUN_ROOT = get_repo_root() / "runs/test_smoke"

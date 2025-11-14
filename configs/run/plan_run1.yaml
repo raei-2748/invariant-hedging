@@ -1,5 +1,0 @@
-environments:
-  train: [synthetic_low, synthetic_med, real_2017_2019]
-  val: [synthetic_high]
-real_2017_2019:
-  source: ${real_data_anchor.file_train}

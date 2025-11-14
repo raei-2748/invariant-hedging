@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from invariant_hedging.modules.diagnostics import safe_eval_metric
+from invariant_hedging.diagnostics.invariance import safe_eval_metric
 
 
 def test_safe_eval_metric_handles_missing_key() -> None:
