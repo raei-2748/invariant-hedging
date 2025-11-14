@@ -1,12 +1,10 @@
-name: Pipeline Smoke
+name: Manual Full Paper
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '0 6 * * *'
 
 jobs:
-  smoke:
+  full-paper:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,18 +17,9 @@ jobs:
           pip install -e .[dev]
       - name: Fetch data
         run: bash tools/fetch_data.sh --data-dir data
-      - name: Run smoke paper pipeline
+      - name: Full paper pipeline
         env:
           WANDB_MODE: offline
         run: |
-          make paper SMOKE=1
+          make paper SMOKE=0
           make report-paper
-      - name: Upload reports bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: smoke-reports
-          path: |
-            reports/
-            runs/
-            outputs/
-          if-no-files-found: ignore
