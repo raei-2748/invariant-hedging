@@ -87,7 +87,7 @@ After `make report-paper`, the repository contains a complete set of diagnostics
 
 - **Fig. 3 (Capital efficiency frontier)**
   ```bash
-  python -m src.visualization.plot_capital_frontier --run_dir "$(ls -td reports/paper/* | head -1)" --out_dir reports/figures/capital_frontier
+  python -m invariant_hedging.visualization.plot_capital_frontier --run_dir "$(ls -td reports/paper/* | head -1)" --out_dir reports/figures/capital_frontier
   ```
   Produces the capital efficiency curve reported in §6. Runtime: ≈2 min CPU, 3 GB RAM.
 
@@ -110,7 +110,7 @@ All scripts respect deterministic seeds embedded in the configs (`seed_list.txt`
 | Figure/Table | Command | Notes |
 |---------------|----------|-------|
 | Fig. 2 (IG vs WG) | `make plot-ig-wg` | Requires `make report-paper`; ~1 min; 2 GB RAM |
-| Fig. 3 (Capital frontier) | `python -m src.visualization.plot_capital_frontier --run_dir "$(ls -td reports/paper/* | head -1)" --out_dir reports/figures/capital_frontier` | Ensure `make report-paper`; ~2 min |
+| Fig. 3 (Capital frontier) | `python -m invariant_hedging.visualization.plot_capital_frontier --run_dir "$(ls -td reports/paper/* | head -1)" --out_dir reports/figures/capital_frontier` | Ensure `make report-paper`; ~2 min |
 | Table 3 (Crisis robustness) | `make eval-crisis` | ≈15 min CPU; produces JSON summary |
 | Appendix A (Stress diagnostics) | `python tools/scripts/aggregate.py --config configs/report/default.yaml` | Requires full seed sweep |
 

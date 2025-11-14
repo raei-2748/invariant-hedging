@@ -78,34 +78,39 @@ Pro/Max for the full 30-seed sweep, though individual ops may still fall back to
 ```
 invariant-hedging/
 ├── src/
-│   ├── core/            # Optimisation engine, solvers, and infrastructure
-│   ├── modules/         # Data modules, environments, baselines, simulators
-│   ├── evaluation/      # Crisis diagnostics, reporting, provenance utilities
-│   ├── visualization/   # Plotting helpers used by the manuscript
-│   └── legacy/          # Archived experiments kept for provenance only
-├── experiments/         # Thin Hydra entrypoints for training & evaluation
-├── configs/             # Versioned Hydra configs for experiments and reports
-├── reports/             # Generated paper artefacts and analysis outputs
-├── tests/               # Lightweight unit and smoke tests (`pytest -m "not heavy"`)
-├── docs/                # Extended documentation and reproduction notes
-└── archive/             # Provenance archives and paper changelog
+│   └── invariant_hedging/
+│       ├── cli/            # Hydra entrypoints for train/eval/report commands
+│       ├── data/           # Loaders, feature engineering, markets, simulators
+│       ├── diagnostics/    # Invariance metrics, crisis diagnostics, utilities
+│       ├── evaluation/     # Evaluation harnesses and baselines
+│       ├── hirm/           # Mathematical definitions and documentation assets
+│       ├── reporting/      # Aggregation, provenance, and LaTeX/plot writers
+│       ├── runtime/        # Device helpers, logging, checkpoint IO, seeds
+│       ├── training/       # Objectives, engines, optimizers, architectures
+│       └── visualization/  # Plotting CLIs that consume finalized report assets
+├── experiments/            # Thin CLI shims that forward to the new entrypoints
+├── configs/                # Versioned Hydra configs for experiments and reports
+├── reports/                # Generated paper artefacts and analysis outputs
+├── tests/                  # Lightweight unit and smoke tests (`pytest -m "not heavy"`)
+├── docs/                   # Extended documentation and reproduction notes
+└── archive/                # Provenance archives and paper changelog
 ```
 
 ### Paper → Code mapping
 
 | Paper section | Code modules |
 | --- | --- |
-| §4 Invariance objectives | `src/core/losses.py`, `src/modules/head_invariance.py` |
-| §5 Robust diagnostics | `src/modules/diagnostics.py`, `src/evaluation/analyze_diagnostics.py` |
-| §6 Efficiency & crisis evaluation | `src/evaluation/evaluate_crisis.py`, `src/evaluation/reporting/` |
-| Appendix (simulators & baselines) | `src/modules/sim/`, `src/modules/markets/`, `src/modules/baselines/` |
+| §4 Invariance objectives | `src/invariant_hedging/training/losses.py`, `src/invariant_hedging/training/head_invariance.py` |
+| §5 Robust diagnostics | `src/invariant_hedging/diagnostics/metrics.py`, `src/invariant_hedging/evaluation/analyze_diagnostics.py` |
+| §6 Efficiency & crisis evaluation | `src/invariant_hedging/evaluation/crisis.py`, `src/invariant_hedging/reporting/` |
+| Appendix (simulators & baselines) | `src/invariant_hedging/data/sim/`, `src/invariant_hedging/data/markets/`, `src/invariant_hedging/evaluation/baselines/` |
 
 #### Figure & table commands
 
 | Figure / Table | Command |
 | --- | --- |
 | Fig. 2 (Invariant gap vs. worst-group) | `make plot-ig-wg` (consumes `reports/paper/manifests/figures.yaml`) |
-| Fig. 3 (Capital efficiency frontier) | `python -m src.visualization.plot_capital_frontier --run_dir "$(ls -td reports/paper/* | head -1)" --out_dir reports/figures/capital_frontier` |
+| Fig. 3 (Capital efficiency frontier) | `python -m invariant_hedging.visualization.plot_capital_frontier --run_dir "$(ls -td reports/paper/* | head -1)" --out_dir reports/figures/capital_frontier` |
 | Table 3 (Crisis robustness) | `make eval-crisis` (uses `configs/eval/robustness.yaml`) |
 | Appendix diagnostics package | `python tools/scripts/aggregate.py --config configs/report/default.yaml` |
 
@@ -136,18 +141,14 @@ See [docs/REPRODUCE.md](docs/REPRODUCE.md) for hardware notes, runtime expectati
 
 ## Continuous integration & tests
 
-Two blocking workflows gate pull requests:
+A single `.github/workflows/ci.yml` workflow now gates every pull request:
 
-- `.github/workflows/lint.yml` (`Lint`) installs the package via `pip install -r requirements-lock.txt && pip install -e .[dev]`
-  and runs `ruff check` across `invariant_hedging/`, `tests/`, `tools/`, and `experiments/`.
-- `.github/workflows/tests.yml` (`Tests`) provisions the same environment, executes `pytest -m "not heavy" --maxfail=1`, and
-  reruns the deterministic `make smoke-check` harness with tolerant comparisons.
+- `lint-and-test` runs on pull requests and non-`main` pushes, installs the package from the lockfile, runs `ruff check --no-fix --output-format=github`, and executes `pytest -m "not heavy" --maxfail=1 --disable-warnings`.
+- `smoke-paper` fans out on pushes to `main` once the lint job succeeds and executes the deterministic smoke paper pipeline: `bash tools/fetch_data.sh --data-dir data`, `make paper SMOKE=1`, and `make report-paper`.
 
-A separate `.github/workflows/pipeline-smoke.yml` workflow runs `make paper SMOKE=1` and `make report-paper` on a nightly
-schedule (and via `workflow_dispatch`) to guard the end-to-end pipeline without blocking day-to-day iteration.
+Nightly, the `.github/workflows/pipeline-smoke.yml` workflow mirrors the smoke paper pipeline (plus artifact upload) to guard end-to-end reproducibility without blocking PRs. When a full reproduction is required on demand, trigger `.github/workflows/manual_full_paper.yml`, which stages data and runs `make paper SMOKE=0` + `make report-paper`.
 
-Local developers can mirror the blocking checks with `make tests` or `pytest -m "not heavy"`; heavy calibration suites remain
-isolated behind `@pytest.mark.heavy`.
+Local developers can mirror the blocking checks with `make tests` or `pytest -m "not heavy"`; heavy calibration suites remain isolated behind `@pytest.mark.heavy`.
 
 ## Data summary
 

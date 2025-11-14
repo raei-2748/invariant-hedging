@@ -27,3 +27,19 @@
 - Updated the Makefile and `experiments/run_{train,diagnostics}.py` to drive the new CLI modules, and repointed every Hydra config `_target_` consumer to the `invariant_hedging` package paths.
 - Deleted previously tracked report artifacts under `reports/artifacts/`, replaced the directory with a `.gitkeep`, and added ignore rules so regenerated paper runs remain untracked.
 - Rebuilt `tools/run_of_record.sh` to export `PYTHONPATH`, fix the MPS autodetection heredoc, and ensure the inline CSV writer runs without heredoc warnings.
+
+## PHASE 4 – CI Rebuild & Finalization
+
+- Unified the lint and test workflows into `.github/workflows/ci.yml` with `lint-and-test` (ruff + pytest) and `smoke-paper` (deterministic smoke paper) jobs.
+- Re-pointed the nightly `.github/workflows/pipeline-smoke.yml` to the new smoke pipeline commands, including explicit data staging.
+- Added `.github/workflows/manual_full_paper.yml` so maintainers can manually trigger the full reproduction pipeline.
+- Updated the README, docs/REPRODUCE.md, and docs/figures.md to reflect the canonical `src/invariant_hedging/` structure and new CLI imports.
+- Rewired test imports to consume `invariant_hedging.reporting` directly and removed the last `evaluation.reporting` compatibility references.
+- Ensured the Makefile, tools scripts, and Hydra configs only reference the unified package namespace.
+
+## Cleanup Complete — Ready for Merge
+
+- CI rebuilt with the unified workflow suite.
+- Documentation aligned with the post-refactor package layout.
+- Smoke-paper pipeline validated alongside `pytest -m "not heavy"`.
+- Repository stabilized for the final merge.
